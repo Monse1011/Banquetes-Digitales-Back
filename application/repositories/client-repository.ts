@@ -6,4 +6,6 @@ export interface ClientRepository {
   create(client: Client): Promise<Client>;
 
   update(client: Client): Promise<Client>;
+  findById(id: number): Promise<Client | null>;
+  findByIds(ids: number[]): Promise<Client[]>;
 }

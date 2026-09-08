@@ -36,4 +36,16 @@ export class InMemoryClientRepository implements ClientRepository {
 
     return client;
   }
+
+  async findById(id: number): Promise<Client | null> {
+    return this.clients.find(
+      client => client.clientId === id
+    ) ?? null;
+  }
+
+  async findByIds(ids: number[]): Promise<Client[]> {
+    return this.clients.filter(
+      client => client.clientId !== undefined && ids.includes(client.clientId)
+    );
+  }
 }
