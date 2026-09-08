@@ -5,7 +5,7 @@ class PostgresUserRepository {
     async findByEmployeeId(idEmployee) {
         const result = await pool.query(`
             SELECT id_user, id_employee, full_name, email, password_hash,
-                   role, status, creation_date, last_access
+                    role, status, creation_date, last_access
             FROM users WHERE id_employee = $1`, [idEmployee]);
         return result.rows[0] ? new User(result.rows[0]) : null;
     }
@@ -13,7 +13,7 @@ class PostgresUserRepository {
     async findById(idUser) {
         const result = await pool.query(`
             SELECT id_user, id_employee, full_name, email, password_hash,
-                   role, status, creation_date, last_access
+                    role, status, creation_date, last_access
             FROM users WHERE id_user = $1`, [idUser]);
         return result.rows[0] ? new User(result.rows[0]) : null;
     }
@@ -21,7 +21,7 @@ class PostgresUserRepository {
     async findByEmail(email) {
         const result = await pool.query(`
             SELECT id_user, id_employee, full_name, email, password_hash,
-                   role, status, creation_date, last_access
+                    role, status, creation_date, last_access
             FROM users WHERE email = $1`, [email]);
         return result.rows[0] ? new User(result.rows[0]) : null;
     }

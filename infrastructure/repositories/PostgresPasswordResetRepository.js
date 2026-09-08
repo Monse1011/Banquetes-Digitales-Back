@@ -12,13 +12,13 @@ class PostgresPasswordResetRepository {
     async findValidToken(token) {
         const result = await pool.query(`
             SELECT prt.id_token, prt.id_user, prt.token,
-                   prt.expiration_date, prt.used,
-                   u.id_employee, u.full_name, u.email, u.role, u.status
+                    prt.expiration_date, prt.used,
+                    u.id_employee, u.full_name, u.email, u.role, u.status
             FROM password_reset_tokens prt
             INNER JOIN users u ON u.id_user = prt.id_user
             WHERE prt.token = $1
-              AND prt.used = FALSE
-              AND prt.expiration_date > NOW()`, [token]);
+                AND prt.used = FALSE
+                AND prt.expiration_date > NOW()`, [token]);
         return result.rows[0] ? new PasswordResetToken(result.rows[0]) : null;
     }
 

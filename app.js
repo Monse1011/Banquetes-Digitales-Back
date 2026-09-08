@@ -15,7 +15,6 @@ const PasswordResetController = require('./presentation/controller/PasswordReset
 const createAuthMiddleware = require('./middleware/authMiddleware');
 const createAuthRoutes = require('./routes/authRoutes');
 const createPasswordResetRoutes = require('./routes/passwordResetRoutes');
-const createTestRoutes = require('./routes/testRoutes');
 const createRateLimit = require('./middleware/rateLimit');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -65,7 +64,5 @@ app.get('/api/health', async (req, res) => {
 
 app.use('/api/auth', authRateLimit, createAuthRoutes(authController, authMiddleware));
 app.use('/api/auth', resetRateLimit, createPasswordResetRoutes(passwordResetController));
-
-app.use('/api/test', createTestRoutes(authMiddleware));
 
 module.exports = app;
