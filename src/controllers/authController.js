@@ -45,7 +45,7 @@ class AuthController {
                 employeeId,
                 currentPassword,
                 newPassword
-            } = req.body;
+            } = req.body || {};
 
             if (!employeeId || !currentPassword || !newPassword) {
                 return res.status(400).json({
