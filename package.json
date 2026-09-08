@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node server.js",
+    "test:user-repository": "node scripts/test-user-repository.js",
+    "test:auth": "node scripts/test-auth-service.js",
+    "test:architecture": "node scripts/test-architecture.js"
   },
   "repository": {
     "type": "git",
