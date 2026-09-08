@@ -50,6 +50,12 @@ describe('HTTP API', () => {
     );
     process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
 
+    const documentationResponse = await request(app).get('/api-docs.json');
+    expect(documentationResponse.status).toBe(200);
+    expect(documentationResponse.body.openapi).toBe('3.0.3');
+    expect(documentationResponse.body.paths['/api/admin/requests/{id}'].patch)
+      .toBeDefined();
+
     const createResponse = await request(app)
       .post('/api/client/request')
       .send({

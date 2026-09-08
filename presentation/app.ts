@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
+import swaggerUi from 'swagger-ui-express';
 import { ServiceRepository } from '../application/repositories/service-repository';
 import { CreateReservationRequestUseCase } from '../application/use-cases/reservation-request/create-reservation-request-use-case';
 import { ApproveReservationRequestUseCase } from '../application/use-cases/reservation-request/approve-reservation-request-use-case';
@@ -10,6 +11,7 @@ import {
   ReservationRequestControllerDependencies
 } from './controller/reservation-request-controller';
 import { ServiceController } from './controller/service-controller';
+import { openApiDocument } from './openapi';
 
 export interface AppDependencies extends ReservationRequestControllerDependencies {
   serviceRepository: ServiceRepository;
@@ -21,6 +23,10 @@ export function createApp(dependencies: AppDependencies) {
   const serviceController = new ServiceController(dependencies.serviceRepository);
 
   app.use(express.json());
+  app.get('/api-docs.json', (_request, response) => {
+    response.json(openApiDocument);
+  });
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
   app.post('/api/client/request', (request, response, next) => {
     reservationRequestController.create(request, response).catch(next);
