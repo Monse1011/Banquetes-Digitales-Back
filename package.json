@@ -1,0 +1,29 @@
+{
+  "name": "banquetes-digitales-back",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Monse1011/Banquetes-Digitales-Back.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Monse1011/Banquetes-Digitales-Back/issues"
+  },
+  "homepage": "https://github.com/Monse1011/Banquetes-Digitales-Back#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.0.1",
+    "pg": "^8.23.0"
+  }
+}
