@@ -1,6 +1,6 @@
-// application/dto/create-client-request-dto.ts
+// application/dto/create-reservation-request-dto.ts
 
-export interface CreateClientRequestDto {
+export interface CreateReservationRequestDto {
   client_full_name: string;
   email: string;
   phone: string;

@@ -1,6 +1,6 @@
-import { RequestStatus } from '../enums/request-status';
+import { ReservationRequestStatus } from '../enums/request-status';
 
-export class ClientRequest {
+export class ReservationRequest {
   constructor(
     public readonly id: number | undefined,
     public readonly folio: string,
@@ -9,7 +9,7 @@ export class ClientRequest {
     public readonly eventDateTime: Date,
     public readonly guestCount: number,
     public readonly eventAddress: string,
-    public status: RequestStatus,
+    public status: ReservationRequestStatus,
     public readonly requestDate: Date,
     public updateDate: Date,
     public readonly servicesIds: number[]

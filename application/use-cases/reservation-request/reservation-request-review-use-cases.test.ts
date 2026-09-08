@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { Client } from '../../../domain/entities/client';
-import { ClientRequest } from '../../../domain/entities/client-request';
+import { ReservationRequest } from '../../../domain/entities/reservation-request';
 import { Service } from '../../../domain/entities/service';
-import { RequestStatus } from '../../../domain/enums/request-status';
+import { ReservationRequestStatus } from '../../../domain/enums/request-status';
 import { InMemoryClientRepository } from '../../../infrastructure/repositories/in-memory-client-repository';
 import { InMemoryReservationRequestRepository } from '../../../infrastructure/repositories/in-memory-reservation-request-repository';
 import { ServiceRepository } from '../../repositories/service-repository';
@@ -17,6 +17,7 @@ describe('Reservation request review use cases', () => {
     new Service(2, 'Decoracion', null, 'Activo')
   ];
   const serviceRepository: ServiceRepository = {
+    findAll: async () => services,
     findByIds: async ids => services.filter(service => ids.includes(service.id))
   };
 
@@ -33,7 +34,7 @@ describe('Reservation request review use cases', () => {
     );
     const reservationRepository = new InMemoryReservationRequestRepository();
     const request = await reservationRepository.create(
-      new ClientRequest(
+      new ReservationRequest(
         undefined,
         'BD-2026-00001',
         client.clientId!,
@@ -41,7 +42,7 @@ describe('Reservation request review use cases', () => {
         new Date('2026-11-20T19:00:00Z'),
         120,
         'Av. Reforma 123',
-        RequestStatus.Pending,
+        ReservationRequestStatus.Pending,
         new Date('2026-08-01T12:00:00Z'),
         new Date('2026-08-01T12:00:00Z'),
         [1, 2]
@@ -68,7 +69,7 @@ describe('Reservation request review use cases', () => {
         client_email: 'ana@example.com',
         requested_date: '2026-11-20T19:00:00.000Z',
         selected_services: ['Banquete formal', 'Decoracion'],
-        status: RequestStatus.Pending
+        status: ReservationRequestStatus.Pending
       }
     ]);
     expect(result.pagination.total_records).toBe(1);
@@ -96,8 +97,8 @@ describe('Reservation request review use cases', () => {
 
     const result = await useCase.execute(request.id!);
 
-    expect(result.status).toBe(RequestStatus.Approved);
+    expect(result.status).toBe(ReservationRequestStatus.Approved);
     expect((await reservationRepository.findById(request.id!))!.status)
-      .toBe(RequestStatus.Approved);
+      .toBe(ReservationRequestStatus.Approved);
   });
 });

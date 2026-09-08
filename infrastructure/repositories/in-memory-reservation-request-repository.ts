@@ -1,4 +1,4 @@
-import { ClientRequest } from '../../domain/entities/client-request';
+import { ReservationRequest } from '../../domain/entities/reservation-request';
 import { ReservationRequestRepository } from '../../application/repositories/reservation-request-repository';
 import { ReservationRequestFilters } from '../../application/dto/reservation-request-filters-dto';
 import { ReservationRequestSort, ReservationRequestSortField } from '../../application/dto/reservation-request-sort';
@@ -6,11 +6,11 @@ import { ReservationRequestSort, ReservationRequestSortField } from '../../appli
 export class InMemoryReservationRequestRepository
   implements ReservationRequestRepository {
 
-  private requests: ClientRequest[] = [];
+  private requests: ReservationRequest[] = [];
   private nextId = 1;
 
-  async create(request: ClientRequest): Promise<ClientRequest> {
-    const createdRequest = new ClientRequest(
+  async create(request: ReservationRequest): Promise<ReservationRequest> {
+    const createdRequest = new ReservationRequest(
       this.nextId++,
       request.folio,
       request.clientId,
@@ -29,11 +29,11 @@ export class InMemoryReservationRequestRepository
     return createdRequest;
   }
 
-  async findById(id: number): Promise<ClientRequest | null> {
+  async findById(id: number): Promise<ReservationRequest | null> {
     return this.requests.find(request => request.id === id) ?? null;
   }
 
-  async update(request: ClientRequest): Promise<ClientRequest> {
+  async update(request: ReservationRequest): Promise<ReservationRequest> {
     const index = this.requests.findIndex(
       existingRequest => existingRequest.id === request.id
     );
@@ -52,7 +52,7 @@ export class InMemoryReservationRequestRepository
     sort: ReservationRequestSort,
     page: number,
     perPage: number
-  ): Promise<{ requests: ClientRequest[]; totalRecords: number }> {
+  ): Promise<{ requests: ReservationRequest[]; totalRecords: number }> {
     const filteredRequests = this.requests.filter(request => {
       if (filters.status && request.status !== filters.status) {
         return false;
@@ -85,7 +85,7 @@ export class InMemoryReservationRequestRepository
   }
 
   private getSortValue(
-    request: ClientRequest,
+    request: ReservationRequest,
     field: ReservationRequestSortField
   ): string | number {
     switch (field) {

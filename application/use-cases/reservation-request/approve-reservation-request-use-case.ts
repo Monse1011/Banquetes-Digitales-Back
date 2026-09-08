@@ -1,5 +1,5 @@
 import { ApproveReservationRequestResponseDto } from '../../dto/approve-reservation-request-response-dto';
-import { RequestStatus } from '../../../domain/enums/request-status';
+import { ReservationRequestStatus } from '../../../domain/enums/request-status';
 import { ReservationRequestRepository } from '../../repositories/reservation-request-repository';
 
 export class ApproveReservationRequestUseCase {
@@ -14,7 +14,7 @@ export class ApproveReservationRequestUseCase {
       throw new Error('Reservation request not found');
     }
 
-    request.status = RequestStatus.Approved;
+    request.status = ReservationRequestStatus.Approved;
     request.updateDate = new Date();
     const updatedRequest = await this.reservationRequestRepository.update(request);
 

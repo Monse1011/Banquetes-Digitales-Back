@@ -4,7 +4,11 @@ import { ServiceRepository } from '../../application/repositories/service-reposi
 export class InMemoryServiceRepository
   implements ServiceRepository {
 
-  private readonly services: Service[] = [];
+  constructor(private readonly services: Service[] = []) {}
+
+  async findAll(): Promise<Service[]> {
+    return this.services;
+  }
 
   async findByIds(ids: number[]): Promise<Service[]> {
     return this.services.filter(
