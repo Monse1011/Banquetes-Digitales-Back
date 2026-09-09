@@ -86,6 +86,26 @@ const openApiDocument = {
               },
             },
           },
+          422: {
+            description: "Validation error, one message per invalid field",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    errors: {
+                      type: "object",
+                      description:
+                        "Keys match the request body fields (e.g. client_full_name, email, phone, event_date_time, guest_count, event_address, services_ids)",
+                      additionalProperties: {
+                        type: "string",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },

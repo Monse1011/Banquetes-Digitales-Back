@@ -116,6 +116,31 @@ describe("App", () => {
       expect(response.body.data).toHaveProperty("folio");
       expect(response.body.data.folio).toMatch(/^BD-\d{4}-\d{5}$/);
     });
+
+    it("should return one error per invalid field", async () => {
+      const response = await request(app).post("/api/client/request").send({
+        client_full_name: "John123",
+        email: "not-an-email",
+        phone: "123",
+        event_date_time: "2000-01-01T10:00:00.000Z",
+        guest_count: 0,
+        event_address: "",
+        services_ids: [],
+      });
+
+      expect(response.status).toBe(422);
+      expect(response.body.errors).toEqual(
+        expect.objectContaining({
+          client_full_name: expect.any(String),
+          email: expect.any(String),
+          phone: expect.any(String),
+          event_date_time: expect.any(String),
+          guest_count: expect.any(String),
+          event_address: expect.any(String),
+          services_ids: expect.any(String),
+        })
+      );
+    });
   });
 
   describe("GET /api/client/services", () => {
