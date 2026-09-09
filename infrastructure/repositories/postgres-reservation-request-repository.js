@@ -27,7 +27,7 @@ class PostgresReservationRequestRepository {
       const row = result.rows[0];
 
       if (!row) {
-        throw new Error('Reservation request could not be created');
+        throw new Error("Reservation request could not be created");
       }
 
       const createdRequest = this.toEntity(row);
@@ -48,7 +48,7 @@ class PostgresReservationRequestRepository {
         request.servicesIds
       );
     } catch (error) {
-      await connection.query('ROLLBACK');
+      await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
@@ -85,7 +85,7 @@ class PostgresReservationRequestRepository {
       );
 
       if (!result.rows[0]) {
-        throw new Error('Reservation request not found');
+        throw new Error("Reservation request not found");
       }
 
       await this.replaceServices(connection, request.id, request.servicesIds);
@@ -106,7 +106,7 @@ class PostgresReservationRequestRepository {
         request.servicesIds
       );
     } catch (error) {
-      await connection.query('ROLLBACK');
+      await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
@@ -142,7 +142,7 @@ class PostgresReservationRequestRepository {
 
     const offset = (page - 1) * perPage;
     const sortColumn = this.sortColumn(sort.field);
-    const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+    const direction = sort.direction === "desc" ? "DESC" : "ASC";
     const dataParameters = [...parameters, perPage, offset];
     const result = await this.pool.query(
       this.baseSelect() +
@@ -154,8 +154,8 @@ class PostgresReservationRequestRepository {
     );
 
     return {
-      requests: result.rows.map(row => this.toEntity(row)),
-      totalRecords: countResult.rows[0]?.total_records ?? 0
+      requests: result.rows.map((row) => this.toEntity(row)),
+      totalRecords: countResult.rows[0]?.total_records ?? 0,
     };
   }
 
@@ -184,7 +184,7 @@ class PostgresReservationRequestRepository {
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.updateDate
+      request.updateDate,
     ];
   }
 
@@ -243,11 +243,11 @@ class PostgresReservationRequestRepository {
   sortColumn(field) {
     switch (field) {
       case ReservationRequestSortField.ClientName:
-        return 'c.full_name';
+        return "c.full_name";
       case ReservationRequestSortField.Status:
-        return 'rr.status';
+        return "rr.status";
       case ReservationRequestSortField.EventDate:
-        return 'rr.event_date';
+        return "rr.event_date";
     }
   }
 }

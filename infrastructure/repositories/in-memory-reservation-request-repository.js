@@ -36,7 +36,7 @@ class InMemoryReservationRequestRepository {
     );
 
     if (index === -1) {
-      throw new Error('Reservation request not found');
+      throw new Error("Reservation request not found");
     }
 
     this.requests[index] = request;
@@ -65,14 +65,14 @@ class InMemoryReservationRequestRepository {
       const rightValue = this.getSortValue(right, sort.field);
       const comparison = leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
 
-      return sort.direction === 'asc' ? comparison : -comparison;
+      return sort.direction === "asc" ? comparison : -comparison;
     });
 
     const start = (page - 1) * perPage;
 
     return {
       requests: sortedRequests.slice(start, start + perPage),
-      totalRecords: filteredRequests.length
+      totalRecords: filteredRequests.length,
     };
   }
 

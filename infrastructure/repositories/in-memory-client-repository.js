@@ -25,11 +25,11 @@ class InMemoryClientRepository {
 
   async update(client) {
     const index = this.clients.findIndex(
-      existingClient => existingClient.clientId === client.clientId
+      (existingClient) => existingClient.clientId === client.clientId
     );
 
     if (index === -1) {
-      throw new Error('Client not found');
+      throw new Error("Client not found");
     }
 
     this.clients[index] = client;
@@ -42,7 +42,7 @@ class InMemoryClientRepository {
 
   async findByIds(ids) {
     return this.clients.filter(
-      client => client.clientId !== undefined && ids.includes(client.clientId)
+      (client) => client.clientId !== undefined && ids.includes(client.clientId)
     );
   }
 }

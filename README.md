@@ -151,3 +151,6 @@ mantienen `reservations_request` y `request_services` dentro de una transacción
 ## Licencia
 
 ISC
+El arranque actual continúa usando in-memory; para producción se deben construir
+los casos de uso con los repositorios PostgreSQL y cerrar el pool durante el
+apagado del proceso.

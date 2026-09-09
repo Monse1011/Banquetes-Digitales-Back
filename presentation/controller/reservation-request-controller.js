@@ -14,7 +14,7 @@ class ReservationRequestController {
   async list(request, response) {
     const result = await this.dependencies.getReservationRequestsUseCase.execute({
       page: this.parsePositiveInteger(request.query.page, 1),
-      perPage: this.parsePositiveInteger(request.query.per_page, 10)
+      perPage: this.parsePositiveInteger(request.query.per_page, 10),
     });
 
     response.json(result);
@@ -33,17 +33,17 @@ class ReservationRequestController {
         guest_count: result.guest_count,
         requested_date: result.event_date_time,
         submission_date: result.request_date,
-        selected_services: result.services.map(service => service.name),
-        status: result.status
-      }
+        selected_services: result.services.map((service) => service.name),
+        status: result.status,
+      },
     });
   }
 
   async approve(request, response) {
     const status = request.body?.status;
 
-    if (status !== 'Aprobado' && status !== 'Aprobada') {
-      response.status(400).json({ error: 'Status must be Aprobado' });
+    if (status !== "Aprobado" && status !== "Aprobada") {
+      response.status(400).json({ error: "Status must be Aprobado" });
       return;
     }
 
@@ -58,7 +58,7 @@ class ReservationRequestController {
     const id = Number(typeof value === 'string' ? value : NaN);
 
     if (!Number.isInteger(id) || id < 1) {
-      throw new Error('Invalid reservation request id');
+      throw new Error("Invalid reservation request id");
     }
 
     return id;

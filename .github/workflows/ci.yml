@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+      - "feature/**"
+
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check ESLint configuration
+        run: |
+          echo "=== Current commit ==="
+          git log -1 --oneline
+
+          echo "=== ESLint configuration ==="
+          cat .eslintrc.cjs
+
+          echo "=== Effective quotes rule ==="
+          npx eslint --print-config infrastructure/repositories/postgres-reservation-request-repository.ts | grep -A5 '"quotes"'
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check Prettier
+        run: npm run format:check
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Check TypeScript
+        run: npx tsc --noEmit

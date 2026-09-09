@@ -27,7 +27,7 @@ class PostgresClientRepository {
     const row = result.rows[0];
 
     if (!row) {
-      throw new Error('Client could not be created');
+      throw new Error("Client could not be created");
     }
 
     return this.toEntity(row);
@@ -43,7 +43,7 @@ class PostgresClientRepository {
     );
 
     if (!result.rows[0]) {
-      throw new Error('Client not found');
+      throw new Error("Client not found");
     }
 
     return this.toEntity(result.rows[0]);
@@ -70,7 +70,7 @@ class PostgresClientRepository {
       [ids]
     );
 
-    return result.rows.map(row => this.toEntity(row));
+    return result.rows.map((row) => this.toEntity(row));
   }
 
   toEntity(row) {
