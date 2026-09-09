@@ -1,5 +1,5 @@
-import { Request, Response } from 'express';
-import { ServiceRepository } from '../../application/repositories/service-repository';
+import { Request, Response } from "express";
+import { ServiceRepository } from "../../application/repositories/service-repository";
 
 export class ServiceController {
   constructor(private readonly serviceRepository: ServiceRepository) {}
@@ -8,10 +8,10 @@ export class ServiceController {
     const services = await this.serviceRepository.findAll();
 
     response.json({
-      data: services.map(service => ({
+      data: services.map((service) => ({
         id: service.id,
-        nombre: service.name
-      }))
+        nombre: service.name,
+      })),
     });
   }
 }

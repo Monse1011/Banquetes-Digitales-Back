@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
-import { ServiceRepository } from '../../application/repositories/service-repository';
-import { Service } from '../../domain/entities/service';
+import { Pool } from "pg";
+import { ServiceRepository } from "../../application/repositories/service-repository";
+import { Service } from "../../domain/entities/service";
 
 interface ServiceRow {
   id_service: number;
@@ -17,10 +17,10 @@ export class PostgresServiceRepository implements ServiceRepository {
       `SELECT id_service, name, description, status
        FROM services
        WHERE status = 'activo'
-       ORDER BY id_service`
+       ORDER BY id_service`,
     );
 
-    return result.rows.map(row => this.toEntity(row));
+    return result.rows.map((row) => this.toEntity(row));
   }
 
   async findByIds(ids: number[]): Promise<Service[]> {
@@ -30,10 +30,10 @@ export class PostgresServiceRepository implements ServiceRepository {
       `SELECT id_service, name, description, status
        FROM services
        WHERE id_service = ANY($1::integer[])`,
-      [ids]
+      [ids],
     );
 
-    return result.rows.map(row => this.toEntity(row));
+    return result.rows.map((row) => this.toEntity(row));
   }
 
   private toEntity(row: ServiceRow): Service {

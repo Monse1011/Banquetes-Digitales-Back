@@ -1,4 +1,4 @@
-import { Pool, PoolConfig } from 'pg';
+import { Pool, PoolConfig } from "pg";
 
 export function createPostgresPool(overrides: PoolConfig = {}): Pool {
   const config: PoolConfig = {};

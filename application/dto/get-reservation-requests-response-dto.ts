@@ -1,4 +1,4 @@
-import { ReservationRequestSummaryDto } from './reservation-request-summary-dto';
+import { ReservationRequestSummaryDto } from "./reservation-request-summary-dto";
 
 export interface GetReservationRequestsResponseDto {
   data: ReservationRequestSummaryDto[];

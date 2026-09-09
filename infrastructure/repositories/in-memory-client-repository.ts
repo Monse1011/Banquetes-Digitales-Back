@@ -1,12 +1,12 @@
-import { Client } from '../../domain/entities/client';
-import { ClientRepository } from '../../application/repositories/client-repository';
+import { Client } from "../../domain/entities/client";
+import { ClientRepository } from "../../application/repositories/client-repository";
 
 export class InMemoryClientRepository implements ClientRepository {
   private clients: Client[] = [];
   private nextId = 1;
 
   async findByEmail(email: string): Promise<Client | null> {
-    return this.clients.find(client => client.email === email) ?? null;
+    return this.clients.find((client) => client.email === email) ?? null;
   }
 
   async create(client: Client): Promise<Client> {
@@ -15,7 +15,7 @@ export class InMemoryClientRepository implements ClientRepository {
       client.fullName,
       client.email,
       client.phone,
-      client.registrationDate
+      client.registrationDate,
     );
 
     this.clients.push(createdClient);
@@ -25,11 +25,11 @@ export class InMemoryClientRepository implements ClientRepository {
 
   async update(client: Client): Promise<Client> {
     const index = this.clients.findIndex(
-      existingClient => existingClient.clientId === client.clientId
+      (existingClient) => existingClient.clientId === client.clientId,
     );
 
     if (index === -1) {
-      throw new Error('Client not found');
+      throw new Error("Client not found");
     }
 
     this.clients[index] = client;
@@ -38,14 +38,13 @@ export class InMemoryClientRepository implements ClientRepository {
   }
 
   async findById(id: number): Promise<Client | null> {
-    return this.clients.find(
-      client => client.clientId === id
-    ) ?? null;
+    return this.clients.find((client) => client.clientId === id) ?? null;
   }
 
   async findByIds(ids: number[]): Promise<Client[]> {
     return this.clients.filter(
-      client => client.clientId !== undefined && ids.includes(client.clientId)
+      (client) =>
+        client.clientId !== undefined && ids.includes(client.clientId),
     );
   }
 }

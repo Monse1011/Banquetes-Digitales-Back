@@ -1,4 +1,4 @@
 export enum ReservationRequestStatus {
-  Pending = 'Pendiente',
-  Approved = 'Aprobada'
+  Pending = "Pendiente",
+  Approved = "Aprobada",
 }

@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
-import { ClientRepository } from '../../application/repositories/client-repository';
-import { Client } from '../../domain/entities/client';
+import { Pool } from "pg";
+import { ClientRepository } from "../../application/repositories/client-repository";
+import { Client } from "../../domain/entities/client";
 
 interface ClientRow {
   id_client: string;
@@ -18,7 +18,7 @@ export class PostgresClientRepository implements ClientRepository {
       `SELECT id_client, full_name, email, phone, registration_date
        FROM clients
        WHERE email = $1`,
-      [email]
+      [email],
     );
 
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
@@ -29,13 +29,13 @@ export class PostgresClientRepository implements ClientRepository {
       `INSERT INTO clients (full_name, email, phone, registration_date)
        VALUES ($1, $2, $3, $4)
        RETURNING id_client, full_name, email, phone, registration_date`,
-      [client.fullName, client.email, client.phone, client.registrationDate]
+      [client.fullName, client.email, client.phone, client.registrationDate],
     );
 
     const row = result.rows[0];
 
     if (!row) {
-      throw new Error('Client could not be created');
+      throw new Error("Client could not be created");
     }
 
     return this.toEntity(row);
@@ -47,11 +47,11 @@ export class PostgresClientRepository implements ClientRepository {
        SET full_name = $1, email = $2, phone = $3
        WHERE id_client = $4
        RETURNING id_client, full_name, email, phone, registration_date`,
-      [client.fullName, client.email, client.phone, client.clientId]
+      [client.fullName, client.email, client.phone, client.clientId],
     );
 
     if (!result.rows[0]) {
-      throw new Error('Client not found');
+      throw new Error("Client not found");
     }
 
     return this.toEntity(result.rows[0]);
@@ -62,7 +62,7 @@ export class PostgresClientRepository implements ClientRepository {
       `SELECT id_client, full_name, email, phone, registration_date
        FROM clients
        WHERE id_client = $1`,
-      [id]
+      [id],
     );
 
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
@@ -75,10 +75,10 @@ export class PostgresClientRepository implements ClientRepository {
       `SELECT id_client, full_name, email, phone, registration_date
        FROM clients
        WHERE id_client = ANY($1::bigint[])`,
-      [ids]
+      [ids],
     );
 
-    return result.rows.map(row => this.toEntity(row));
+    return result.rows.map((row) => this.toEntity(row));
   }
 
   private toEntity(row: ClientRow): Client {
@@ -87,7 +87,7 @@ export class PostgresClientRepository implements ClientRepository {
       row.full_name,
       row.email,
       row.phone,
-      new Date(row.registration_date)
+      new Date(row.registration_date),
     );
   }
 }

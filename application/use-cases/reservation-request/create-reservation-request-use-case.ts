@@ -1,29 +1,28 @@
-import { CreateReservationRequestDto } from '../../dto/create-reservation-req-request-dto';
-import { CreateReservationResponseDto } from '../../dto/create-reservaton-req-response-dto';
+import { CreateReservationRequestDto } from "../../dto/create-reservation-req-request-dto";
+import { CreateReservationResponseDto } from "../../dto/create-reservaton-req-response-dto";
 
-import { ReservationRequestRepository } from '../../repositories/reservation-request-repository';
-import { FolioGenerator } from '../../services/folio-generator';
+import { ReservationRequestRepository } from "../../repositories/reservation-request-repository";
+import { FolioGenerator } from "../../services/folio-generator";
 
-import { UpsertClientByEmailUseCase } from '../client/upsert-client-by-email-use-case';
+import { UpsertClientByEmailUseCase } from "../client/upsert-client-by-email-use-case";
 
-import { ReservationRequest } from '../../../domain/entities/reservation-request';
-import { ReservationRequestStatus } from '../../../domain/enums/request-status';
+import { ReservationRequest } from "../../../domain/entities/reservation-request";
+import { ReservationRequestStatus } from "../../../domain/enums/request-status";
 
 export class CreateReservationRequestUseCase {
   constructor(
     private readonly upsertClientByEmailUseCase: UpsertClientByEmailUseCase,
     private readonly reservationRequestRepository: ReservationRequestRepository,
-    private readonly folioGenerator: FolioGenerator
+    private readonly folioGenerator: FolioGenerator,
   ) {}
 
   async execute(
-    dto: CreateReservationRequestDto
+    dto: CreateReservationRequestDto,
   ): Promise<CreateReservationResponseDto> {
-    
     const client = await this.upsertClientByEmailUseCase.execute({
       fullName: dto.client_full_name,
       email: dto.email,
-      phone: dto.phone
+      phone: dto.phone,
     });
 
     const folio = this.folioGenerator.generate();
@@ -41,15 +40,13 @@ export class CreateReservationRequestUseCase {
       ReservationRequestStatus.Pending,
       now,
       now,
-      dto.services_ids
+      dto.services_ids,
     );
 
-    await this.reservationRequestRepository.create(
-      reservationRequest
-    );
+    await this.reservationRequestRepository.create(reservationRequest);
 
     return {
-      folio
+      folio,
     };
   }
 }

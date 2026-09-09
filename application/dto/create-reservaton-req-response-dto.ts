@@ -1,3 +1,3 @@
 export interface CreateReservationResponseDto {
-    folio: string;
-    }
+  folio: string;
+}

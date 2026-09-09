@@ -1,12 +1,12 @@
-import { Pool, PoolClient } from 'pg';
-import { ReservationRequestRepository } from '../../application/repositories/reservation-request-repository';
-import { ReservationRequestFilters } from '../../application/dto/reservation-request-filters-dto';
+import { Pool, PoolClient } from "pg";
+import { ReservationRequestRepository } from "../../application/repositories/reservation-request-repository";
+import { ReservationRequestFilters } from "../../application/dto/reservation-request-filters-dto";
 import {
   ReservationRequestSort,
-  ReservationRequestSortField
-} from '../../application/dto/reservation-request-sort';
-import { ReservationRequest } from '../../domain/entities/reservation-request';
-import { ReservationRequestStatus } from '../../domain/enums/request-status';
+  ReservationRequestSortField,
+} from "../../application/dto/reservation-request-sort";
+import { ReservationRequest } from "../../domain/entities/reservation-request";
+import { ReservationRequestStatus } from "../../domain/enums/request-status";
 
 interface ReservationRequestRow {
   id_reservation_request: string;
@@ -23,15 +23,14 @@ interface ReservationRequestRow {
   services_ids: number[] | string[];
 }
 
-export class PostgresReservationRequestRepository
-implements ReservationRequestRepository {
+export class PostgresReservationRequestRepository implements ReservationRequestRepository {
   constructor(private readonly pool: Pool) {}
 
   async create(request: ReservationRequest): Promise<ReservationRequest> {
     const connection = await this.pool.connect();
 
     try {
-      await connection.query('BEGIN');
+      await connection.query("BEGIN");
       const result = await connection.query<ReservationRequestRow>(
         `INSERT INTO reservations_request
           (folio, id_client, id_user, event_date, event_time, guest_count,
@@ -41,18 +40,22 @@ implements ReservationRequestRepository {
            event_date, event_time, guest_count, event_address, status,
            request_date, update_date,
            ARRAY[]::integer[] AS services_ids`,
-        this.requestValues(request)
+        this.requestValues(request),
       );
 
       const row = result.rows[0];
 
       if (!row) {
-        throw new Error('Reservation request could not be created');
+        throw new Error("Reservation request could not be created");
       }
 
       const createdRequest = this.toEntity(row);
-      await this.replaceServices(connection, createdRequest.id!, request.servicesIds);
-      await connection.query('COMMIT');
+      await this.replaceServices(
+        connection,
+        createdRequest.id!,
+        request.servicesIds,
+      );
+      await connection.query("COMMIT");
 
       return new ReservationRequest(
         createdRequest.id,
@@ -65,10 +68,10 @@ implements ReservationRequestRepository {
         createdRequest.status,
         createdRequest.requestDate,
         createdRequest.updateDate,
-        request.servicesIds
+        request.servicesIds,
       );
     } catch (error) {
-      await connection.query('ROLLBACK');
+      await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
@@ -80,7 +83,7 @@ implements ReservationRequestRepository {
       this.baseSelect() +
         ` WHERE rr.id_reservation_request = $1
           GROUP BY rr.id_reservation_request`,
-      [id]
+      [id],
     );
 
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
@@ -90,7 +93,7 @@ implements ReservationRequestRepository {
     const connection = await this.pool.connect();
 
     try {
-      await connection.query('BEGIN');
+      await connection.query("BEGIN");
       const result = await connection.query<ReservationRequestRow>(
         `UPDATE reservations_request
          SET folio = $1, id_client = $2, id_user = $3, event_date = $4,
@@ -101,15 +104,15 @@ implements ReservationRequestRepository {
            event_date, event_time, guest_count, event_address, status,
            request_date, update_date,
            ARRAY[]::integer[] AS services_ids`,
-        [...this.requestValues(request), request.id]
+        [...this.requestValues(request), request.id],
       );
 
       if (!result.rows[0]) {
-        throw new Error('Reservation request not found');
+        throw new Error("Reservation request not found");
       }
 
       await this.replaceServices(connection, request.id!, request.servicesIds);
-      await connection.query('COMMIT');
+      await connection.query("COMMIT");
       const updatedRequest = this.toEntity(result.rows[0]);
 
       return new ReservationRequest(
@@ -123,10 +126,10 @@ implements ReservationRequestRepository {
         updatedRequest.status,
         updatedRequest.requestDate,
         updatedRequest.updateDate,
-        request.servicesIds
+        request.servicesIds,
       );
     } catch (error) {
-      await connection.query('ROLLBACK');
+      await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
@@ -137,7 +140,7 @@ implements ReservationRequestRepository {
     filters: ReservationRequestFilters,
     sort: ReservationRequestSort,
     page: number,
-    perPage: number
+    perPage: number,
   ): Promise<{ requests: ReservationRequest[]; totalRecords: number }> {
     const parameters: unknown[] = [];
     const conditions: string[] = [];
@@ -157,16 +160,17 @@ implements ReservationRequestRepository {
       conditions.push(`c.full_name ILIKE $${parameters.length}`);
     }
 
-    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
+    const where =
+      conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const countResult = await this.pool.query<{ total_records: number }>(
       `SELECT COUNT(*)::int AS total_records
        FROM reservations_request rr
        JOIN clients c ON c.id_client = rr.id_client${where}`,
-      parameters
+      parameters,
     );
     const offset = (page - 1) * perPage;
     const sortColumn = this.sortColumn(sort.field);
-    const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+    const direction = sort.direction === "desc" ? "DESC" : "ASC";
     const dataParameters = [...parameters, perPage, offset];
     const result = await this.pool.query<ReservationRequestRow>(
       this.baseSelect() +
@@ -174,12 +178,12 @@ implements ReservationRequestRepository {
          GROUP BY rr.id_reservation_request
          ORDER BY ${sortColumn} ${direction}
          LIMIT $${dataParameters.length - 1} OFFSET $${dataParameters.length}`,
-      dataParameters
+      dataParameters,
     );
 
     return {
-      requests: result.rows.map(row => this.toEntity(row)),
-      totalRecords: countResult.rows[0]?.total_records ?? 0
+      requests: result.rows.map((row) => this.toEntity(row)),
+      totalRecords: countResult.rows[0]?.total_records ?? 0,
     };
   }
 
@@ -208,31 +212,31 @@ implements ReservationRequestRepository {
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.updateDate
+      request.updateDate,
     ];
   }
 
   private async replaceServices(
     connection: PoolClient,
     requestId: number,
-    serviceIds: number[]
+    serviceIds: number[],
   ): Promise<void> {
     await connection.query(
-      'DELETE FROM request_services WHERE id_request = $1',
-      [requestId]
+      "DELETE FROM request_services WHERE id_request = $1",
+      [requestId],
     );
 
     for (const serviceId of serviceIds) {
       await connection.query(
         `INSERT INTO request_services (id_request, id_service)
          VALUES ($1, $2)`,
-        [requestId, serviceId]
+        [requestId, serviceId],
       );
     }
   }
 
   private toEntity(row: ReservationRequestRow): ReservationRequest {
-    const serviceIds = row.services_ids.map(serviceId => Number(serviceId));
+    const serviceIds = row.services_ids.map((serviceId) => Number(serviceId));
 
     return new ReservationRequest(
       Number(row.id_reservation_request),
@@ -245,17 +249,22 @@ implements ReservationRequestRepository {
       row.status,
       new Date(row.request_date),
       new Date(row.update_date),
-      serviceIds
+      serviceIds,
     );
   }
 
-  private combineDateAndTime(eventDate: string | Date, eventTime: string | Date): Date {
-    const date = eventDate instanceof Date
-      ? eventDate.toISOString().slice(0, 10)
-      : eventDate;
-    const time = eventTime instanceof Date
-      ? eventTime.toISOString().slice(11, 19)
-      : eventTime;
+  private combineDateAndTime(
+    eventDate: string | Date,
+    eventTime: string | Date,
+  ): Date {
+    const date =
+      eventDate instanceof Date
+        ? eventDate.toISOString().slice(0, 10)
+        : eventDate;
+    const time =
+      eventTime instanceof Date
+        ? eventTime.toISOString().slice(11, 19)
+        : eventTime;
 
     return new Date(`${date}T${time}Z`);
   }
@@ -271,11 +280,11 @@ implements ReservationRequestRepository {
   private sortColumn(field: ReservationRequestSortField): string {
     switch (field) {
       case ReservationRequestSortField.ClientName:
-        return 'c.full_name';
+        return "c.full_name";
       case ReservationRequestSortField.Status:
-        return 'rr.status';
+        return "rr.status";
       case ReservationRequestSortField.EventDate:
-        return 'rr.event_date';
+        return "rr.event_date";
     }
   }
 }

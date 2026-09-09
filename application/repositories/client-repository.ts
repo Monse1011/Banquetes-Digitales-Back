@@ -1,4 +1,4 @@
-import { Client } from '../../domain/entities/client';
+import { Client } from "../../domain/entities/client";
 
 export interface ClientRepository {
   findByEmail(email: string): Promise<Client | null>;

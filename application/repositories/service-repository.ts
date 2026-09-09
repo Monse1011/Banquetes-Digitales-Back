@@ -1,4 +1,4 @@
-import { Service } from '../../domain/entities/service';
+import { Service } from "../../domain/entities/service";
 
 export interface ServiceRepository {
   findAll(): Promise<Service[]>;
