@@ -24,7 +24,7 @@ interface ReservationRequestRow {
 }
 
 export class PostgresReservationRequestRepository
-  implements ReservationRequestRepository {
+implements ReservationRequestRepository {
   constructor(private readonly pool: Pool) {}
 
   async create(request: ReservationRequest): Promise<ReservationRequest> {

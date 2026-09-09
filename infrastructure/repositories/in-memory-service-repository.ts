@@ -2,7 +2,7 @@ import { Service } from '../../domain/entities/service';
 import { ServiceRepository } from '../../application/repositories/service-repository';
 
 export class InMemoryServiceRepository
-  implements ServiceRepository {
+implements ServiceRepository {
 
   constructor(private readonly services: Service[] = []) {}
 

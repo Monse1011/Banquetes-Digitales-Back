@@ -6,5 +6,13 @@ export interface ReservationRequestRepository {
   create(request: ReservationRequest): Promise<ReservationRequest>;
   findById(id: number): Promise<ReservationRequest | null>;
   update(request: ReservationRequest): Promise<ReservationRequest>;
-  findAll(filters: ReservationRequestFilters, sort: ReservationRequestSort, page: number, perPage: number): Promise<{ requests: ReservationRequest[]; totalRecords: number; }>;
+  findAll(
+  filters: ReservationRequestFilters,
+  sort: ReservationRequestSort,
+  page: number,
+  perPage: number,
+): Promise<{
+  requests: ReservationRequest[];
+  totalRecords: number;
+}>;
 }

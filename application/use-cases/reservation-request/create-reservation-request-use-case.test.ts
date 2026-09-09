@@ -67,29 +67,29 @@ describe('CreateReservationRequestUseCase', () => {
         new InMemoryFolioGenerator();
 
     const useCase = new CreateReservationRequestUseCase(
-        upsertClientUseCase,
-        reservationRepository,
-        folioGenerator
+      upsertClientUseCase,
+      reservationRepository,
+      folioGenerator
     );
 
     const firstResult = await useCase.execute({
-        client_full_name: 'Carlos Mendoza',
-        email: 'carlos@example.com',
-        phone: '9991234567',
-        event_date_time: '2026-11-20T19:00:00Z',
-        guest_count: 100,
-        event_address: 'Av. Reforma 123',
-        services_ids: [1, 2]
+      client_full_name: 'Carlos Mendoza',
+      email: 'carlos@example.com',
+      phone: '9991234567',
+      event_date_time: '2026-11-20T19:00:00Z',
+      guest_count: 100,
+      event_address: 'Av. Reforma 123',
+      services_ids: [1, 2]
     });
 
     const secondResult = await useCase.execute({
-        client_full_name: 'Carlos Mendoza Ruiz',
-        email: 'carlos@example.com',
-        phone: '9999876543',
-        event_date_time: '2026-12-20T19:00:00Z',
-        guest_count: 150,
-        event_address: 'Av. Reforma 456',
-        services_ids: [3, 4]
+      client_full_name: 'Carlos Mendoza Ruiz',
+      email: 'carlos@example.com',
+      phone: '9999876543',
+      event_date_time: '2026-12-20T19:00:00Z',
+      guest_count: 150,
+      event_address: 'Av. Reforma 456',
+      services_ids: [3, 4]
     });
 
     const firstRequest =
@@ -102,7 +102,7 @@ describe('CreateReservationRequestUseCase', () => {
     expect(secondResult.folio).toBe('BD-2026-00002');
 
     expect(firstRequest!.clientId)
-        .toBe(secondRequest!.clientId);
-    });
+      .toBe(secondRequest!.clientId);
+  });
 
 });

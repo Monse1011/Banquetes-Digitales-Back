@@ -4,7 +4,7 @@ import { ReservationRequestFilters } from '../../application/dto/reservation-req
 import { ReservationRequestSort, ReservationRequestSortField } from '../../application/dto/reservation-request-sort';
 
 export class InMemoryReservationRequestRepository
-  implements ReservationRequestRepository {
+implements ReservationRequestRepository {
 
   private requests: ReservationRequest[] = [];
   private nextId = 1;
