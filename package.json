@@ -6,8 +6,8 @@
   "scripts": {
     "test": "vitest",
     "test:run": "vitest run",
-    "dev": "tsx watch src/app.ts",
-    "start": "tsx src/app.ts"
+    "dev": "node --watch src/app.js",
+    "start": "node src/app.js"
   },
   "repository": {
     "type": "git",
@@ -22,15 +22,7 @@
   },
   "homepage": "https://github.com/Monse1011/Banquetes-Digitales-Back#readme",
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.5.0",
-    "@types/pg": "^8.23.1",
-    "@types/supertest": "^7.2.1",
-    "@types/swagger-ui-express": "^4.1.8",
     "supertest": "^7.2.2",
-    "tsx": "^4.23.13",
-    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
   "dependencies": {
