@@ -95,8 +95,7 @@ module.exports = {
     "import/no-unresolved": "error",
     "import/no-duplicates": "error",
 
-    // Airbnb rules disabled because they conflict
-    // with our TypeScript architecture
+    // Airbnb rules disabled
     "import/prefer-default-export": "off",
     "no-useless-constructor": "off",
     "no-empty-function": "off",
@@ -132,14 +131,13 @@ module.exports = {
   },
 
   overrides: [
+    // Tests
     {
       files: ["**/*.test.ts", "**/*.spec.ts"],
-
       env: {
         node: true,
         es2022: true,
       },
-
       rules: {
         "no-console": "off",
         "max-lines-per-function": "off",
@@ -147,7 +145,35 @@ module.exports = {
         "import/no-extraneous-dependencies": "off",
       },
     },
-  ],
 
-  ignorePatterns: ["node_modules/", "coverage/", "dist/", "build/", ".env", ".env.*"],
+    // JavaScript
+    {
+      files: ["**/*.js"],
+      env: {
+        node: true,
+        es2022: true,
+      },
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "commonjs",
+      },
+      rules: {
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+
+        "no-unused-vars": [
+          "error",
+          {
+            vars: "all",
+            args: "after-used",
+            ignoreRestSiblings: true,
+            argsIgnorePattern: "^_",
+            varsIgnorePattern: "^_",
+          },
+        ],
+
+        "no-console": "off",
+      },
+    },
+  ],
 };
