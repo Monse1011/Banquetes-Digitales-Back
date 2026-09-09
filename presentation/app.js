@@ -1,9 +1,9 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const { requireAdmin } = require("./middleware/admin-auth");
-const createAuthMiddleware = require("../middleware/authMiddleware");
-const createAuthRoutes = require("../routes/authRoutes");
-const createPasswordResetRoutes = require("../routes/passwordResetRoutes");
+const createAuthMiddleware = require('../middleware/auth-middleware');
+const createAuthRoutes = require("../routes/auth-routes");
+const createPasswordResetRoutes = require("../routes/password-reset-routes");
 
 const { ReservationRequestController } = require("./controller/reservation-request-controller");
 const { ServiceController } = require("./controller/service-controller");

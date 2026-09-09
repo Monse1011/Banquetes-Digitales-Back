@@ -31,12 +31,14 @@
     "eslint": "^8.57.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-check-file": "^2.7.1",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.9.6",
     "supertest": "^7.2.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "eslint-plugin-check-file": "^2.7.1"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

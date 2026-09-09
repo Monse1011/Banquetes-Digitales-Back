@@ -15,6 +15,8 @@ module.exports = {
 
   extends: ["airbnb-base", "prettier"],
 
+  plugins: ["check-file"],
+
   rules: {
     indent: ["error", 2, { SwitchCase: 1 }],
 
@@ -49,6 +51,17 @@ module.exports = {
         ignoreDestructuring: false,
         ignoreImports: false,
         allow: ["^req$", "^res$", "^next$", "^id$", "^URL$", "^UUID$"],
+      },
+    ],
+
+    "check-file/filename-naming-convention": [
+      "error",
+      {
+        "**/*.js": "KEBAB_CASE",
+      },
+      {
+        ignoreMiddleExtensions: true,
+        errorMessage: 'El archivo "{{ target }}" debe utilizar kebab-case. Ejemplo: user-status.js',
       },
     ],
 
