@@ -1,9 +1,12 @@
-const pool = require("../database/database");
 const Block = require("../../domain/entities/Block");
 
 class PostgresBlockRepository {
+  constructor(pool) {
+    this.pool = pool;
+  }
+
   async findByUserId(idUser) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             SELECT id_block, id_user, failed_attempts, blocked_until
             FROM blocks WHERE id_user = $1`,
@@ -13,7 +16,7 @@ class PostgresBlockRepository {
   }
 
   async incrementFailedAttempts(idUser) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             INSERT INTO blocks (id_user, failed_attempts)
             VALUES ($1, 1)
@@ -26,7 +29,7 @@ class PostgresBlockRepository {
   }
 
   async blockUser(idUser) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             UPDATE blocks SET blocked_until = NOW() + INTERVAL '15 minutes'
             WHERE id_user = $1 RETURNING *`,
@@ -36,7 +39,7 @@ class PostgresBlockRepository {
   }
 
   async resetAttempts(idUser) {
-    await pool.query(
+    await this.pool.query(
       `
             UPDATE blocks SET failed_attempts = 0, blocked_until = NULL
             WHERE id_user = $1`,
@@ -44,4 +47,5 @@ class PostgresBlockRepository {
     );
   }
 }
+
 module.exports = PostgresBlockRepository;

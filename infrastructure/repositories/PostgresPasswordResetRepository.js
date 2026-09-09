@@ -1,9 +1,12 @@
-const pool = require("../database/database");
 const PasswordResetToken = require("../../domain/entities/PasswordResetToken");
 
 class PostgresPasswordResetRepository {
+  constructor(pool) {
+    this.pool = pool;
+  }
+
   async create(idUser, token, expirationDate) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             INSERT INTO password_reset_tokens (id_user, token, expiration_date)
             VALUES ($1, $2, $3) RETURNING *`,
@@ -13,7 +16,7 @@ class PostgresPasswordResetRepository {
   }
 
   async findValidToken(token) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             SELECT prt.id_token, prt.id_user, prt.token,
                     prt.expiration_date, prt.used,
@@ -29,11 +32,13 @@ class PostgresPasswordResetRepository {
   }
 
   async markAsUsed(idToken) {
-    await pool.query("UPDATE password_reset_tokens SET used = TRUE WHERE id_token = $1", [idToken]);
+    await this.pool.query("UPDATE password_reset_tokens SET used = TRUE WHERE id_token = $1", [
+      idToken,
+    ]);
   }
 
   async invalidateUserTokens(idUser) {
-    await pool.query(
+    await this.pool.query(
       `
             UPDATE password_reset_tokens SET used = TRUE
             WHERE id_user = $1 AND used = FALSE`,
@@ -41,4 +46,5 @@ class PostgresPasswordResetRepository {
     );
   }
 }
+
 module.exports = PostgresPasswordResetRepository;

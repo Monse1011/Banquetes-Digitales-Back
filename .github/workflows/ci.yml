@@ -36,7 +36,7 @@ jobs:
           cat .eslintrc.cjs
 
           echo "=== Effective quotes rule ==="
-          npx eslint --print-config infrastructure/repositories/postgres-reservation-request-repository.ts | grep -A5 '"quotes"'
+          npx eslint --print-config infrastructure/repositories/postgres-reservation-request-repository.js | grep -A5 '"quotes"'
 
       - name: Run ESLint
         run: npm run lint
@@ -46,6 +46,3 @@ jobs:
 
       - name: Run tests
         run: npm run test:run
-
-      - name: Check TypeScript
-        run: npx tsc --noEmit

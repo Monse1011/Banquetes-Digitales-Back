@@ -6,43 +6,16 @@ module.exports = {
     es2022: true,
   },
 
-  parser: "@typescript-eslint/parser",
+  ignorePatterns: ["vitest.config.js"],
 
   parserOptions: {
     ecmaVersion: "latest",
-    sourceType: "script",
+    sourceType: "commonjs",
   },
 
-  plugins: ["@typescript-eslint"],
-
-  extends: ["airbnb-base", "plugin:@typescript-eslint/recommended", "prettier"],
-
-  settings: {
-    "import/resolver": {
-      typescript: {
-        project: "./tsconfig.json",
-      },
-    },
-  },
+  extends: ["airbnb-base", "prettier"],
 
   rules: {
-    // TypeScript
-    "no-unused-vars": "off",
-
-    "@typescript-eslint/no-unused-vars": [
-      "error",
-      {
-        vars: "all",
-        args: "after-used",
-        ignoreRestSiblings: true,
-        argsIgnorePattern: "^_",
-        varsIgnorePattern: "^_",
-      },
-    ],
-
-    "@typescript-eslint/no-explicit-any": "warn",
-
-    // Formatting
     indent: ["error", 2, { SwitchCase: 1 }],
 
     quotes: [
@@ -69,7 +42,6 @@ module.exports = {
       },
     ],
 
-    // Naming
     camelcase: [
       "error",
       {
@@ -80,22 +52,10 @@ module.exports = {
       },
     ],
 
-    // Imports
-    "import/extensions": [
-      "error",
-      "ignorePackages",
-      {
-        js: "never",
-        jsx: "never",
-        ts: "never",
-        tsx: "never",
-      },
-    ],
-
-    "import/no-unresolved": "error",
+    "import/extensions": "off",
+    "import/no-unresolved": "off",
     "import/no-duplicates": "error",
 
-    // Airbnb rules disabled
     "import/prefer-default-export": "off",
     "no-useless-constructor": "off",
     "no-empty-function": "off",
@@ -110,8 +70,7 @@ module.exports = {
     "default-case": "off",
     "max-params": "off",
 
-    // Code quality
-    "no-console": "error",
+    "no-console": "off",
     "no-eval": "error",
     "no-new-func": "error",
     "no-implied-eval": "error",
@@ -128,51 +87,34 @@ module.exports = {
         skipComments: true,
       },
     ],
+    "no-unused-vars": [
+      "error",
+      {
+        vars: "all",
+        args: "after-used",
+        argsIgnorePattern: "^_",
+        ignoreRestSiblings: true,
+      },
+    ],
   },
 
   overrides: [
-    // Tests
     {
-      files: ["**/*.test.ts", "**/*.spec.ts"],
-      env: {
-        node: true,
-        es2022: true,
+      files: ["**/*.test.js", "**/*.spec.js"],
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        expect: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
       },
       rules: {
         "no-console": "off",
         "max-lines-per-function": "off",
         "max-params": "off",
         "import/no-extraneous-dependencies": "off",
-      },
-    },
-
-    // JavaScript
-    {
-      files: ["**/*.js"],
-      env: {
-        node: true,
-        es2022: true,
-      },
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "commonjs",
-      },
-      rules: {
-        "@typescript-eslint/no-require-imports": "off",
-        "@typescript-eslint/no-unused-vars": "off",
-
-        "no-unused-vars": [
-          "error",
-          {
-            vars: "all",
-            args: "after-used",
-            ignoreRestSiblings: true,
-            argsIgnorePattern: "^_",
-            varsIgnorePattern: "^_",
-          },
-        ],
-
-        "no-console": "off",
       },
     },
   ],

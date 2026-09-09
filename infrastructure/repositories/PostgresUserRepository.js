@@ -1,9 +1,12 @@
-const pool = require("../database/database");
 const User = require("../../domain/entities/User");
 
 class PostgresUserRepository {
+  constructor(pool) {
+    this.pool = pool;
+  }
+
   async findByEmployeeId(idEmployee) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             SELECT id_user, id_employee, full_name, email, password_hash,
                     role, status, creation_date, last_access
@@ -14,7 +17,7 @@ class PostgresUserRepository {
   }
 
   async findById(idUser) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             SELECT id_user, id_employee, full_name, email, password_hash,
                     role, status, creation_date, last_access
@@ -25,7 +28,7 @@ class PostgresUserRepository {
   }
 
   async findByEmail(email) {
-    const result = await pool.query(
+    const result = await this.pool.query(
       `
             SELECT id_user, id_employee, full_name, email, password_hash,
                     role, status, creation_date, last_access
@@ -36,11 +39,11 @@ class PostgresUserRepository {
   }
 
   async updateLastAccess(idUser) {
-    await pool.query("UPDATE users SET last_access = NOW() WHERE id_user = $1", [idUser]);
+    await this.pool.query("UPDATE users SET last_access = NOW() WHERE id_user = $1", [idUser]);
   }
 
   async updatePassword(idUser, passwordHash) {
-    await pool.query(
+    await this.pool.query(
       `
             UPDATE users SET password_hash = $1, last_access = NOW()
             WHERE id_user = $2`,
@@ -48,4 +51,5 @@ class PostgresUserRepository {
     );
   }
 }
+
 module.exports = PostgresUserRepository;
