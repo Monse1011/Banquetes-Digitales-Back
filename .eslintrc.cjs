@@ -47,7 +47,7 @@ module.exports = {
 
     quotes: [
       "error",
-      "single",
+      "double",
       {
         avoidEscape: true,
         allowTemplateLiterals: false,
