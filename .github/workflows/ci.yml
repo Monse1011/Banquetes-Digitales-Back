@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - develop
-      - "feature/**"
+      - 'feature/**'
 
   pull_request:
     branches:
@@ -26,6 +26,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check ESLint configuration
+        run: |
+          echo "=== Current commit ==="
+          git log -1 --oneline
+
+          echo "=== ESLint configuration ==="
+          cat .eslintrc.cjs
+
+          echo "=== Effective quotes rule ==="
+          npx eslint --print-config infrastructure/repositories/postgres-reservation-request-repository.ts | grep -A5 '"quotes"'
 
       - name: Run ESLint
         run: npm run lint
