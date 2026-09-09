@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
-const Password = require("../../domain/value-objects/Password");
-const InvalidResetTokenException = require("../../domain/exceptions/InvalidResetTokenException");
+const Password = require("../../domain/value-objects/password");
+const InvalidResetTokenException = require("../../domain/exceptions/invalid-reset-token-exception");
 
 class ResetPassword {
   constructor(userRepository, passwordResetRepository, tokenService) {

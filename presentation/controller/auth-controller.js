@@ -1,7 +1,7 @@
-const LoginRequestDTO = require("../../application/dto/auth/LoginRequestDTO");
-const ChangePasswordRequestDTO = require("../../application/dto/auth/ChangePasswordRequestDTO");
-const InvalidCredentialsException = require("../../domain/exceptions/InvalidCredentialsException");
-const AccountBlockedException = require("../../domain/exceptions/AccountBlockedException");
+const LoginRequestDTO = require("../../application/dto/auth/login-request-dto");
+const ChangePasswordRequestDTO = require("../../application/dto/auth/change-password-request-dto");
+const InvalidCredentialsException = require("../../domain/exceptions/invalid-credentials-exception");
+const AccountBlockedException = require("../../domain/exceptions/account-blocked-exception");
 
 class AuthController {
   constructor(authenticateUser, changePassword) {

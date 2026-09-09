@@ -1,4 +1,4 @@
-const PasswordResetToken = require("../../domain/entities/PasswordResetToken");
+const PasswordResetToken = require("../../domain/entities/password-reset-token");
 
 class PostgresPasswordResetRepository {
   constructor(pool) {

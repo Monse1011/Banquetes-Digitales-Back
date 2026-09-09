@@ -1,4 +1,4 @@
-const Block = require("../../domain/entities/Block");
+const Block = require("../../domain/entities/block");
 
 class PostgresBlockRepository {
   constructor(pool) {

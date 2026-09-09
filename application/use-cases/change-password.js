@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
-const Password = require("../../domain/value-objects/Password");
-const InvalidPasswordException = require("../../domain/exceptions/InvalidPasswordException");
+const Password = require("../../domain/value-objects/password");
+const InvalidPasswordException = require("../../domain/exceptions/invalid-password-exception");
 
 class ChangePassword {
   constructor(userRepository, blockService, tokenService) {
