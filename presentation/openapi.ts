@@ -3,8 +3,7 @@ export const openApiDocument = {
   info: {
     title: "Banquetes Digitales API",
     version: "1.0.0",
-    description:
-      "API para crear, revisar y aprobar solicitudes de reservacion.",
+    description: "API para crear, revisar y aprobar solicitudes de reservacion.",
   },
   servers: [
     {

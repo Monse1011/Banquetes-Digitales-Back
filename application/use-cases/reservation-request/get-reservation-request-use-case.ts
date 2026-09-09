@@ -7,7 +7,7 @@ export class GetReservationRequestUseCase {
   constructor(
     private readonly reservationRequestRepository: ReservationRequestRepository,
     private readonly clientRepository: ClientRepository,
-    private readonly serviceRepository: ServiceRepository,
+    private readonly serviceRepository: ServiceRepository
   ) {}
 
   async execute(id: number): Promise<GetReservationRequestResponseDto> {
@@ -18,9 +18,7 @@ export class GetReservationRequestUseCase {
     }
 
     const client = await this.clientRepository.findById(request.clientId);
-    const services = await this.serviceRepository.findByIds(
-      request.servicesIds,
-    );
+    const services = await this.serviceRepository.findByIds(request.servicesIds);
 
     if (!client) {
       throw new Error(`Client ${request.clientId} not found`);

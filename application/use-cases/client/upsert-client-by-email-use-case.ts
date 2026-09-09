@@ -24,13 +24,7 @@ export class UpsertClientByEmailUseCase {
       return { clientId: existingClient.clientId! };
     }
 
-    const newClient = new Client(
-      undefined,
-      input.fullName,
-      input.email,
-      input.phone,
-      new Date(),
-    );
+    const newClient = new Client(undefined, input.fullName, input.email, input.phone, new Date());
 
     const createdClient = await this.clientRepository.create(newClient);
     return { clientId: createdClient.clientId! };

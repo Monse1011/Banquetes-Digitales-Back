@@ -12,6 +12,6 @@ export class ReservationRequest {
     public status: ReservationRequestStatus,
     public readonly requestDate: Date,
     public updateDate: Date,
-    public readonly servicesIds: number[],
+    public readonly servicesIds: number[]
   ) {}
 }

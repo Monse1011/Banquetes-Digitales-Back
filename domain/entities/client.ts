@@ -4,6 +4,6 @@ export class Client {
     public fullName: string,
     public email: string,
     public phone: string,
-    public readonly registrationDate: Date,
+    public readonly registrationDate: Date
   ) {}
 }

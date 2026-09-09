@@ -1,11 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 
-export function requireAdmin(
-  request: Request,
-  response: Response,
-  next: NextFunction,
-): void {
+export function requireAdmin(request: Request, response: Response, next: NextFunction): void {
   const authorization = request.header("authorization");
   const token = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)

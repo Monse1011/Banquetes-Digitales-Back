@@ -19,7 +19,7 @@ describe("InMemoryReservationRequestRepository", () => {
       ReservationRequestStatus.Pending,
       new Date(),
       new Date(),
-      [1, 2, 4, 5],
+      [1, 2, 4, 5]
     );
 
     const createdRequest = await repository.create(request);

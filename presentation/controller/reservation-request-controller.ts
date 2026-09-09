@@ -13,40 +13,29 @@ export interface ReservationRequestControllerDependencies {
 }
 
 export class ReservationRequestController {
-  constructor(
-    private readonly dependencies: ReservationRequestControllerDependencies,
-  ) {}
+  constructor(private readonly dependencies: ReservationRequestControllerDependencies) {}
 
   async create(
-    request: Request<
-      Record<string, never>,
-      unknown,
-      CreateReservationRequestDto
-    >,
-    response: Response,
+    request: Request<Record<string, never>, unknown, CreateReservationRequestDto>,
+    response: Response
   ): Promise<void> {
-    const result =
-      await this.dependencies.createReservationRequestUseCase.execute(
-        request.body,
-      );
+    const result = await this.dependencies.createReservationRequestUseCase.execute(request.body);
 
     response.status(201).json({ data: result });
   }
 
   async list(request: Request, response: Response): Promise<void> {
-    const result =
-      await this.dependencies.getReservationRequestsUseCase.execute({
-        page: this.parsePositiveInteger(request.query.page, 1),
-        perPage: this.parsePositiveInteger(request.query.per_page, 10),
-      });
+    const result = await this.dependencies.getReservationRequestsUseCase.execute({
+      page: this.parsePositiveInteger(request.query.page, 1),
+      perPage: this.parsePositiveInteger(request.query.per_page, 10),
+    });
 
     response.json(result);
   }
 
   async getById(request: Request, response: Response): Promise<void> {
     const id = this.parseId(request.params.id);
-    const result =
-      await this.dependencies.getReservationRequestUseCase.execute(id);
+    const result = await this.dependencies.getReservationRequestUseCase.execute(id);
 
     response.json({
       data: {
@@ -71,10 +60,9 @@ export class ReservationRequestController {
       return;
     }
 
-    const result =
-      await this.dependencies.approveReservationRequestUseCase.execute(
-        this.parseId(request.params.id),
-      );
+    const result = await this.dependencies.approveReservationRequestUseCase.execute(
+      this.parseId(request.params.id)
+    );
 
     response.json({ data: result });
   }

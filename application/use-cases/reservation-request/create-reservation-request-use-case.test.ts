@@ -14,9 +14,7 @@ describe("CreateReservationRequestUseCase", () => {
   it("should create a reservation request with a new client", async () => {
     const clientRepository = new InMemoryClientRepository();
 
-    const upsertClientUseCase = new UpsertClientByEmailUseCase(
-      clientRepository,
-    );
+    const upsertClientUseCase = new UpsertClientByEmailUseCase(clientRepository);
 
     const reservationRepository = new InMemoryReservationRequestRepository();
 
@@ -25,7 +23,7 @@ describe("CreateReservationRequestUseCase", () => {
     const useCase = new CreateReservationRequestUseCase(
       upsertClientUseCase,
       reservationRepository,
-      folioGenerator,
+      folioGenerator
     );
 
     const result = await useCase.execute({
@@ -54,9 +52,7 @@ describe("CreateReservationRequestUseCase", () => {
   it("should reuse an existing client when the email already exists", async () => {
     const clientRepository = new InMemoryClientRepository();
 
-    const upsertClientUseCase = new UpsertClientByEmailUseCase(
-      clientRepository,
-    );
+    const upsertClientUseCase = new UpsertClientByEmailUseCase(clientRepository);
 
     const reservationRepository = new InMemoryReservationRequestRepository();
 
@@ -65,7 +61,7 @@ describe("CreateReservationRequestUseCase", () => {
     const useCase = new CreateReservationRequestUseCase(
       upsertClientUseCase,
       reservationRepository,
-      folioGenerator,
+      folioGenerator
     );
 
     const firstResult = await useCase.execute({

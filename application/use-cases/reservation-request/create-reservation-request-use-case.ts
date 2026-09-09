@@ -13,12 +13,10 @@ export class CreateReservationRequestUseCase {
   constructor(
     private readonly upsertClientByEmailUseCase: UpsertClientByEmailUseCase,
     private readonly reservationRequestRepository: ReservationRequestRepository,
-    private readonly folioGenerator: FolioGenerator,
+    private readonly folioGenerator: FolioGenerator
   ) {}
 
-  async execute(
-    dto: CreateReservationRequestDto,
-  ): Promise<CreateReservationResponseDto> {
+  async execute(dto: CreateReservationRequestDto): Promise<CreateReservationResponseDto> {
     const client = await this.upsertClientByEmailUseCase.execute({
       fullName: dto.client_full_name,
       email: dto.email,
@@ -40,7 +38,7 @@ export class CreateReservationRequestUseCase {
       ReservationRequestStatus.Pending,
       now,
       now,
-      dto.services_ids,
+      dto.services_ids
     );
 
     await this.reservationRequestRepository.create(reservationRequest);

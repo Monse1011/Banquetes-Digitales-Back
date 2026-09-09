@@ -27,20 +27,20 @@ const app = createApp({
   createReservationRequestUseCase: new CreateReservationRequestUseCase(
     new UpsertClientByEmailUseCase(clientRepository),
     reservationRequestRepository,
-    new InMemoryFolioGenerator(),
+    new InMemoryFolioGenerator()
   ),
   getReservationRequestsUseCase: new GetReservationRequestsUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository,
+    serviceRepository
   ),
   getReservationRequestUseCase: new GetReservationRequestUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository,
+    serviceRepository
   ),
   approveReservationRequestUseCase: new ApproveReservationRequestUseCase(
-    reservationRequestRepository,
+    reservationRequestRepository
   ),
 });
 

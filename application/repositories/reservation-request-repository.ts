@@ -10,7 +10,7 @@ export interface ReservationRequestRepository {
     filters: ReservationRequestFilters,
     sort: ReservationRequestSort,
     page: number,
-    perPage: number,
+    perPage: number
   ): Promise<{
     requests: ReservationRequest[];
     totalRecords: number;

@@ -22,7 +22,7 @@ export class InMemoryReservationRequestRepository implements ReservationRequestR
       request.status,
       request.requestDate,
       request.updateDate,
-      request.servicesIds,
+      request.servicesIds
     );
 
     this.requests.push(createdRequest);
@@ -35,9 +35,7 @@ export class InMemoryReservationRequestRepository implements ReservationRequestR
   }
 
   async update(request: ReservationRequest): Promise<ReservationRequest> {
-    const index = this.requests.findIndex(
-      (existingRequest) => existingRequest.id === request.id,
-    );
+    const index = this.requests.findIndex((existingRequest) => existingRequest.id === request.id);
 
     if (index === -1) {
       throw new Error("Reservation request not found");
@@ -52,7 +50,7 @@ export class InMemoryReservationRequestRepository implements ReservationRequestR
     filters: ReservationRequestFilters,
     sort: ReservationRequestSort,
     page: number,
-    perPage: number,
+    perPage: number
   ): Promise<{ requests: ReservationRequest[]; totalRecords: number }> {
     const filteredRequests = this.requests.filter((request) => {
       if (filters.status && request.status !== filters.status) {
@@ -73,8 +71,7 @@ export class InMemoryReservationRequestRepository implements ReservationRequestR
     const sortedRequests = [...filteredRequests].sort((left, right) => {
       const leftValue = this.getSortValue(left, sort.field);
       const rightValue = this.getSortValue(right, sort.field);
-      const comparison =
-        leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
+      const comparison = leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
 
       return sort.direction === "asc" ? comparison : -comparison;
     });
@@ -88,7 +85,7 @@ export class InMemoryReservationRequestRepository implements ReservationRequestR
 
   private getSortValue(
     request: ReservationRequest,
-    field: ReservationRequestSortField,
+    field: ReservationRequestSortField
   ): string | number {
     switch (field) {
       case ReservationRequestSortField.EventDate:

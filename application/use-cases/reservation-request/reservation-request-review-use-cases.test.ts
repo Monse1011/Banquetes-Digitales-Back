@@ -18,8 +18,7 @@ describe("Reservation request review use cases", () => {
   ];
   const serviceRepository: ServiceRepository = {
     findAll: async () => services,
-    findByIds: async (ids) =>
-      services.filter((service) => ids.includes(service.id)),
+    findByIds: async (ids) => services.filter((service) => ids.includes(service.id)),
   };
 
   async function createRequest() {
@@ -30,8 +29,8 @@ describe("Reservation request review use cases", () => {
         "Ana Lopez",
         "ana@example.com",
         "9991234567",
-        new Date("2026-01-01T00:00:00Z"),
-      ),
+        new Date("2026-01-01T00:00:00Z")
+      )
     );
     const reservationRepository = new InMemoryReservationRequestRepository();
     const request = await reservationRepository.create(
@@ -46,8 +45,8 @@ describe("Reservation request review use cases", () => {
         ReservationRequestStatus.Pending,
         new Date("2026-08-01T12:00:00Z"),
         new Date("2026-08-01T12:00:00Z"),
-        [1, 2],
-      ),
+        [1, 2]
+      )
     );
 
     return { clientRepository, reservationRepository, request };
@@ -58,7 +57,7 @@ describe("Reservation request review use cases", () => {
     const useCase = new GetReservationRequestsUseCase(
       reservationRepository,
       clientRepository,
-      serviceRepository,
+      serviceRepository
     );
 
     const result = await useCase.execute({ page: 1, perPage: 10 });
@@ -77,12 +76,11 @@ describe("Reservation request review use cases", () => {
   });
 
   it("gets all information for a selected reservation request", async () => {
-    const { clientRepository, reservationRepository, request } =
-      await createRequest();
+    const { clientRepository, reservationRepository, request } = await createRequest();
     const useCase = new GetReservationRequestUseCase(
       reservationRepository,
       clientRepository,
-      serviceRepository,
+      serviceRepository
     );
 
     const result = await useCase.execute(request.id!);
@@ -101,7 +99,7 @@ describe("Reservation request review use cases", () => {
 
     expect(result.status).toBe(ReservationRequestStatus.Approved);
     expect((await reservationRepository.findById(request.id!))!.status).toBe(
-      ReservationRequestStatus.Approved,
+      ReservationRequestStatus.Approved
     );
   });
 });

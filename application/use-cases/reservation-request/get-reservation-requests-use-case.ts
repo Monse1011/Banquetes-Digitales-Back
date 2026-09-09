@@ -19,11 +19,11 @@ export class GetReservationRequestsUseCase {
   constructor(
     private readonly reservationRequestRepository: ReservationRequestRepository,
     private readonly clientRepository: ClientRepository,
-    private readonly serviceRepository: ServiceRepository,
+    private readonly serviceRepository: ServiceRepository
   ) {}
 
   async execute(
-    input: GetReservationRequestsInput = {},
+    input: GetReservationRequestsInput = {}
   ): Promise<GetReservationRequestsResponseDto> {
     const page = input.page ?? 1;
     const perPage = input.perPage ?? 20;
@@ -35,20 +35,16 @@ export class GetReservationRequestsUseCase {
       input.filters ?? {},
       sort,
       page,
-      perPage,
+      perPage
     );
     const clients = await this.clientRepository.findByIds(
-      result.requests.map((request) => request.clientId),
+      result.requests.map((request) => request.clientId)
     );
     const services = await this.serviceRepository.findByIds(
-      result.requests.flatMap((request) => request.servicesIds),
+      result.requests.flatMap((request) => request.servicesIds)
     );
-    const clientsById = new Map(
-      clients.map((client) => [client.clientId, client]),
-    );
-    const servicesById = new Map(
-      services.map((service) => [service.id, service]),
-    );
+    const clientsById = new Map(clients.map((client) => [client.clientId, client]));
+    const servicesById = new Map(services.map((service) => [service.id, service]));
 
     return {
       data: result.requests.map((request) => {

@@ -17,7 +17,7 @@ export class PostgresServiceRepository implements ServiceRepository {
       `SELECT id_service, name, description, status
        FROM services
        WHERE status = 'activo'
-       ORDER BY id_service`,
+       ORDER BY id_service`
     );
 
     return result.rows.map((row) => this.toEntity(row));
@@ -30,7 +30,7 @@ export class PostgresServiceRepository implements ServiceRepository {
       `SELECT id_service, name, description, status
        FROM services
        WHERE id_service = ANY($1::integer[])`,
-      [ids],
+      [ids]
     );
 
     return result.rows.map((row) => this.toEntity(row));

@@ -3,6 +3,6 @@ export class Service {
     public readonly id: number,
     public readonly name: string,
     public readonly description: string | null,
-    public readonly status: string,
+    public readonly status: string
   ) {}
 }

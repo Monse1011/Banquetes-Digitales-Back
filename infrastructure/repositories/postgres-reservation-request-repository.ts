@@ -40,7 +40,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
            event_date, event_time, guest_count, event_address, status,
            request_date, update_date,
            ARRAY[]::integer[] AS services_ids`,
-        this.requestValues(request),
+        this.requestValues(request)
       );
 
       const row = result.rows[0];
@@ -50,11 +50,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
       }
 
       const createdRequest = this.toEntity(row);
-      await this.replaceServices(
-        connection,
-        createdRequest.id!,
-        request.servicesIds,
-      );
+      await this.replaceServices(connection, createdRequest.id!, request.servicesIds);
       await connection.query("COMMIT");
 
       return new ReservationRequest(
@@ -68,7 +64,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
         createdRequest.status,
         createdRequest.requestDate,
         createdRequest.updateDate,
-        request.servicesIds,
+        request.servicesIds
       );
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -83,7 +79,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
       this.baseSelect() +
         ` WHERE rr.id_reservation_request = $1
           GROUP BY rr.id_reservation_request`,
-      [id],
+      [id]
     );
 
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
@@ -104,7 +100,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
            event_date, event_time, guest_count, event_address, status,
            request_date, update_date,
            ARRAY[]::integer[] AS services_ids`,
-        [...this.requestValues(request), request.id],
+        [...this.requestValues(request), request.id]
       );
 
       if (!result.rows[0]) {
@@ -126,7 +122,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
         updatedRequest.status,
         updatedRequest.requestDate,
         updatedRequest.updateDate,
-        request.servicesIds,
+        request.servicesIds
       );
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -140,7 +136,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
     filters: ReservationRequestFilters,
     sort: ReservationRequestSort,
     page: number,
-    perPage: number,
+    perPage: number
   ): Promise<{ requests: ReservationRequest[]; totalRecords: number }> {
     const parameters: unknown[] = [];
     const conditions: string[] = [];
@@ -160,13 +156,12 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
       conditions.push(`c.full_name ILIKE $${parameters.length}`);
     }
 
-    const where =
-      conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const countResult = await this.pool.query<{ total_records: number }>(
       `SELECT COUNT(*)::int AS total_records
        FROM reservations_request rr
        JOIN clients c ON c.id_client = rr.id_client${where}`,
-      parameters,
+      parameters
     );
     const offset = (page - 1) * perPage;
     const sortColumn = this.sortColumn(sort.field);
@@ -178,7 +173,7 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
          GROUP BY rr.id_reservation_request
          ORDER BY ${sortColumn} ${direction}
          LIMIT $${dataParameters.length - 1} OFFSET $${dataParameters.length}`,
-      dataParameters,
+      dataParameters
     );
 
     return {
@@ -219,18 +214,15 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
   private async replaceServices(
     connection: PoolClient,
     requestId: number,
-    serviceIds: number[],
+    serviceIds: number[]
   ): Promise<void> {
-    await connection.query(
-      "DELETE FROM request_services WHERE id_request = $1",
-      [requestId],
-    );
+    await connection.query("DELETE FROM request_services WHERE id_request = $1", [requestId]);
 
     for (const serviceId of serviceIds) {
       await connection.query(
         `INSERT INTO request_services (id_request, id_service)
          VALUES ($1, $2)`,
-        [requestId, serviceId],
+        [requestId, serviceId]
       );
     }
   }
@@ -249,22 +241,13 @@ export class PostgresReservationRequestRepository implements ReservationRequestR
       row.status,
       new Date(row.request_date),
       new Date(row.update_date),
-      serviceIds,
+      serviceIds
     );
   }
 
-  private combineDateAndTime(
-    eventDate: string | Date,
-    eventTime: string | Date,
-  ): Date {
-    const date =
-      eventDate instanceof Date
-        ? eventDate.toISOString().slice(0, 10)
-        : eventDate;
-    const time =
-      eventTime instanceof Date
-        ? eventTime.toISOString().slice(11, 19)
-        : eventTime;
+  private combineDateAndTime(eventDate: string | Date, eventTime: string | Date): Date {
+    const date = eventDate instanceof Date ? eventDate.toISOString().slice(0, 10) : eventDate;
+    const time = eventTime instanceof Date ? eventTime.toISOString().slice(11, 19) : eventTime;
 
     return new Date(`${date}T${time}Z`);
   }

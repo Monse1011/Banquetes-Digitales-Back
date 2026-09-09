@@ -25,37 +25,30 @@ describe("HTTP API", () => {
     const createReservationRequestUseCase = new CreateReservationRequestUseCase(
       new UpsertClientByEmailUseCase(clientRepository),
       reservationRepository,
-      new InMemoryFolioGenerator(),
+      new InMemoryFolioGenerator()
     );
     const app = createApp({
       createReservationRequestUseCase,
       getReservationRequestsUseCase: new GetReservationRequestsUseCase(
         reservationRepository,
         clientRepository,
-        serviceRepository,
+        serviceRepository
       ),
       getReservationRequestUseCase: new GetReservationRequestUseCase(
         reservationRepository,
         clientRepository,
-        serviceRepository,
+        serviceRepository
       ),
-      approveReservationRequestUseCase: new ApproveReservationRequestUseCase(
-        reservationRepository,
-      ),
+      approveReservationRequestUseCase: new ApproveReservationRequestUseCase(reservationRepository),
       serviceRepository,
     });
-    const token = jwt.sign(
-      { role: "Administrador" },
-      process.env.JWT_SECRET ?? "test-secret",
-    );
+    const token = jwt.sign({ role: "Administrador" }, process.env.JWT_SECRET ?? "test-secret");
     process.env.JWT_SECRET = process.env.JWT_SECRET ?? "test-secret";
 
     const documentationResponse = await request(app).get("/api-docs.json");
     expect(documentationResponse.status).toBe(200);
     expect(documentationResponse.body.openapi).toBe("3.0.3");
-    expect(
-      documentationResponse.body.paths["/api/admin/requests/{id}"].patch,
-    ).toBeDefined();
+    expect(documentationResponse.body.paths["/api/admin/requests/{id}"].patch).toBeDefined();
 
     const createResponse = await request(app)
       .post("/api/client/request")
@@ -84,10 +77,7 @@ describe("HTTP API", () => {
     const detailResponse = await request(app)
       .get("/api/admin/requests/1")
       .set("Authorization", `Bearer ${token}`);
-    expect(detailResponse.body.data.selected_services).toEqual([
-      "Banquetes y bebidas",
-      "Musica",
-    ]);
+    expect(detailResponse.body.data.selected_services).toEqual(["Banquetes y bebidas", "Musica"]);
 
     const approveResponse = await request(app)
       .patch("/api/admin/requests/1")
@@ -103,10 +93,9 @@ describe("HTTP API", () => {
         createReservationRequestUseCase: {} as CreateReservationRequestUseCase,
         getReservationRequestsUseCase: {} as GetReservationRequestsUseCase,
         getReservationRequestUseCase: {} as GetReservationRequestUseCase,
-        approveReservationRequestUseCase:
-          {} as ApproveReservationRequestUseCase,
+        approveReservationRequestUseCase: {} as ApproveReservationRequestUseCase,
         serviceRepository: new InMemoryServiceRepository(),
-      }),
+      })
     ).get("/api/admin/requests");
 
     expect(response.status).toBe(401);

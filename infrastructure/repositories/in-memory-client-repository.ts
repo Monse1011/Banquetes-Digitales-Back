@@ -15,7 +15,7 @@ export class InMemoryClientRepository implements ClientRepository {
       client.fullName,
       client.email,
       client.phone,
-      client.registrationDate,
+      client.registrationDate
     );
 
     this.clients.push(createdClient);
@@ -25,7 +25,7 @@ export class InMemoryClientRepository implements ClientRepository {
 
   async update(client: Client): Promise<Client> {
     const index = this.clients.findIndex(
-      (existingClient) => existingClient.clientId === client.clientId,
+      (existingClient) => existingClient.clientId === client.clientId
     );
 
     if (index === -1) {
@@ -43,8 +43,7 @@ export class InMemoryClientRepository implements ClientRepository {
 
   async findByIds(ids: number[]): Promise<Client[]> {
     return this.clients.filter(
-      (client) =>
-        client.clientId !== undefined && ids.includes(client.clientId),
+      (client) => client.clientId !== undefined && ids.includes(client.clientId)
     );
   }
 }

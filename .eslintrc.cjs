@@ -149,12 +149,5 @@ module.exports = {
     },
   ],
 
-  ignorePatterns: [
-    "node_modules/",
-    "coverage/",
-    "dist/",
-    "build/",
-    ".env",
-    ".env.*",
-  ],
+  ignorePatterns: ["node_modules/", "coverage/", "dist/", "build/", ".env", ".env.*"],
 };

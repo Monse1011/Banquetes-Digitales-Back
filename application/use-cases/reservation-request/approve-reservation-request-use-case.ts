@@ -3,9 +3,7 @@ import { ReservationRequestStatus } from "../../../domain/enums/request-status";
 import { ReservationRequestRepository } from "../../repositories/reservation-request-repository";
 
 export class ApproveReservationRequestUseCase {
-  constructor(
-    private readonly reservationRequestRepository: ReservationRequestRepository,
-  ) {}
+  constructor(private readonly reservationRequestRepository: ReservationRequestRepository) {}
 
   async execute(id: number): Promise<ApproveReservationRequestResponseDto> {
     const request = await this.reservationRequestRepository.findById(id);
@@ -16,8 +14,7 @@ export class ApproveReservationRequestUseCase {
 
     request.status = ReservationRequestStatus.Approved;
     request.updateDate = new Date();
-    const updatedRequest =
-      await this.reservationRequestRepository.update(request);
+    const updatedRequest = await this.reservationRequestRepository.update(request);
 
     return {
       id: updatedRequest.id!,

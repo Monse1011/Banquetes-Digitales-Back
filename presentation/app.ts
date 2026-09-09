@@ -19,12 +19,8 @@ export interface AppDependencies extends ReservationRequestControllerDependencie
 
 export function createApp(dependencies: AppDependencies) {
   const app = express();
-  const reservationRequestController = new ReservationRequestController(
-    dependencies,
-  );
-  const serviceController = new ServiceController(
-    dependencies.serviceRepository,
-  );
+  const reservationRequestController = new ReservationRequestController(dependencies);
+  const serviceController = new ServiceController(dependencies.serviceRepository);
 
   app.use(express.json());
   app.get("/api-docs.json", (_request, response) => {
@@ -41,35 +37,19 @@ export function createApp(dependencies: AppDependencies) {
   app.get("/api/admin/requests", requireAdmin, (request, response, next) => {
     reservationRequestController.list(request, response).catch(next);
   });
-  app.get(
-    "/api/admin/requests/:id",
-    requireAdmin,
-    (request, response, next) => {
-      reservationRequestController.getById(request, response).catch(next);
-    },
-  );
-  app.patch(
-    "/api/admin/requests/:id",
-    requireAdmin,
-    (request, response, next) => {
-      reservationRequestController.approve(request, response).catch(next);
-    },
-  );
+  app.get("/api/admin/requests/:id", requireAdmin, (request, response, next) => {
+    reservationRequestController.getById(request, response).catch(next);
+  });
+  app.patch("/api/admin/requests/:id", requireAdmin, (request, response, next) => {
+    reservationRequestController.approve(request, response).catch(next);
+  });
 
-  app.use(
-    (
-      error: unknown,
-      _request: Request,
-      response: Response,
-      _next: NextFunction,
-    ) => {
-      const message =
-        error instanceof Error ? error.message : "Internal server error";
-      const status = message === "Reservation request not found" ? 404 : 400;
+  app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    const status = message === "Reservation request not found" ? 404 : 400;
 
-      response.status(status).json({ error: message });
-    },
-  );
+    response.status(status).json({ error: message });
+  });
 
   return app;
 }
