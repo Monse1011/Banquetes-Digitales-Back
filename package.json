@@ -6,8 +6,8 @@
   "scripts": {
     "test": "vitest",
     "test:run": "vitest run",
-    "dev": "tsx watch src/app.ts",
-    "start": "tsx src/app.ts",
+    "dev": "node --watch src/app.js",
+    "start": "node src/app.js",
     "lint": "eslint . --ext .ts,.js",
     "lint:fix": "eslint . --ext .ts,.js --fix",
     "format": "prettier . --write",
