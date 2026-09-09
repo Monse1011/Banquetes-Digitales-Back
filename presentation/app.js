@@ -1,7 +1,7 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const { requireAdmin } = require("./middleware/admin-auth");
-const createAuthMiddleware = require('../middleware/auth-middleware');
+const createAuthMiddleware = require(2../middleware/auth-middleware");
 const createAuthRoutes = require("../routes/auth-routes");
 const createPasswordResetRoutes = require("../routes/password-reset-routes");
 
