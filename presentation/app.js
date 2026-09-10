@@ -8,6 +8,7 @@ const createPasswordResetRoutes = require("../routes/password-reset-routes");
 const { ReservationRequestController } = require("./controller/reservation-request-controller");
 const { ServiceController } = require("./controller/service-controller");
 const { openApiDocument } = require("./openapi");
+const ReservationRequestValidationException = require("../domain/exceptions/reservation-request-validation-exception");
 
 function createApp(dependencies) {
   const app = express();
@@ -56,6 +57,11 @@ function createApp(dependencies) {
 
   // Error handler
   app.use((error, _request, response, _next) => {
+    if (error instanceof ReservationRequestValidationException) {
+      response.status(422).json({ errors: error.errors });
+      return;
+    }
+
     const message = error instanceof Error ? error.message : "Internal server error";
     const status = message === "Reservation request not found" ? 404 : 400;
 

@@ -13,14 +13,14 @@ const {
 } = require("../infrastructure/repositories/postgres-reservation-request-repository");
 
 // Authentication repositories
-const PostgresUserRepository = require("../infrastructure/repositories/PostgresUserRepository");
-const PostgresBlockRepository = require("../infrastructure/repositories/PostgresBlockRepository");
-const PostgresPasswordResetRepository = require("../infrastructure/repositories/PostgresPasswordResetRepository");
+const PostgresUserRepository = require("../infrastructure/repositories/postgres-user-repository");
+const PostgresBlockRepository = require("../infrastructure/repositories/postgres-block-repository");
+const PostgresPasswordResetRepository = require("../infrastructure/repositories/postgres-password-reset-repository");
 
 // Services
 const PostgresFolioGenerator = require("../infrastructure/services/postgres-folio-generator");
-const JwtTokenService = require("../infrastructure/security/JwtTokenService");
-const NodemailerEmailService = require("../infrastructure/email/NodemailerEmailService");
+const JwtTokenService = require("../infrastructure/security/jwt-token-service");
+const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
 
 // Use cases
 const {
@@ -40,15 +40,15 @@ const {
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
 
 // Authentication use cases
-const AuthenticateUser = require("../application/use-cases/AuthenticateUser");
-const BlockService = require("../application/use-cases/BlockService");
-const ChangePassword = require("../application/use-cases/ChangePassword");
-const RequestPasswordReset = require("../application/use-cases/RequestPasswordReset");
-const ResetPassword = require("../application/use-cases/ResetPassword");
+const AuthenticateUser = require("../application/use-cases/authenticate-user");
+const BlockService = require("../application/use-cases/block-service");
+const ChangePassword = require("../application/use-cases/change-password");
+const RequestPasswordReset = require("../application/use-cases/request-password-reset");
+const ResetPassword = require("../application/use-cases/reset-password");
 
 // Controllers
-const AuthController = require("../presentation/controller/AuthController");
-const PasswordResetController = require("../presentation/controller/PasswordResetController");
+const AuthController = require("../presentation/controller/auth-controller");
+const PasswordResetController = require("../presentation/controller/password-reset-controller");
 
 async function main() {
   const pool = createPostgresPool();

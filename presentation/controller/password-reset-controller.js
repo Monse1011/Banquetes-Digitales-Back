@@ -1,5 +1,5 @@
-const ForgotPasswordRequestDTO = require("../../application/dto/password-reset/ForgotPasswordRequestDTO");
-const ResetPasswordRequestDTO = require("../../application/dto/password-reset/ResetPasswordRequestDTO");
+const ForgotPasswordRequestDTO = require("../../application/dto/password-reset/forgot-password-request-dto");
+const ResetPasswordRequestDTO = require("../../application/dto/password-reset/reset-password-request-dto");
 
 class PasswordResetController {
   constructor(requestPasswordReset, resetPassword) {
