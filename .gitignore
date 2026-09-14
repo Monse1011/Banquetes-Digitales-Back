@@ -44,17 +44,3 @@ Thumbs.db
 
 # Test / tool output
 .npm/
-
-# Environment files
-.env
-.env.example
-.env.local
-.env.*.local
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-*.mdb
-*.ldb
-*.sql
