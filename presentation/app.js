@@ -1,21 +1,23 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
-const createAuthMiddleware = require("../middleware/auth-middleware");
-const requireRole = require("../middleware/role-middleware");
-const createAuthRoutes = require("../routes/auth-routes");
-const createPasswordResetRoutes = require("../routes/password-reset-routes");
-const createClientRoutes = require("../routes/client-routes");
-const createAdminRoutes = require("../routes/admin-routes");
-const UserRole = require("../domain/enums/user-role");
+const createAuthMiddleware = require("./middleware/auth/auth-middleware");
+const requireRole = require("./middleware/auth/role-middleware");
+const createAuthRoutes = require("./routes/auth-routes");
+const createPasswordResetRoutes = require("./routes/password-reset-routes");
+const createClientRoutes = require("./routes/client-routes");
+const createAdminRoutes = require("./routes/admin-routes");
+const UserRole = require("../domain/enums/auth/user-role");
 
-const { ReservationRequestController } = require("./controller/reservation-request-controller");
-const { ServiceController } = require("./controller/service-controller");
+const {
+  ReservationRequestController,
+} = require("./controller/reservation-request/reservation-request-controller");
+const { ServiceController } = require("./controller/service/service-controller");
 const { openApiDocument } = require("./openapi");
-const ReservationRequestValidationException = require("../domain/exceptions/reservation-request-validation-exception");
-const InvalidCredentialsException = require("../domain/exceptions/invalid-credentials-exception");
-const AccountBlockedException = require("../domain/exceptions/account-blocked-exception");
-const InvalidPasswordException = require("../domain/exceptions/invalid-password-exception");
-const InvalidResetTokenException = require("../domain/exceptions/invalid-reset-token-exception");
+const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
+const InvalidCredentialsException = require("../domain/exceptions/auth/invalid-credentials-exception");
+const AccountBlockedException = require("../domain/exceptions/auth/account-blocked-exception");
+const InvalidPasswordException = require("../domain/exceptions/password-reset/invalid-password-exception");
+const InvalidResetTokenException = require("../domain/exceptions/password-reset/invalid-reset-token-exception");
 
 function createApp(dependencies) {
   const app = express();

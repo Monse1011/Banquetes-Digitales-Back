@@ -1,8 +1,12 @@
-const { ReservationRequest } = require("../../../domain/entities/reservation-request");
-const { ReservationRequestStatus } = require("../../../domain/enums/request-status");
-const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request-validation-exception");
-const CreateReservationRequestDto = require("../../dto/create-reservation-req-request-dto");
-const CreateReservationResponseDto = require("../../dto/create-reservaton-req-response-dto");
+const {
+  ReservationRequest,
+} = require("../../../domain/entities/reservation-request/reservation-request");
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request/reservation-request-validation-exception");
+const CreateReservationRequestDto = require("../../dto/reservation-request/create-reservation-req-request-dto");
+const CreateReservationResponseDto = require("../../dto/reservation-request/create-reservaton-req-response-dto");
 
 class CreateReservationRequestUseCase {
   constructor(upsertClientByEmailUseCase, reservationRequestRepository, folioGenerator) {

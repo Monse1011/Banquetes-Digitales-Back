@@ -1,8 +1,8 @@
 const bcrypt = require("bcrypt");
-const InvalidCredentialsException = require("../../domain/exceptions/invalid-credentials-exception");
-const AccountBlockedException = require("../../domain/exceptions/account-blocked-exception");
-const LoginResponseDTO = require("../dto/auth/login-response-dto");
-const UserStatus = require("../../domain/enums/user-status");
+const InvalidCredentialsException = require("../../../domain/exceptions/auth/invalid-credentials-exception");
+const AccountBlockedException = require("../../../domain/exceptions/auth/account-blocked-exception");
+const LoginResponseDTO = require("../../dto/auth/login-response-dto");
+const UserStatus = require("../../../domain/enums/auth/user-status");
 
 class AuthenticateUser {
   constructor(userRepository, blockService, tokenService) {

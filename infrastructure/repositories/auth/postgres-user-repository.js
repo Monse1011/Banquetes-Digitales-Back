@@ -1,4 +1,4 @@
-const User = require("../../domain/entities/user");
+const User = require("../../../domain/entities/auth/user");
 
 class PostgresUserRepository {
   constructor(pool) {

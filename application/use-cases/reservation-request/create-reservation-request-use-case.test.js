@@ -2,14 +2,14 @@ const { CreateReservationRequestUseCase } = require("./create-reservation-reques
 const { UpsertClientByEmailUseCase } = require("../client/upsert-client-by-email-use-case");
 const {
   InMemoryClientRepository,
-} = require("../../../infrastructure/repositories/in-memory-client-repository");
+} = require("../../../infrastructure/repositories/client/in-memory-client-repository");
 const {
   InMemoryReservationRequestRepository,
-} = require("../../../infrastructure/repositories/in-memory-reservation-request-repository");
+} = require("../../../infrastructure/repositories/reservation-request/in-memory-reservation-request-repository");
 const {
   InMemoryFolioGenerator,
-} = require("../../../infrastructure/services/in-memory-folio-generator");
-const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request-validation-exception");
+} = require("../../../infrastructure/services/reservation-request/in-memory-folio-generator");
+const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request/reservation-request-validation-exception");
 
 describe("CreateReservationRequestUseCase", () => {
   let useCase;

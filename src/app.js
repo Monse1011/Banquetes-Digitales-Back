@@ -22,21 +22,21 @@ function validateEnv() {
 // Repositories
 const {
   PostgresClientRepository,
-} = require("../infrastructure/repositories/postgres-client-repository");
+} = require("../infrastructure/repositories/client/postgres-client-repository");
 const {
   PostgresServiceRepository,
-} = require("../infrastructure/repositories/postgres-service-repository");
+} = require("../infrastructure/repositories/service/postgres-service-repository");
 const {
   PostgresReservationRequestRepository,
-} = require("../infrastructure/repositories/postgres-reservation-request-repository");
+} = require("../infrastructure/repositories/reservation-request/postgres-reservation-request-repository");
 
 // Authentication repositories
-const PostgresUserRepository = require("../infrastructure/repositories/postgres-user-repository");
-const PostgresBlockRepository = require("../infrastructure/repositories/postgres-block-repository");
-const PostgresPasswordResetRepository = require("../infrastructure/repositories/postgres-password-reset-repository");
+const PostgresUserRepository = require("../infrastructure/repositories/auth/postgres-user-repository");
+const PostgresBlockRepository = require("../infrastructure/repositories/auth/postgres-block-repository");
+const PostgresPasswordResetRepository = require("../infrastructure/repositories/password-reset/postgres-password-reset-repository");
 
 // Services
-const PostgresFolioGenerator = require("../infrastructure/services/postgres-folio-generator");
+const PostgresFolioGenerator = require("../infrastructure/services/reservation-request/postgres-folio-generator");
 const JwtTokenService = require("../infrastructure/security/jwt-token-service");
 const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
 
@@ -58,15 +58,15 @@ const {
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
 
 // Authentication use cases
-const AuthenticateUser = require("../application/use-cases/authenticate-user");
-const BlockService = require("../application/use-cases/block-service");
-const ChangePassword = require("../application/use-cases/change-password");
-const RequestPasswordReset = require("../application/use-cases/request-password-reset");
-const ResetPassword = require("../application/use-cases/reset-password");
+const AuthenticateUser = require("../application/use-cases/auth/authenticate-user");
+const BlockService = require("../application/use-cases/auth/block-service");
+const ChangePassword = require("../application/use-cases/auth/change-password");
+const RequestPasswordReset = require("../application/use-cases/password-reset/request-password-reset");
+const ResetPassword = require("../application/use-cases/password-reset/reset-password");
 
 // Controllers
-const AuthController = require("../presentation/controller/auth-controller");
-const PasswordResetController = require("../presentation/controller/password-reset-controller");
+const AuthController = require("../presentation/controller/auth/auth-controller");
+const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
 
 async function main() {
   validateEnv();

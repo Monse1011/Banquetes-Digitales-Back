@@ -4,17 +4,17 @@ const { CreateReservationRequestUseCase } = require("./create-reservation-reques
 const { UpsertClientByEmailUseCase } = require("../client/upsert-client-by-email-use-case");
 const {
   InMemoryClientRepository,
-} = require("../../../infrastructure/repositories/in-memory-client-repository");
+} = require("../../../infrastructure/repositories/client/in-memory-client-repository");
 const {
   InMemoryServiceRepository,
-} = require("../../../infrastructure/repositories/in-memory-service-repository");
+} = require("../../../infrastructure/repositories/service/in-memory-service-repository");
 const {
   InMemoryReservationRequestRepository,
-} = require("../../../infrastructure/repositories/in-memory-reservation-request-repository");
+} = require("../../../infrastructure/repositories/reservation-request/in-memory-reservation-request-repository");
 const {
   InMemoryFolioGenerator,
-} = require("../../../infrastructure/services/in-memory-folio-generator");
-const { Service } = require("../../../domain/entities/service");
+} = require("../../../infrastructure/services/reservation-request/in-memory-folio-generator");
+const { Service } = require("../../../domain/entities/service/service");
 
 describe("ReservationRequest Review UseCases", () => {
   let clientRepository;

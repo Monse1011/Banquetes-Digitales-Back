@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const UserStatus = require("../../domain/enums/user-status");
+const UserStatus = require("../../../domain/enums/auth/user-status");
 
 class RequestPasswordReset {
   constructor(userRepository, passwordResetRepository, emailService) {

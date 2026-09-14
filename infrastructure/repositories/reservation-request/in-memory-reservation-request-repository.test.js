@@ -1,11 +1,15 @@
 const {
   InMemoryReservationRequestRepository,
 } = require("./in-memory-reservation-request-repository");
-const { ReservationRequest } = require("../../domain/entities/reservation-request");
-const { ReservationRequestStatus } = require("../../domain/enums/request-status");
+const {
+  ReservationRequest,
+} = require("../../../domain/entities/reservation-request/reservation-request");
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
 const {
   ReservationRequestSortField,
-} = require("../../domain/enums/reservation-request-sort-field");
+} = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 
 describe("InMemoryReservationRequestRepository", () => {
   let repository;

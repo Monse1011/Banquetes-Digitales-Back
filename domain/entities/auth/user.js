@@ -1,4 +1,4 @@
-const UserStatus = require("../enums/user-status");
+const UserStatus = require("../../enums/auth/user-status");
 
 class User {
   constructor(

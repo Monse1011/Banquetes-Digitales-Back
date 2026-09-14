@@ -1,4 +1,4 @@
-const GetReservationRequestResponseDto = require("../../dto/get-reservation-request-response-dto");
+const GetReservationRequestResponseDto = require("../../dto/reservation-request/get-reservation-request-response-dto");
 
 class GetReservationRequestUseCase {
   constructor(reservationRequestRepository, clientRepository, serviceRepository) {

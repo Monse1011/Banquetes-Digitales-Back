@@ -1,5 +1,5 @@
-const { Service } = require("../../domain/entities/service");
-const ServiceStatus = require("../../domain/enums/service-status");
+const { Service } = require("../../../domain/entities/service/service");
+const ServiceStatus = require("../../../domain/enums/service/service-status");
 
 class PostgresServiceRepository {
   constructor(pool) {

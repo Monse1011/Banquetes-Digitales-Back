@@ -1,5 +1,7 @@
-const { ReservationRequestStatus } = require("../../../domain/enums/request-status");
-const ApproveReservationRequestResponseDto = require("../../dto/approve-reservation-request-response-dto");
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+const ApproveReservationRequestResponseDto = require("../../dto/reservation-request/approve-reservation-request-response-dto");
 
 class ApproveReservationRequestUseCase {
   constructor(reservationRequestRepository) {

@@ -1,4 +1,4 @@
-const AccountBlockedException = require("../../domain/exceptions/account-blocked-exception");
+const AccountBlockedException = require("../../../domain/exceptions/auth/account-blocked-exception");
 
 class BlockService {
   constructor(blockRepository) {

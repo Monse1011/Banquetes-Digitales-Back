@@ -1,8 +1,8 @@
 const {
   ReservationRequestSortField,
-} = require("../../../domain/enums/reservation-request-sort-field");
-const GetReservationRequestsResponseDto = require("../../dto/get-reservation-requests-response-dto");
-const ReservationRequestSummaryDto = require("../../dto/reservation-request-summary-dto");
+} = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
+const GetReservationRequestsResponseDto = require("../../dto/reservation-request/get-reservation-requests-response-dto");
+const ReservationRequestSummaryDto = require("../../dto/reservation-request/reservation-request-summary-dto");
 
 class GetReservationRequestsUseCase {
   constructor(reservationRequestRepository, clientRepository, serviceRepository) {

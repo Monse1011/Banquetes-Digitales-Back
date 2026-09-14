@@ -1,4 +1,4 @@
-const Block = require("../../domain/entities/block");
+const Block = require("../../../domain/entities/auth/block");
 
 const BLOCK_DURATION_MINUTES = 15;
 

@@ -1,4 +1,4 @@
-const Email = require("../../domain/value-objects/email");
+const Email = require("../../../domain/value-objects/email");
 
 // RF-3.4.3.2: solo letras (con acentos) y al menos nombre + apellido.
 const FULL_NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ]+)+$/;

@@ -1,7 +1,9 @@
-const { ReservationRequest } = require("../../domain/entities/reservation-request");
+const {
+  ReservationRequest,
+} = require("../../../domain/entities/reservation-request/reservation-request");
 const {
   ReservationRequestSortField,
-} = require("../../domain/enums/reservation-request-sort-field");
+} = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 
 class PostgresReservationRequestRepository {
   constructor(pool) {
