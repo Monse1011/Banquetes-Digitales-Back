@@ -1,19 +1,27 @@
-/**
- * @typedef {Object} GetReservationRequestResponseDto
- * @property {number} id
- * @property {string} folio
- * @property {Object} client
- * @property {number} client.id
- * @property {string} client.full_name
- * @property {string} client.email
- * @property {string} client.phone
- * @property {string} event_date_time
- * @property {number} guest_count
- * @property {string} event_address
- * @property {Array} services
- * @property {string} status
- * @property {string} request_date
- * @property {string} update_date
- */
+class GetReservationRequestResponseDto {
+  constructor(
+    id,
+    folio,
+    client,
+    eventDateTime,
+    guestCount,
+    eventAddress,
+    services,
+    status,
+    requestDate,
+    updateDate
+  ) {
+    this.id = id;
+    this.folio = folio;
+    this.client = client;
+    this.event_date_time = eventDateTime;
+    this.guest_count = guestCount;
+    this.event_address = eventAddress;
+    this.services = services;
+    this.status = status;
+    this.request_date = requestDate;
+    this.update_date = updateDate;
+  }
+}
 
-module.exports = {};
+module.exports = GetReservationRequestResponseDto;

@@ -1,5 +1,7 @@
 const { ReservationRequest } = require("../../domain/entities/reservation-request");
-const { ReservationRequestSortField } = require("../../application/dto/reservation-request-sort");
+const {
+  ReservationRequestSortField,
+} = require("../../domain/enums/reservation-request-sort-field");
 
 class PostgresReservationRequestRepository {
   constructor(pool) {
@@ -190,13 +192,14 @@ class PostgresReservationRequestRepository {
   async replaceServices(connection, requestId, serviceIds) {
     await connection.query("DELETE FROM request_services WHERE id_request = $1", [requestId]);
 
-    for (const serviceId of serviceIds) {
-      await connection.query(
-        `INSERT INTO request_services (id_request, id_service)
-         VALUES ($1, $2)`,
-        [requestId, serviceId]
-      );
-    }
+    if (serviceIds.length === 0) return;
+
+    const values = serviceIds.map((_serviceId, index) => `($1, $${index + 2})`).join(", ");
+
+    await connection.query(
+      `INSERT INTO request_services (id_request, id_service) VALUES ${values}`,
+      [requestId, ...serviceIds]
+    );
   }
 
   toEntity(row) {
@@ -234,11 +237,11 @@ class PostgresReservationRequestRepository {
 
   sortColumn(field) {
     switch (field) {
-      case ReservationRequestSortField.ClientName:
+      case ReservationRequestSortField.CLIENT_NAME:
         return "c.full_name";
-      case ReservationRequestSortField.Status:
+      case ReservationRequestSortField.STATUS:
         return "rr.status";
-      case ReservationRequestSortField.EventDate:
+      case ReservationRequestSortField.EVENT_DATE:
         return "rr.event_date";
     }
   }

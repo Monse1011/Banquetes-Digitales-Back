@@ -15,10 +15,9 @@ class PasswordResetController {
       return res.status(200).json(await this.requestPasswordReset.execute(dto.email));
     } catch (error) {
       console.error("Error al solicitar restablecimiento:", error);
-      return res.status(200).json({
-        message:
-          "Si existe una cuenta asociada a este correo, se enviará un enlace de restablecimiento",
-      });
+      return res
+        .status(500)
+        .json({ message: "No fue posible procesar la solicitud de restablecimiento" });
     }
   };
 

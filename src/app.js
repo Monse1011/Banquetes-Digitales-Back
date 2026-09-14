@@ -1,5 +1,23 @@
+require("dotenv").config();
+
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
+
+const REQUIRED_ENV_VARS = ["JWT_SECRET"];
+
+function validateEnv() {
+  const hasDatabaseConfig = Boolean(process.env.DATABASE_URL || process.env.PGHOST);
+  const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+
+  if (!hasDatabaseConfig) {
+    missing.push("DATABASE_URL or PGHOST");
+  }
+
+  if (missing.length > 0) {
+    console.error(`Missing required environment variables: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+}
 
 // Repositories
 const {
@@ -51,6 +69,8 @@ const AuthController = require("../presentation/controller/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset-controller");
 
 async function main() {
+  validateEnv();
+
   const pool = createPostgresPool();
 
   try {

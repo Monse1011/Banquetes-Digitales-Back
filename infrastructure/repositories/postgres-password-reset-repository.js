@@ -12,7 +12,7 @@ class PostgresPasswordResetRepository {
             VALUES ($1, $2, $3) RETURNING *`,
       [idUser, token, expirationDate]
     );
-    return new PasswordResetToken(result.rows[0]);
+    return this.toEntity(result.rows[0]);
   }
 
   async findValidToken(token) {
@@ -28,7 +28,7 @@ class PostgresPasswordResetRepository {
                 AND prt.expiration_date > NOW()`,
       [token]
     );
-    return result.rows[0] ? new PasswordResetToken(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async markAsUsed(idToken) {
@@ -43,6 +43,20 @@ class PostgresPasswordResetRepository {
             UPDATE password_reset_tokens SET used = TRUE
             WHERE id_user = $1 AND used = FALSE`,
       [idUser]
+    );
+  }
+
+  toEntity(row) {
+    return new PasswordResetToken(
+      row.id_token,
+      row.id_user,
+      row.token,
+      row.expiration_date,
+      row.used,
+      row.id_employee,
+      row.full_name,
+      row.email,
+      row.role
     );
   }
 }

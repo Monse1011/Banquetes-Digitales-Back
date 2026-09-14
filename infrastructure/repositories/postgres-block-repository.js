@@ -1,5 +1,7 @@
 const Block = require("../../domain/entities/block");
 
+const BLOCK_DURATION_MINUTES = 15;
+
 class PostgresBlockRepository {
   constructor(pool) {
     this.pool = pool;
@@ -12,7 +14,7 @@ class PostgresBlockRepository {
             FROM blocks WHERE id_user = $1`,
       [idUser]
     );
-    return result.rows[0] ? new Block(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async incrementFailedAttempts(idUser) {
@@ -25,17 +27,17 @@ class PostgresBlockRepository {
             RETURNING *`,
       [idUser]
     );
-    return new Block(result.rows[0]);
+    return this.toEntity(result.rows[0]);
   }
 
   async blockUser(idUser) {
     const result = await this.pool.query(
       `
-            UPDATE blocks SET blocked_until = NOW() + INTERVAL '15 minutes'
+            UPDATE blocks SET blocked_until = NOW() + make_interval(mins => $2)
             WHERE id_user = $1 RETURNING *`,
-      [idUser]
+      [idUser, BLOCK_DURATION_MINUTES]
     );
-    return result.rows[0] ? new Block(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async resetAttempts(idUser) {
@@ -45,6 +47,10 @@ class PostgresBlockRepository {
             WHERE id_user = $1`,
       [idUser]
     );
+  }
+
+  toEntity(row) {
+    return new Block(row.id_block, row.id_user, row.failed_attempts, row.blocked_until);
   }
 }
 

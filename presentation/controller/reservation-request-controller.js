@@ -41,7 +41,7 @@ class ReservationRequestController {
     const status = request.body?.status;
 
     if (status !== "Aprobado" && status !== "Aprobada") {
-      response.status(400).json({ error: "Status must be Aprobado" });
+      response.status(400).json({ message: "Status must be Aprobado" });
       return;
     }
 

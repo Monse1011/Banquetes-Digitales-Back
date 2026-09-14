@@ -1,9 +1,8 @@
 const { ReservationRequest } = require("../../../domain/entities/reservation-request");
 const { ReservationRequestStatus } = require("../../../domain/enums/request-status");
 const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request-validation-exception");
-const {
-  validateCreateReservationRequest,
-} = require("../../validators/reservation-request-validator");
+const CreateReservationRequestDto = require("../../dto/create-reservation-req-request-dto");
+const CreateReservationResponseDto = require("../../dto/create-reservaton-req-response-dto");
 
 class CreateReservationRequestUseCase {
   constructor(upsertClientByEmailUseCase, reservationRequestRepository, folioGenerator) {
@@ -12,8 +11,9 @@ class CreateReservationRequestUseCase {
     this.folioGenerator = folioGenerator;
   }
 
-  async execute(dto) {
-    const errors = validateCreateReservationRequest(dto);
+  async execute(body) {
+    const dto = new CreateReservationRequestDto(body);
+    const errors = dto.validate();
 
     if (Object.keys(errors).length > 0) {
       throw new ReservationRequestValidationException(errors);
@@ -36,7 +36,7 @@ class CreateReservationRequestUseCase {
       new Date(dto.event_date_time),
       dto.guest_count,
       dto.event_address,
-      ReservationRequestStatus.Pending,
+      ReservationRequestStatus.PENDING,
       now,
       now,
       dto.services_ids
@@ -44,9 +44,7 @@ class CreateReservationRequestUseCase {
 
     await this.reservationRequestRepository.create(reservationRequest);
 
-    return {
-      folio,
-    };
+    return new CreateReservationResponseDto(folio);
   }
 }
 

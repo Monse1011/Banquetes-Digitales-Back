@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const UserStatus = require("../../domain/enums/user-status");
 
 class RequestPasswordReset {
   constructor(userRepository, passwordResetRepository, emailService) {
@@ -14,15 +15,15 @@ class RequestPasswordReset {
     };
 
     const user = await this.userRepository.findByEmail(email);
-    if (!user || user.status !== "activo") return genericResponse;
+    if (!user || user.status !== UserStatus.ACTIVE) return genericResponse;
 
-    await this.passwordResetRepository.invalidateUserTokens(user.id_user);
+    await this.passwordResetRepository.invalidateUserTokens(user.id);
 
     const token = crypto.randomBytes(32).toString("hex");
     const expirationDate = new Date(Date.now() + 15 * 60 * 1000);
 
-    await this.passwordResetRepository.create(user.id_user, token, expirationDate);
-    await this.emailService.sendPasswordResetEmail(user.email, user.full_name, token);
+    await this.passwordResetRepository.create(user.id, token, expirationDate);
+    await this.emailService.sendPasswordResetEmail(user.email, user.fullName, token);
 
     return genericResponse;
   }

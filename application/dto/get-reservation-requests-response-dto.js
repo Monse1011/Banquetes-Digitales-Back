@@ -1,10 +1,12 @@
-/**
- * @typedef {Object} GetReservationRequestsResponseDto
- * @property {Array} data
- * @property {Object} pagination
- * @property {number} pagination.total_records
- * @property {number} pagination.page
- * @property {number} pagination.per_page
- */
+class GetReservationRequestsResponseDto {
+  constructor(data, totalRecords, page, perPage) {
+    this.data = data;
+    this.pagination = {
+      total_records: totalRecords,
+      page,
+      per_page: perPage,
+    };
+  }
+}
 
-module.exports = {};
+module.exports = GetReservationRequestsResponseDto;

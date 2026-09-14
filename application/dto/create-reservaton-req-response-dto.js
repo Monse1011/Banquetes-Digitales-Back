@@ -1,6 +1,7 @@
-/**
- * @typedef {Object} CreateReservationResponseDto
- * @property {string} folio
- */
+class CreateReservationResponseDto {
+  constructor(folio) {
+    this.folio = folio;
+  }
+}
 
-module.exports = {};
+module.exports = CreateReservationResponseDto;

@@ -1,6 +1,7 @@
-class EmailService {
-  async sendPasswordResetEmail() {
-    throw new Error("Not implemented");
-  }
-}
-module.exports = EmailService;
+/**
+ * @typedef {Object} EmailService
+ * @property {(email: string, fullName: string, token: string) =>
+ * Promise<void>} sendPasswordResetEmail
+ */
+
+module.exports = {};

@@ -1,15 +1,10 @@
-class PasswordResetRepository {
-  async create() {
-    throw new Error("Not implemented");
-  }
-  async findValidToken() {
-    throw new Error("Not implemented");
-  }
-  async markAsUsed() {
-    throw new Error("Not implemented");
-  }
-  async invalidateUserTokens() {
-    throw new Error("Not implemented");
-  }
-}
-module.exports = PasswordResetRepository;
+/**
+ * @typedef {Object} PasswordResetRepository
+ * @property {(userId: number, token: string, expirationDate: Date) =>
+ * Promise<PasswordResetToken>} create
+ * @property {(token: string) => Promise<PasswordResetToken | null>} findValidToken
+ * @property {(tokenId: number) => Promise<void>} markAsUsed
+ * @property {(userId: number) => Promise<void>} invalidateUserTokens
+ */
+
+module.exports = {};

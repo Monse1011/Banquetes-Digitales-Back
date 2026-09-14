@@ -1,15 +1,10 @@
-class UserRepository {
-  async findByEmployeeId() {
-    throw new Error("Not implemented");
-  }
-  async findByEmail() {
-    throw new Error("Not implemented");
-  }
-  async updateLastAccess() {
-    throw new Error("Not implemented");
-  }
-  async updatePassword() {
-    throw new Error("Not implemented");
-  }
-}
-module.exports = UserRepository;
+/**
+ * @typedef {Object} UserRepository
+ * @property {(employeeId: string) => Promise<User | null>} findByEmployeeId
+ * @property {(email: string) => Promise<User | null>} findByEmail
+ * @property {(userId: number) => Promise<User | null>} findById
+ * @property {(userId: number) => Promise<void>} updateLastAccess
+ * @property {(userId: number, passwordHash: string) => Promise<void>} updatePassword
+ */
+
+module.exports = {};

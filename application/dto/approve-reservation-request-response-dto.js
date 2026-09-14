@@ -1,8 +1,9 @@
-/**
- * @typedef {Object} ApproveReservationRequestResponseDto
- * @property {number} id
- * @property {string} folio
- * @property {string} status
- */
+class ApproveReservationRequestResponseDto {
+  constructor(id, folio, status) {
+    this.id = id;
+    this.folio = folio;
+    this.status = status;
+  }
+}
 
-module.exports = {};
+module.exports = ApproveReservationRequestResponseDto;

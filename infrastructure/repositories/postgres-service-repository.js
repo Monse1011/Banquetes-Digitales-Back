@@ -1,4 +1,5 @@
 const { Service } = require("../../domain/entities/service");
+const ServiceStatus = require("../../domain/enums/service-status");
 
 class PostgresServiceRepository {
   constructor(pool) {
@@ -9,8 +10,9 @@ class PostgresServiceRepository {
     const result = await this.pool.query(
       `SELECT id_service, name, description, status
        FROM services
-       WHERE status = 'activo'
-       ORDER BY id_service`
+       WHERE status = $1
+       ORDER BY id_service`,
+      [ServiceStatus.ACTIVE]
     );
 
     return result.rows.map((row) => this.toEntity(row));

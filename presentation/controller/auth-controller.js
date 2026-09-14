@@ -2,6 +2,7 @@ const LoginRequestDTO = require("../../application/dto/auth/login-request-dto");
 const ChangePasswordRequestDTO = require("../../application/dto/auth/change-password-request-dto");
 const InvalidCredentialsException = require("../../domain/exceptions/invalid-credentials-exception");
 const AccountBlockedException = require("../../domain/exceptions/account-blocked-exception");
+const InvalidPasswordException = require("../../domain/exceptions/invalid-password-exception");
 
 class AuthController {
   constructor(authenticateUser, changePassword) {
@@ -47,8 +48,11 @@ class AuthController {
       );
       return res.status(200).json(result);
     } catch (error) {
-      console.error("Error al cambiar contraseña:", error.message);
-      return res.status(400).json({ message: error.message });
+      console.error("Error al cambiar contraseña:", error);
+      if (error instanceof InvalidPasswordException) {
+        return res.status(400).json({ message: error.message });
+      }
+      return res.status(400).json({ message: "No fue posible cambiar la contraseña" });
     }
   };
 }

@@ -3,7 +3,9 @@ const {
 } = require("./in-memory-reservation-request-repository");
 const { ReservationRequest } = require("../../domain/entities/reservation-request");
 const { ReservationRequestStatus } = require("../../domain/enums/request-status");
-const { ReservationRequestSortField } = require("../../application/dto/reservation-request-sort");
+const {
+  ReservationRequestSortField,
+} = require("../../domain/enums/reservation-request-sort-field");
 
 describe("InMemoryReservationRequestRepository", () => {
   let repository;
@@ -21,7 +23,7 @@ describe("InMemoryReservationRequestRepository", () => {
       new Date(),
       50,
       "123 Main St",
-      ReservationRequestStatus.Pending,
+      ReservationRequestStatus.PENDING,
       new Date(),
       new Date(),
       [1, 2]
@@ -42,7 +44,7 @@ describe("InMemoryReservationRequestRepository", () => {
       new Date(),
       50,
       "123 Main St",
-      ReservationRequestStatus.Pending,
+      ReservationRequestStatus.PENDING,
       new Date(),
       new Date(),
       [1, 2]
@@ -64,18 +66,18 @@ describe("InMemoryReservationRequestRepository", () => {
       new Date(),
       50,
       "123 Main St",
-      ReservationRequestStatus.Pending,
+      ReservationRequestStatus.PENDING,
       new Date(),
       new Date(),
       [1, 2]
     );
 
     const created = await repository.create(request);
-    created.status = ReservationRequestStatus.Approved;
+    created.status = ReservationRequestStatus.APPROVED;
     await repository.update(created);
     const updated = await repository.findById(created.id);
 
-    expect(updated.status).toBe(ReservationRequestStatus.Approved);
+    expect(updated.status).toBe(ReservationRequestStatus.APPROVED);
   });
 
   it("should find all with pagination", async () => {
@@ -88,7 +90,7 @@ describe("InMemoryReservationRequestRepository", () => {
         new Date(),
         50,
         "123 Main St",
-        ReservationRequestStatus.Pending,
+        ReservationRequestStatus.PENDING,
         new Date(),
         new Date(),
         [1, 2]
@@ -98,7 +100,7 @@ describe("InMemoryReservationRequestRepository", () => {
 
     const result = await repository.findAll(
       {},
-      { field: ReservationRequestSortField.EventDate, direction: "asc" },
+      { field: ReservationRequestSortField.EVENT_DATE, direction: "asc" },
       1,
       3
     );
@@ -116,7 +118,7 @@ describe("InMemoryReservationRequestRepository", () => {
       new Date(),
       50,
       "123 Main St",
-      ReservationRequestStatus.Pending,
+      ReservationRequestStatus.PENDING,
       new Date(),
       new Date(),
       [1]
@@ -130,7 +132,7 @@ describe("InMemoryReservationRequestRepository", () => {
       new Date(),
       50,
       "123 Main St",
-      ReservationRequestStatus.Approved,
+      ReservationRequestStatus.APPROVED,
       new Date(),
       new Date(),
       [1]
@@ -140,13 +142,13 @@ describe("InMemoryReservationRequestRepository", () => {
     await repository.create(approved);
 
     const result = await repository.findAll(
-      { status: ReservationRequestStatus.Approved },
-      { field: ReservationRequestSortField.EventDate, direction: "asc" },
+      { status: ReservationRequestStatus.APPROVED },
+      { field: ReservationRequestSortField.EVENT_DATE, direction: "asc" },
       1,
       10
     );
 
     expect(result.requests).toHaveLength(1);
-    expect(result.requests[0].status).toBe(ReservationRequestStatus.Approved);
+    expect(result.requests[0].status).toBe(ReservationRequestStatus.APPROVED);
   });
 });

@@ -1,3 +1,5 @@
+const GetReservationRequestResponseDto = require("../../dto/get-reservation-request-response-dto");
+
 class GetReservationRequestUseCase {
   constructor(reservationRequestRepository, clientRepository, serviceRepository) {
     this.reservationRequestRepository = reservationRequestRepository;
@@ -19,28 +21,28 @@ class GetReservationRequestUseCase {
       throw new Error(`Client ${request.clientId} not found`);
     }
 
-    return {
-      id: request.id,
-      folio: request.folio,
-      client: {
+    return new GetReservationRequestResponseDto(
+      request.id,
+      request.folio,
+      {
         id: client.clientId,
         full_name: client.fullName,
         email: client.email,
         phone: client.phone,
       },
-      event_date_time: request.eventDateTime.toISOString(),
-      guest_count: request.guestCount,
-      event_address: request.eventAddress,
-      services: services.map((service) => ({
+      request.eventDateTime.toISOString(),
+      request.guestCount,
+      request.eventAddress,
+      services.map((service) => ({
         id: service.id,
         name: service.name,
         description: service.description,
         status: service.status,
       })),
-      status: request.status,
-      request_date: request.requestDate.toISOString(),
-      update_date: request.updateDate.toISOString(),
-    };
+      request.status,
+      request.requestDate.toISOString(),
+      request.updateDate.toISOString()
+    );
   }
 }
 

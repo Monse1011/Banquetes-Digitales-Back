@@ -1,9 +1,13 @@
 class Block {
-  constructor(data) {
-    Object.assign(this, data);
+  constructor(id, userId, failedAttempts, blockedUntil) {
+    this.id = id;
+    this.userId = userId;
+    this.failedAttempts = failedAttempts;
+    this.blockedUntil = blockedUntil;
   }
+
   isCurrentlyBlocked() {
-    return Boolean(this.blocked_until && new Date(this.blocked_until) > new Date());
+    return Boolean(this.blockedUntil && new Date(this.blockedUntil) > new Date());
   }
 }
 module.exports = Block;

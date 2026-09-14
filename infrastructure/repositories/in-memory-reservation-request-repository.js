@@ -1,5 +1,7 @@
 const { ReservationRequest } = require("../../domain/entities/reservation-request");
-const { ReservationRequestSortField } = require("../../application/dto/reservation-request-sort");
+const {
+  ReservationRequestSortField,
+} = require("../../domain/enums/reservation-request-sort-field");
 
 class InMemoryReservationRequestRepository {
   constructor() {
@@ -76,11 +78,11 @@ class InMemoryReservationRequestRepository {
 
   getSortValue(request, field) {
     switch (field) {
-      case ReservationRequestSortField.EventDate:
+      case ReservationRequestSortField.EVENT_DATE:
         return request.eventDateTime.getTime();
-      case ReservationRequestSortField.Status:
+      case ReservationRequestSortField.STATUS:
         return request.status;
-      case ReservationRequestSortField.ClientName:
+      case ReservationRequestSortField.CLIENT_NAME:
         return request.clientId;
     }
   }

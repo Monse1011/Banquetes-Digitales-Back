@@ -13,7 +13,7 @@ class PostgresUserRepository {
             FROM users WHERE id_employee = $1`,
       [idEmployee]
     );
-    return result.rows[0] ? new User(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async findById(idUser) {
@@ -24,7 +24,7 @@ class PostgresUserRepository {
             FROM users WHERE id_user = $1`,
       [idUser]
     );
-    return result.rows[0] ? new User(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async findByEmail(email) {
@@ -35,7 +35,7 @@ class PostgresUserRepository {
             FROM users WHERE email = $1`,
       [email]
     );
-    return result.rows[0] ? new User(result.rows[0]) : null;
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async updateLastAccess(idUser) {
@@ -48,6 +48,20 @@ class PostgresUserRepository {
             UPDATE users SET password_hash = $1, last_access = NOW()
             WHERE id_user = $2`,
       [passwordHash, idUser]
+    );
+  }
+
+  toEntity(row) {
+    return new User(
+      row.id_user,
+      row.id_employee,
+      row.full_name,
+      row.email,
+      row.password_hash,
+      row.role,
+      row.status,
+      row.creation_date,
+      row.last_access
     );
   }
 }

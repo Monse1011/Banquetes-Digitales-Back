@@ -1,4 +1,8 @@
-const { ReservationRequestSortField } = require("../../dto/reservation-request-sort");
+const {
+  ReservationRequestSortField,
+} = require("../../../domain/enums/reservation-request-sort-field");
+const GetReservationRequestsResponseDto = require("../../dto/get-reservation-requests-response-dto");
+const ReservationRequestSummaryDto = require("../../dto/reservation-request-summary-dto");
 
 class GetReservationRequestsUseCase {
   constructor(reservationRequestRepository, clientRepository, serviceRepository) {
@@ -11,7 +15,7 @@ class GetReservationRequestsUseCase {
     const page = input.page ?? 1;
     const perPage = input.perPage ?? 20;
     const sort = input.sort ?? {
-      field: ReservationRequestSortField.EventDate,
+      field: ReservationRequestSortField.EVENT_DATE,
       direction: "asc",
     };
 
@@ -33,31 +37,26 @@ class GetReservationRequestsUseCase {
     const clientsById = new Map(clients.map((client) => [client.clientId, client]));
     const servicesById = new Map(services.map((service) => [service.id, service]));
 
-    return {
-      data: result.requests.map((request) => {
-        const client = clientsById.get(request.clientId);
+    const data = result.requests.map((request) => {
+      const client = clientsById.get(request.clientId);
 
-        if (!client) {
-          throw new Error(`Client ${request.clientId} not found`);
-        }
+      if (!client) {
+        throw new Error(`Client ${request.clientId} not found`);
+      }
 
-        return {
-          folio: request.folio,
-          client_name: client.fullName,
-          client_email: client.email,
-          requested_date: request.eventDateTime.toISOString(),
-          selected_services: request.servicesIds
-            .map((serviceId) => servicesById.get(serviceId)?.name)
-            .filter((name) => name !== undefined),
-          status: request.status,
-        };
-      }),
-      pagination: {
-        total_records: result.totalRecords,
-        page,
-        per_page: perPage,
-      },
-    };
+      return new ReservationRequestSummaryDto(
+        request.folio,
+        client.fullName,
+        client.email,
+        request.eventDateTime.toISOString(),
+        request.servicesIds
+          .map((serviceId) => servicesById.get(serviceId)?.name)
+          .filter((name) => name !== undefined),
+        request.status
+      );
+    });
+
+    return new GetReservationRequestsResponseDto(data, result.totalRecords, page, perPage);
   }
 }
 

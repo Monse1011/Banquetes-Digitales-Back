@@ -4,8 +4,8 @@ class JwtTokenService {
   generateToken(user, extraClaims = {}) {
     return jwt.sign(
       {
-        id_user: user.id_user,
-        id_employee: user.id_employee,
+        id_user: user.id,
+        id_employee: user.employeeId,
         role: user.role,
         ...extraClaims,
       },

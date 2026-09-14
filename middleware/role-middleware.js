@@ -6,4 +6,5 @@ function requireRole(...allowedRoles) {
     next();
   };
 }
+
 module.exports = requireRole;

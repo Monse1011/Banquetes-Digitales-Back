@@ -7,8 +7,8 @@ class BlockService {
 
   async isBlocked(idUser) {
     const block = await this.blockRepository.findByUserId(idUser);
-    if (!block || !block.blocked_until) return false;
-    if (new Date(block.blocked_until) > new Date()) return true;
+    if (!block || !block.blockedUntil) return false;
+    if (new Date(block.blockedUntil) > new Date()) return true;
     await this.blockRepository.resetAttempts(idUser);
     return false;
   }
@@ -19,7 +19,7 @@ class BlockService {
 
   async registerFailedAttempt(idUser) {
     const attempts = await this.blockRepository.incrementFailedAttempts(idUser);
-    if (attempts.failed_attempts >= 3) {
+    if (attempts.failedAttempts >= 3) {
       await this.blockRepository.blockUser(idUser);
       return true;
     }
