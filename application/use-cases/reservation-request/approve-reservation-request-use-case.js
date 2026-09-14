@@ -1,4 +1,7 @@
-const { ReservationRequestStatus } = require("../../../domain/enums/request-status");
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+const ApproveReservationRequestResponseDto = require("../../dto/reservation-request/approve-reservation-request-response-dto");
 
 class ApproveReservationRequestUseCase {
   constructor(reservationRequestRepository) {
@@ -12,15 +15,15 @@ class ApproveReservationRequestUseCase {
       throw new Error("Reservation request not found");
     }
 
-    request.status = ReservationRequestStatus.Approved;
+    request.status = ReservationRequestStatus.APPROVED;
     request.updateDate = new Date();
     const updatedRequest = await this.reservationRequestRepository.update(request);
 
-    return {
-      id: updatedRequest.id,
-      folio: updatedRequest.folio,
-      status: updatedRequest.status,
-    };
+    return new ApproveReservationRequestResponseDto(
+      updatedRequest.id,
+      updatedRequest.folio,
+      updatedRequest.status
+    );
   }
 }
 

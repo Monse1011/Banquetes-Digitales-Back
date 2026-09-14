@@ -2,14 +2,16 @@ const request = require("supertest");
 const { createApp } = require("./app");
 const {
   InMemoryClientRepository,
-} = require("../infrastructure/repositories/in-memory-client-repository");
+} = require("../infrastructure/repositories/client/in-memory-client-repository");
 const {
   InMemoryServiceRepository,
-} = require("../infrastructure/repositories/in-memory-service-repository");
+} = require("../infrastructure/repositories/service/in-memory-service-repository");
 const {
   InMemoryReservationRequestRepository,
-} = require("../infrastructure/repositories/in-memory-reservation-request-repository");
-const { InMemoryFolioGenerator } = require("../infrastructure/services/in-memory-folio-generator");
+} = require("../infrastructure/repositories/reservation-request/in-memory-reservation-request-repository");
+const {
+  InMemoryFolioGenerator,
+} = require("../infrastructure/services/reservation-request/in-memory-folio-generator");
 const {
   UpsertClientByEmailUseCase,
 } = require("../application/use-cases/client/upsert-client-by-email-use-case");
@@ -25,7 +27,7 @@ const {
 const {
   GetReservationRequestsUseCase,
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
-const { Service } = require("../domain/entities/service");
+const { Service } = require("../domain/entities/service/service");
 
 describe("App", () => {
   let app;

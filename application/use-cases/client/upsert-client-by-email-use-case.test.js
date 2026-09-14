@@ -1,7 +1,7 @@
 const { UpsertClientByEmailUseCase } = require("./upsert-client-by-email-use-case");
 const {
   InMemoryClientRepository,
-} = require("../../../infrastructure/repositories/in-memory-client-repository");
+} = require("../../../infrastructure/repositories/client/in-memory-client-repository");
 
 describe("UpsertClientByEmailUseCase", () => {
   let useCase;

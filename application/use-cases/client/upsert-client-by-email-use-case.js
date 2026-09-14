@@ -1,4 +1,4 @@
-const { Client } = require("../../../domain/entities/client");
+const { Client } = require("../../../domain/entities/client/client");
 
 class UpsertClientByEmailUseCase {
   constructor(clientRepository) {

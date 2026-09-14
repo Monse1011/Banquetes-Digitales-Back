@@ -83,26 +83,31 @@ npm start
 ## Estructura del Proyecto
 
 ```
-├── domain/                 # Entidades y lógica de dominio
-│   ├── entities/          # Cliente, Servicio, SolicitudReserva
-│   ├── enums/             # Estados de solicitud
-│   └── exceptions/        # Excepciones de dominio
-├── application/           # Lógica de aplicación
-│   ├── dto/              # Objetos de transferencia de datos
-│   ├── use-cases/        # Casos de uso de negocio
-│   ├── ports/            # Interfaces de puertos
-│   ├── repositories/     # Interfaces de repositorio
-│   └── services/         # Interfaces de servicio
-├── infrastructure/        # Implementaciones técnicas
-│   ├── database/         # Configuración de base de datos
-│   ├── repositories/     # Implementaciones de repositorio
-│   └── services/         # Implementaciones de servicio
-├── presentation/         # API y controladores
-│   ├── controller/       # Controladores HTTP
-│   ├── middleware/       # Middleware de Express
-│   └── app.js           # Configuración de Express
+├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
+│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
+│   ├── enums/             # Constantes y enumeradores del negocio, por feature
+│   ├── exceptions/        # Errores de dominio, por feature
+│   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
+├── application/           # Casos de uso que orquestan la lógica de dominio
+│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
+│   ├── dto/               # Entrada/salida de los casos de uso, por feature
+│   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
+│   ├── repositories/       # Contratos de los repositorios, por feature
+│   └── services/           # Lógica de aplicación que orquesta una entidad (folio-generator)
+├── infrastructure/         # Implementaciones técnicas
+│   ├── database/           # Configuración de conexión (postgres-pool)
+│   ├── email/               # Implementación real de envío de correo
+│   ├── repositories/        # Implementación real de los repositorios, por feature
+│   ├── security/             # Hashing y JWT
+│   └── services/              # Implementación de servicios externos, por feature
+├── presentation/            # API HTTP
+│   ├── controller/           # Controladores HTTP, por feature
+│   ├── middleware/            # Autenticación, rate limiting
+│   ├── routes/                 # Routers de Express
+│   ├── app.js                  # Composición de la app Express
+│   └── openapi.js              # Documento Swagger/OpenAPI
 └── src/
-    └── app.js           # Punto de entrada de la aplicación
+    └── app.js                  # Punto de entrada: carga env, arma dependencias y arranca el server
 ```
 
 ## API Endpoints
