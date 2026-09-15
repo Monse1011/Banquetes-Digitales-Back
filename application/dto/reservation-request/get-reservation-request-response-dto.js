@@ -1,24 +1,32 @@
 class GetReservationRequestResponseDto {
   constructor(
-    id,
+    requestId,
     folio,
-    client,
-    eventDateTime,
+    clientName,
+    clientEmail,
+    clientPhone,
     guestCount,
     eventAddress,
-    services,
+    eventDateTime,
+    requestDate,
     status,
-    requestDate
+    selectedServices
   ) {
-    this.id = id;
-    this.folio = folio;
-    this.client = client;
-    this.event_date_time = eventDateTime;
-    this.guest_count = guestCount;
-    this.event_address = eventAddress;
-    this.services = services;
-    this.status = status;
-    this.request_date = requestDate;
+    this.data = [
+      {
+        request_id: requestId,
+        folio: folio,
+        client_name: clientName,
+        client_email: clientEmail,
+        client_phone: clientPhone,
+        guest_count: guestCount,
+        event_address: eventAddress,
+        event_date_time: eventDateTime,
+        requested_date: requestDate,
+        status: status,
+        selected_services: selectedServices,
+      },
+    ];
   }
 }
 

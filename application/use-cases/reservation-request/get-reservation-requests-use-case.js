@@ -11,6 +11,7 @@ class GetReservationRequestsUseCase {
     this.serviceRepository = serviceRepository;
   }
 
+  //inputs are received from query
   async execute(input = {}) {
     const page = input.page ?? 1;
     const perPage = input.perPage ?? 20;
@@ -45,10 +46,11 @@ class GetReservationRequestsUseCase {
       }
 
       return new ReservationRequestSummaryDto(
+        request.requestId,
         request.folio,
         client.fullName,
         client.email,
-        request.eventDateTime.toISOString(),
+        request.requestDate.toISOString(),
         request.servicesIds
           .map((serviceId) => servicesById.get(serviceId)?.name)
           .filter((name) => name !== undefined),

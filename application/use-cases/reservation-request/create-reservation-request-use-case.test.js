@@ -38,8 +38,8 @@ describe("CreateReservationRequestUseCase", () => {
       services_ids: [1, 2],
     });
 
-    expect(result).toHaveProperty("folio");
-    expect(result.folio).toMatch(/^BD-\d{4}-\d{5}$/);
+    expect(result.data[0]).toHaveProperty("folio");
+    expect(result.data[0].folio).toMatch(/^BD-\d{4}-\d{5}$/);
   });
 
   it("should throw a validation exception with one error per invalid field", async () => {

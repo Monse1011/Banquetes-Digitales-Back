@@ -24,23 +24,15 @@ class GetReservationRequestUseCase {
     return new GetReservationRequestResponseDto(
       request.requestId,
       request.folio,
-      {
-        id: client.clientId,
-        full_name: client.fullName,
-        email: client.email,
-        phone: client.phone,
-      },
-      request.eventDateTime.toISOString(),
+      client.fullName,
+      client.email,
+      client.phone,
       request.guestCount,
       request.eventAddress,
-      services.map((service) => ({
-        id: service.id,
-        name: service.name,
-        description: service.description,
-        status: service.status,
-      })),
+      request.eventDateTime.toISOString(),
+      request.requestDate.toISOString(),
       request.status,
-      request.requestDate.toISOString()
+      services.map((service) => service.name)
     );
   }
 }

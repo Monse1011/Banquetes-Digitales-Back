@@ -1,8 +1,12 @@
 class ApproveReservationRequestResponseDto {
-  constructor(id, folio, status) {
-    this.id = id;
-    this.folio = folio;
-    this.status = status;
+  constructor(requestId, folio, status) {
+    this.data = [
+      {
+        request_id: requestId,
+        folio: folio,
+        status: status,
+      },
+    ];
   }
 }
 
