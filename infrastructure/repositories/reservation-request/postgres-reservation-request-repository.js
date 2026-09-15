@@ -17,12 +17,12 @@ class PostgresReservationRequestRepository {
       await connection.query("BEGIN");
       const result = await connection.query(
         `INSERT INTO reservations_request
-          (folio, id_client, id_user, event_date, event_time, guest_count,
-           event_address, status, request_date, update_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          (folio, id_client, id_user, event_date_time, guest_count,
+           event_address, status, request_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id_reservation_request, folio, id_client, id_user,
-           event_date, event_time, guest_count, event_address, status,
-           request_date, update_date,
+           event_date_time, guest_count, event_address, status,
+           request_date,
            ARRAY[]::integer[] AS services_ids`,
         this.requestValues(request)
       );
@@ -34,11 +34,11 @@ class PostgresReservationRequestRepository {
       }
 
       const createdRequest = this.toEntity(row);
-      await this.replaceServices(connection, createdRequest.id, request.servicesIds);
+      await this.replaceServices(connection, createdRequest.requestId, request.servicesIds);
       await connection.query("COMMIT");
 
       return new ReservationRequest(
-        createdRequest.id,
+        createdRequest.requestId,
         createdRequest.folio,
         createdRequest.clientId,
         createdRequest.userId,
@@ -47,7 +47,6 @@ class PostgresReservationRequestRepository {
         createdRequest.eventAddress,
         createdRequest.status,
         createdRequest.requestDate,
-        createdRequest.updateDate,
         request.servicesIds
       );
     } catch (error) {
@@ -76,27 +75,26 @@ class PostgresReservationRequestRepository {
       await connection.query("BEGIN");
       const result = await connection.query(
         `UPDATE reservations_request
-         SET folio = $1, id_client = $2, id_user = $3, event_date = $4,
-             event_time = $5, guest_count = $6, event_address = $7,
-             status = $8, request_date = $9, update_date = $10
-         WHERE id_reservation_request = $11
+         SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
+             guest_count = $5, event_address = $6, status = $7, request_date = $8
+         WHERE id_reservation_request = $9
          RETURNING id_reservation_request, folio, id_client, id_user,
-           event_date, event_time, guest_count, event_address, status,
-           request_date, update_date,
+           event_date_time, guest_count, event_address, status,
+           request_date,
            ARRAY[]::integer[] AS services_ids`,
-        [...this.requestValues(request), request.id]
+        [...this.requestValues(request), request.requestId]
       );
 
       if (!result.rows[0]) {
         throw new Error("Reservation request not found");
       }
 
-      await this.replaceServices(connection, request.id, request.servicesIds);
+      await this.replaceServices(connection, request.requestId, request.servicesIds);
       await connection.query("COMMIT");
       const updatedRequest = this.toEntity(result.rows[0]);
 
       return new ReservationRequest(
-        updatedRequest.id,
+        updatedRequest.requestId,
         updatedRequest.folio,
         updatedRequest.clientId,
         updatedRequest.userId,
@@ -105,7 +103,6 @@ class PostgresReservationRequestRepository {
         updatedRequest.eventAddress,
         updatedRequest.status,
         updatedRequest.requestDate,
-        updatedRequest.updateDate,
         request.servicesIds
       );
     } catch (error) {
@@ -127,7 +124,7 @@ class PostgresReservationRequestRepository {
 
     if (filters.eventDate) {
       parameters.push(this.datePart(filters.eventDate));
-      conditions.push(`rr.event_date = $${parameters.length}`);
+      conditions.push(`CAST(rr.event_date_time AS DATE) = $${parameters.length}`);
     }
 
     if (filters.clientName) {
@@ -164,8 +161,8 @@ class PostgresReservationRequestRepository {
 
   baseSelect() {
     return `SELECT rr.id_reservation_request, rr.folio, rr.id_client, rr.id_user,
-      rr.event_date, rr.event_time, rr.guest_count, rr.event_address, rr.status,
-      rr.request_date, rr.update_date,
+      rr.event_date_time, rr.guest_count, rr.event_address, rr.status,
+      rr.request_date,
       COALESCE(
         ARRAY_AGG(rs.id_service) FILTER (WHERE rs.id_service IS NOT NULL),
         ARRAY[]::integer[]
@@ -181,13 +178,11 @@ class PostgresReservationRequestRepository {
       request.folio,
       request.clientId,
       request.userId,
-      this.datePart(request.eventDateTime),
-      this.timePart(request.eventDateTime),
+      request.eventDateTime,
       request.guestCount,
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.updateDate,
     ];
   }
 
@@ -212,29 +207,17 @@ class PostgresReservationRequestRepository {
       row.folio,
       Number(row.id_client),
       row.id_user === null ? null : Number(row.id_user),
-      this.combineDateAndTime(row.event_date, row.event_time),
+      new Date(row.event_date_time),
       row.guest_count,
       row.event_address,
       row.status,
       new Date(row.request_date),
-      new Date(row.update_date),
       serviceIds
     );
   }
 
-  combineDateAndTime(eventDate, eventTime) {
-    const date = eventDate instanceof Date ? eventDate.toISOString().slice(0, 10) : eventDate;
-    const time = eventTime instanceof Date ? eventTime.toISOString().slice(11, 19) : eventTime;
-
-    return new Date(`${date}T${time}Z`);
-  }
-
   datePart(value) {
     return value.toISOString().slice(0, 10);
-  }
-
-  timePart(value) {
-    return value.toISOString().slice(11, 19);
   }
 
   sortColumn(field) {
@@ -244,7 +227,7 @@ class PostgresReservationRequestRepository {
       case ReservationRequestSortField.STATUS:
         return "rr.status";
       case ReservationRequestSortField.EVENT_DATE:
-        return "rr.event_date";
+        return "rr.event_date_time";
     }
   }
 }

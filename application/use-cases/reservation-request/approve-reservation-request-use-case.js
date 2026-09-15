@@ -16,11 +16,10 @@ class ApproveReservationRequestUseCase {
     }
 
     request.status = ReservationRequestStatus.APPROVED;
-    request.updateDate = new Date();
     const updatedRequest = await this.reservationRequestRepository.update(request);
 
     return new ApproveReservationRequestResponseDto(
-      updatedRequest.id,
+      updatedRequest.requestId,
       updatedRequest.folio,
       updatedRequest.status
     );

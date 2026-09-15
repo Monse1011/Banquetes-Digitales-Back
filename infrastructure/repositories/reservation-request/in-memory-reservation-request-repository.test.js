@@ -29,13 +29,12 @@ describe("InMemoryReservationRequestRepository", () => {
       "123 Main St",
       ReservationRequestStatus.PENDING,
       new Date(),
-      new Date(),
       [1, 2]
     );
 
     const created = await repository.create(request);
 
-    expect(created.id).toBeDefined();
+    expect(created.requestId).toBeDefined();
     expect(created.folio).toBe("BD-2024-00001");
   });
 
@@ -50,12 +49,11 @@ describe("InMemoryReservationRequestRepository", () => {
       "123 Main St",
       ReservationRequestStatus.PENDING,
       new Date(),
-      new Date(),
       [1, 2]
     );
 
     const created = await repository.create(request);
-    const found = await repository.findById(created.id);
+    const found = await repository.findById(created.requestId);
 
     expect(found).toBeDefined();
     expect(found.folio).toBe("BD-2024-00001");
@@ -72,14 +70,13 @@ describe("InMemoryReservationRequestRepository", () => {
       "123 Main St",
       ReservationRequestStatus.PENDING,
       new Date(),
-      new Date(),
       [1, 2]
     );
 
     const created = await repository.create(request);
     created.status = ReservationRequestStatus.APPROVED;
     await repository.update(created);
-    const updated = await repository.findById(created.id);
+    const updated = await repository.findById(created.requestId);
 
     expect(updated.status).toBe(ReservationRequestStatus.APPROVED);
   });
@@ -95,7 +92,6 @@ describe("InMemoryReservationRequestRepository", () => {
         50,
         "123 Main St",
         ReservationRequestStatus.PENDING,
-        new Date(),
         new Date(),
         [1, 2]
       );
@@ -124,7 +120,6 @@ describe("InMemoryReservationRequestRepository", () => {
       "123 Main St",
       ReservationRequestStatus.PENDING,
       new Date(),
-      new Date(),
       [1]
     );
 
@@ -137,7 +132,6 @@ describe("InMemoryReservationRequestRepository", () => {
       50,
       "123 Main St",
       ReservationRequestStatus.APPROVED,
-      new Date(),
       new Date(),
       [1]
     );

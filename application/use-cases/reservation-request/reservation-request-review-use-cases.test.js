@@ -66,7 +66,7 @@ describe("ReservationRequest Review UseCases", () => {
         1
       );
 
-      const result = await approveUseCase.execute(firstRequest.requests[0].id);
+      const result = await approveUseCase.execute(firstRequest.requests[0].requestId);
 
       expect(result.status).toBe("Aprobada");
     });
@@ -100,7 +100,7 @@ describe("ReservationRequest Review UseCases", () => {
         1
       );
 
-      const result = await getUseCase.execute(firstRequest.requests[0].id);
+      const result = await getUseCase.execute(firstRequest.requests[0].requestId);
 
       expect(result).toHaveProperty("id");
       expect(result).toHaveProperty("folio");

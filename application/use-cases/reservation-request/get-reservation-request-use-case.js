@@ -22,7 +22,7 @@ class GetReservationRequestUseCase {
     }
 
     return new GetReservationRequestResponseDto(
-      request.id,
+      request.requestId,
       request.folio,
       {
         id: client.clientId,
@@ -40,8 +40,7 @@ class GetReservationRequestUseCase {
         status: service.status,
       })),
       request.status,
-      request.requestDate.toISOString(),
-      request.updateDate.toISOString()
+      request.requestDate.toISOString()
     );
   }
 }

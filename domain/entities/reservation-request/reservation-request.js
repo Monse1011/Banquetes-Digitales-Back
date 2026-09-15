@@ -1,6 +1,6 @@
 class ReservationRequest {
   constructor(
-    id,
+    requestId,
     folio,
     clientId,
     userId,
@@ -9,10 +9,9 @@ class ReservationRequest {
     eventAddress,
     status,
     requestDate,
-    updateDate,
     servicesIds
   ) {
-    this.id = id;
+    this.requestId = requestId;
     this.folio = folio;
     this.clientId = clientId;
     this.userId = userId;
@@ -21,7 +20,6 @@ class ReservationRequest {
     this.eventAddress = eventAddress;
     this.status = status;
     this.requestDate = requestDate;
-    this.updateDate = updateDate;
     this.servicesIds = servicesIds;
   }
 }

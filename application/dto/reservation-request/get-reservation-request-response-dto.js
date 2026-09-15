@@ -8,8 +8,7 @@ class GetReservationRequestResponseDto {
     eventAddress,
     services,
     status,
-    requestDate,
-    updateDate
+    requestDate
   ) {
     this.id = id;
     this.folio = folio;
@@ -20,7 +19,6 @@ class GetReservationRequestResponseDto {
     this.services = services;
     this.status = status;
     this.request_date = requestDate;
-    this.update_date = updateDate;
   }
 }
 
