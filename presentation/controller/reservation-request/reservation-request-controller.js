@@ -6,7 +6,7 @@ class ReservationRequestController {
   async create(request, response) {
     const result = await this.dependencies.createReservationRequestUseCase.execute(request.body);
 
-    response.status(201).json({ data: result });
+    response.status(201).json(result);
   }
 
   async list(request, response) {
@@ -22,19 +22,7 @@ class ReservationRequestController {
     const id = this.parseId(request.params.id);
     const result = await this.dependencies.getReservationRequestUseCase.execute(id);
 
-    response.json({
-      data: {
-        folio: result.folio,
-        client_name: result.client.full_name,
-        client_email: result.client.email,
-        client_phone: result.client.phone,
-        guest_count: result.guest_count,
-        requested_date: result.event_date_time,
-        submission_date: result.request_date,
-        selected_services: result.services.map((service) => service.name),
-        status: result.status,
-      },
-    });
+    response.json(result);
   }
 
   async approve(request, response) {
@@ -49,7 +37,7 @@ class ReservationRequestController {
       this.parseId(request.params.id)
     );
 
-    response.json({ data: result });
+    response.json(result);
   }
 
   parseId(value) {

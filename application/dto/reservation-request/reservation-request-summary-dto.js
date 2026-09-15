@@ -1,5 +1,6 @@
 class ReservationRequestSummaryDto {
-  constructor(folio, clientName, clientEmail, requestedDate, selectedServices, status) {
+  constructor(requestId, folio, clientName, clientEmail, requestedDate, selectedServices, status) {
+    this.id = requestId;
     this.folio = folio;
     this.client_name = clientName;
     this.client_email = clientEmail;

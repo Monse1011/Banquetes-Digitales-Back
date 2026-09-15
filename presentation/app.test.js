@@ -115,8 +115,8 @@ describe("App", () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.data).toHaveProperty("folio");
-      expect(response.body.data.folio).toMatch(/^BD-\d{4}-\d{5}$/);
+      expect(response.body.data[0]).toHaveProperty("folio");
+      expect(response.body.data[0].folio).toMatch(/^BD-\d{4}-\d{5}$/);
     });
 
     it("should return one error per invalid field", async () => {

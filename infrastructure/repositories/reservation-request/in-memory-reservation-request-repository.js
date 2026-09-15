@@ -22,7 +22,6 @@ class InMemoryReservationRequestRepository {
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.updateDate,
       request.servicesIds
     );
 
@@ -31,11 +30,13 @@ class InMemoryReservationRequestRepository {
   }
 
   async findById(id) {
-    return this.requests.find((request) => request.id === id) ?? null;
+    return this.requests.find((request) => request.requestId === id) ?? null;
   }
 
   async update(request) {
-    const index = this.requests.findIndex((existingRequest) => existingRequest.id === request.id);
+    const index = this.requests.findIndex(
+      (existingRequest) => existingRequest.requestId === request.requestId
+    );
 
     if (index === -1) {
       throw new Error("Reservation request not found");

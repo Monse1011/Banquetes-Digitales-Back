@@ -66,9 +66,9 @@ describe("ReservationRequest Review UseCases", () => {
         1
       );
 
-      const result = await approveUseCase.execute(firstRequest.requests[0].id);
+      const result = await approveUseCase.execute(firstRequest.requests[0].requestId);
 
-      expect(result.status).toBe("Aprobada");
+      expect(result.data[0].status).toBe("Aprobada");
     });
 
     it("should throw error when request not found", async () => {
@@ -100,12 +100,12 @@ describe("ReservationRequest Review UseCases", () => {
         1
       );
 
-      const result = await getUseCase.execute(firstRequest.requests[0].id);
+      const result = await getUseCase.execute(firstRequest.requests[0].requestId);
 
-      expect(result).toHaveProperty("id");
-      expect(result).toHaveProperty("folio");
-      expect(result.client).toHaveProperty("full_name");
-      expect(result.services).toHaveLength(1);
+      expect(result.data[0]).toHaveProperty("request_id");
+      expect(result.data[0]).toHaveProperty("folio");
+      expect(result.data[0]).toHaveProperty("client_name");
+      expect(result.data[0].selected_services).toHaveLength(1);
     });
   });
 });
