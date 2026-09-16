@@ -1,0 +1,14 @@
+class GetReservationRequestsResponseDto {
+  constructor(data, totalRecords, page, perPage) {
+    this.data = data;
+    this.metadata = {
+      pagination: {
+        total_records: totalRecords,
+        page: page,
+        per_page: perPage,
+      },
+    };
+  }
+}
+
+module.exports = GetReservationRequestsResponseDto;
