@@ -1,6 +1,6 @@
-# Banquetes Digitales - Authentication Backend
+# Banquetes Digitales - Backend
 
-API backend para autenticación y recuperación de contraseñas. Construida con Node.js y Express.
+API backend para autenticación, recuperación de contraseñas y gestión de reservaciones.
 
 ## Requisitos
 
@@ -84,12 +84,12 @@ npm start
 
 ```
 ├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
-│   ├── entities/          # auth/, password-reset/
+│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
 │   ├── enums/             # Constantes y enumeradores del negocio, por feature
 │   ├── exceptions/        # Errores de dominio, por feature
 │   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
 ├── application/           # Casos de uso que orquestan la lógica de dominio
-│   ├── use-cases/        # auth/, password-reset/
+│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
 │   ├── dto/               # Entrada/salida de los casos de uso, por feature
 │   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
 │   ├── repositories/       # Contratos de los repositorios, por feature
@@ -119,6 +119,17 @@ npm start
 - **POST** `/api/auth/change-password` - Cambiar contraseña
 - **POST** `/api/auth/forgot-password` - Solicitar recuperación
 - **POST** `/api/auth/reset-password` - Restablecer contraseña
+
+### Cliente
+
+- **POST** `/api/client/request` - Crear solicitud de reservación
+- **GET** `/api/client/services` - Listar servicios disponibles
+
+### Administrador
+
+- **GET** `/api/admin/requests` - Listar solicitudes
+- **GET** `/api/admin/requests/:id` - Consultar una solicitud
+- **PATCH** `/api/admin/requests/:id` - Aprobar una solicitud
 
 ## Documentación API
 

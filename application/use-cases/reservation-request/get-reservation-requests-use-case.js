@@ -11,7 +11,7 @@ class GetReservationRequestsUseCase {
     this.serviceRepository = serviceRepository;
   }
 
-  //inputs are received from query
+  // Inputs are received from query
   async execute(input = {}) {
     const page = input.page ?? 1;
     const perPage = input.perPage ?? 20;

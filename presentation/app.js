@@ -2,7 +2,14 @@ const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const createAuthMiddleware = require("./middleware/auth/auth-middleware");
 const createAuthRoutes = require("./routes/auth-routes");
+const createClientRoutes = require("./routes/client-routes");
+const createAdminRoutes = require("./routes/admin-routes");
 const { openApiDocument } = require("./openapi");
+const {
+  ReservationRequestController,
+} = require("./controller/reservation-request/reservation-request-controller");
+const { ServiceController } = require("./controller/service/service-controller");
+const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
 const InvalidCredentialsException = require("../domain/exceptions/auth/invalid-credentials-exception");
 const AccountBlockedException = require("../domain/exceptions/auth/account-blocked-exception");
 const InvalidPasswordException = require("../domain/exceptions/password-reset/invalid-password-exception");
@@ -14,6 +21,8 @@ function createApp(dependencies) {
 
   // Authentication
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
+  const reservationRequestController = new ReservationRequestController(dependencies);
+  const serviceController = new ServiceController(dependencies.serviceRepository);
 
   app.use(express.json());
 
@@ -39,8 +48,18 @@ function createApp(dependencies) {
     )
   );
 
+  app.use("/api/client", createClientRoutes(reservationRequestController, serviceController));
+  app.use("/api/admin", createAdminRoutes(reservationRequestController, authMiddleware));
+
   // Error handler
   app.use((error, _request, response, _next) => {
+    if (error instanceof ReservationRequestValidationException) {
+      response.status(422).json({
+        message: error.message,
+        errors: error.errors,
+      });
+      return;
+    }
     if (error instanceof AccountBlockedException) {
       response.status(423).json({ message: ErrorMessages.ACCOUNT_BLOCKED });
       return;

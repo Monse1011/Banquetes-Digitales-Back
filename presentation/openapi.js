@@ -101,6 +101,47 @@ const openApiDocument = {
         responses: { 200: { description: "Password reset" }, 400: { description: "Invalid reset request" } },
       },
     },
+    "/api/client/request": {
+      post: {
+        tags: ["Client"],
+        summary: "Create a reservation request",
+        responses: {
+          201: { description: "Reservation request created" },
+          422: { description: "Validation error" },
+        },
+      },
+    },
+    "/api/client/services": {
+      get: {
+        tags: ["Client"],
+        summary: "List available services",
+        responses: { 200: { description: "Services list" } },
+      },
+    },
+    "/api/admin/requests": {
+      get: {
+        tags: ["Admin"],
+        summary: "List reservation requests",
+        security: [{ CookieAuth: [] }],
+        responses: { 200: { description: "Requests list" }, 403: { description: "Forbidden" } },
+      },
+    },
+    "/api/admin/requests/{id}": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get a reservation request",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { 200: { description: "Request details" }, 404: { description: "Not found" } },
+      },
+      patch: {
+        tags: ["Admin"],
+        summary: "Approve a reservation request",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { 200: { description: "Request approved" }, 400: { description: "Invalid request" } },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -108,5 +149,4 @@ const openApiDocument = {
     },
   },
 };
-module.exports = { openApiDocument };
 module.exports = { openApiDocument };

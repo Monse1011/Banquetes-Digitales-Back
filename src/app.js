@@ -3,6 +3,17 @@ require("dotenv").config();
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
 
+const {
+  PostgresClientRepository,
+} = require("../infrastructure/repositories/client/postgres-client-repository");
+const {
+  PostgresServiceRepository,
+} = require("../infrastructure/repositories/service/postgres-service-repository");
+const {
+  PostgresReservationRequestRepository,
+} = require("../infrastructure/repositories/reservation-request/postgres-reservation-request-repository");
+const PostgresFolioGenerator = require("../infrastructure/services/reservation-request/postgres-folio-generator");
+
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
   "SMTP_HOST",
@@ -88,6 +99,21 @@ const BlockService = require("../application/use-cases/auth/block-service");
 const ChangePassword = require("../application/use-cases/auth/change-password");
 const RequestPasswordReset = require("../application/use-cases/password-reset/request-password-reset");
 const ResetPassword = require("../application/use-cases/password-reset/reset-password");
+const {
+  UpsertClientByEmailUseCase,
+} = require("../application/use-cases/client/upsert-client-by-email-use-case");
+const {
+  CreateReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/create-reservation-request-use-case");
+const {
+  ApproveReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/approve-reservation-request-use-case");
+const {
+  GetReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/get-reservation-request-use-case");
+const {
+  GetReservationRequestsUseCase,
+} = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -139,12 +165,44 @@ async function main() {
 
   const passwordResetController = new PasswordResetController(requestPasswordReset, resetPassword);
 
+  const clientRepository = new PostgresClientRepository(pool);
+  const serviceRepository = new PostgresServiceRepository(pool);
+  const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
+  const folioGenerator = new PostgresFolioGenerator(pool);
+  const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
+  const createReservationRequestUseCase = new CreateReservationRequestUseCase(
+    upsertClientByEmailUseCase,
+    reservationRequestRepository,
+    folioGenerator
+  );
+  const approveReservationRequestUseCase = new ApproveReservationRequestUseCase(
+    reservationRequestRepository
+  );
+  const getReservationRequestUseCase = new GetReservationRequestUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    serviceRepository
+  );
+  const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    serviceRepository
+  );
+
   const app = createApp({
     // Authentication
     authController,
     passwordResetController,
     tokenService,
-
+    clientRepository,
+    serviceRepository,
+    reservationRequestRepository,
+    folioGenerator,
+    upsertClientByEmailUseCase,
+    createReservationRequestUseCase,
+    approveReservationRequestUseCase,
+    getReservationRequestUseCase,
+    getReservationRequestsUseCase,
   });
 
   app.listen(config.port, () => {

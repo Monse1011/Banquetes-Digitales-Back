@@ -15,7 +15,7 @@ class GetReservationRequestResponseDto {
     this.data = [
       {
         request_id: requestId,
-        folio: folio,
+        folio,
         client_name: clientName,
         client_email: clientEmail,
         client_phone: clientPhone,
@@ -23,7 +23,7 @@ class GetReservationRequestResponseDto {
         event_address: eventAddress,
         event_date_time: eventDateTime,
         requested_date: requestDate,
-        status: status,
+        status,
         selected_services: selectedServices,
       },
     ];

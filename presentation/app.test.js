@@ -16,8 +16,13 @@ describe("Authentication app", () => {
         resetPassword: (_req, res) => res.status(200).json({}),
       },
       tokenService: {
-        verifyToken: () => ({ id_user: 1 }),
+        verifyToken: () => ({ id_user: 1, role: "admin" }),
       },
+      serviceRepository: { findAll: async () => [] },
+      createReservationRequestUseCase: { execute: async () => ({}) },
+      getReservationRequestsUseCase: { execute: async () => ({}) },
+      getReservationRequestUseCase: { execute: async () => ({}) },
+      approveReservationRequestUseCase: { execute: async () => ({}) },
     });
   });
 
@@ -34,6 +39,19 @@ describe("Authentication app", () => {
     const response = await request(app)
       .get("/api/auth/first-access")
       .set("Authorization", "Bearer valid-token");
+
+    expect(response.status).toBe(401);
+  });
+
+  it("keeps the client services route available", async () => {
+    const response = await request(app).get("/api/client/services");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ data: [] });
+  });
+
+  it("protects the admin reservation routes with the auth cookie", async () => {
+    const response = await request(app).get("/api/admin/requests");
 
     expect(response.status).toBe(401);
   });
