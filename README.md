@@ -1,6 +1,6 @@
-# Banquetes Digitales - Backend
+# Banquetes Digitales - Authentication Backend
 
-API backend para gestionar reservas de banquetes digitales. Construida con Node.js y Express.
+API backend para autenticación y recuperación de contraseñas. Construida con Node.js y Express.
 
 ## Requisitos
 
@@ -84,16 +84,16 @@ npm start
 
 ```
 ├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
-│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
+│   ├── entities/          # auth/, password-reset/
 │   ├── enums/             # Constantes y enumeradores del negocio, por feature
 │   ├── exceptions/        # Errores de dominio, por feature
 │   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
 ├── application/           # Casos de uso que orquestan la lógica de dominio
-│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
+│   ├── use-cases/        # auth/, password-reset/
 │   ├── dto/               # Entrada/salida de los casos de uso, por feature
 │   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
 │   ├── repositories/       # Contratos de los repositorios, por feature
-│   └── services/           # Lógica de aplicación que orquesta una entidad (folio-generator)
+│   └── services/           # Lógica de aplicación
 ├── infrastructure/         # Implementaciones técnicas
 │   ├── database/           # Configuración de conexión (postgres-pool)
 │   ├── email/               # Implementación real de envío de correo
@@ -112,16 +112,13 @@ npm start
 
 ## API Endpoints
 
-### Cliente
+### Autenticación
 
-- **POST** `/api/client/request` - Crear solicitud de reserva
-- **GET** `/api/client/services` - Listar servicios disponibles
-
-### Admin (requiere autenticación JWT)
-
-- **GET** `/api/admin/requests` - Listar todas las solicitudes
-- **GET** `/api/admin/requests/:id` - Obtener detalles de solicitud
-- **PATCH** `/api/admin/requests/:id` - Aprobar solicitud
+- **POST** `/api/auth/login` - Iniciar sesión
+- **GET** `/api/auth/first-access` - Consultar primer acceso
+- **POST** `/api/auth/change-password` - Cambiar contraseña
+- **POST** `/api/auth/forgot-password` - Solicitar recuperación
+- **POST** `/api/auth/reset-password` - Restablecer contraseña
 
 ## Documentación API
 
@@ -146,20 +143,8 @@ El proyecto sigue Clean Architecture con 4 capas:
 
 ## Base de Datos
 
-La infraestructura incluye `PostgresClientRepository`, `PostgresServiceRepository`
-y `PostgresReservationRequestRepository`, compatibles con los puertos de
-`application`. La conexión se crea con `createPostgresPool` y acepta
-`DATABASE_URL` o las variables `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` y
-`PGDATABASE`.
-
-El esquema esperado es el definido en `database.sql`. Las operaciones de solicitudes
-mantienen `reservations_request` y `request_services` dentro de una transacción.
-
-El esquema de la base de datos se utiliza para mantener las entidades
-`reservations_request` y `request_services` dentro de una transacción.
-El arranque actual continúa usando in-memory; para producción se deben construir
-los casos de uso con los repositorios PostgreSQL y cerrar el pool durante el
-apagado del proceso.
+La conexión se crea con `createPostgresPool` y acepta `DATABASE_URL` o las variables
+`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` y `PGDATABASE`.
 
 ## Contribuir
 

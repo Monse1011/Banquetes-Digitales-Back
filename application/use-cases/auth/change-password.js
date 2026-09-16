@@ -28,10 +28,9 @@ class ChangePassword {
     await this.blockService.reset(idUser);
 
     const updatedUser = { ...user, passwordHash: hash, lastAccess: new Date() };
-    const token = this.tokenService.generateToken(updatedUser, { mustChangePassword: false });
+    const token = this.tokenService.generateToken(updatedUser);
 
     return {
-      requiresPasswordChange: false,
       token,
       user: {
         id_user: user.id,

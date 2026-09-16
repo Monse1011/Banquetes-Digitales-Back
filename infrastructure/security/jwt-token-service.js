@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { SecurityConstants } = require("../../domain/constants/security");
 
 class JwtTokenService {
   generateToken(user, extraClaims = {}) {
@@ -10,12 +11,24 @@ class JwtTokenService {
         ...extraClaims,
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "1h" }
+      {
+        algorithm: SecurityConstants.JWT_ALGORITHM,
+        expiresIn: process.env.JWT_EXPIRES_IN || SecurityConstants.JWT_DEFAULT_TTL,
+      }
     );
   }
 
   verifyToken(token) {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: [SecurityConstants.JWT_ALGORITHM],
+    });
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    if (!Number.isFinite(payload.exp) || payload.exp <= currentTime) {
+      throw new Error("JWT expiration is invalid or expired");
+    }
+
+    return payload;
   }
 }
 module.exports = JwtTokenService;

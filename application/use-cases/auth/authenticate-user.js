@@ -26,17 +26,14 @@ class AuthenticateUser {
 
     await this.blockService.reset(user.id);
 
-    const requiresPasswordChange = user.isFirstAccess();
-    const token = this.tokenService.generateToken(user, {
-      mustChangePassword: requiresPasswordChange,
-    });
+    const isFirstAccess = user.isFirstAccess();
+    const token = this.tokenService.generateToken(user);
 
-    if (!requiresPasswordChange) {
+    if (!isFirstAccess) {
       await this.userRepository.updateLastAccess(user.id);
     }
 
     return new LoginResponseDTO({
-      requiresPasswordChange,
       token,
       user: this.toPublicUser(user),
     });

@@ -1,6 +1,6 @@
 class InvalidResetTokenException extends Error {
-  constructor() {
-    super("El enlace de restablecimiento no es válido o ha expirado");
+  constructor(message = "El enlace de restablecimiento no es válido o ha expirado") {
+    super(message);
     this.name = "InvalidResetTokenException";
   }
 }

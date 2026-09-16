@@ -1,5 +1,7 @@
 const ForgotPasswordRequestDTO = require("../../../application/dto/password-reset/forgot-password-request-dto");
 const ResetPasswordRequestDTO = require("../../../application/dto/password-reset/reset-password-request-dto");
+const InvalidResetTokenException = require("../../../domain/exceptions/password-reset/invalid-reset-token-exception");
+const ErrorMessages = require("../../constants/error-messages");
 
 class PasswordResetController {
   constructor(requestPasswordReset, resetPassword) {
@@ -17,7 +19,7 @@ class PasswordResetController {
       console.error("Error al solicitar restablecimiento:", error);
       return res
         .status(500)
-        .json({ message: "No fue posible procesar la solicitud de restablecimiento" });
+        .json({ message: ErrorMessages.PASSWORD_RESET_REQUEST_FAILED });
     }
   };
 
@@ -31,8 +33,11 @@ class PasswordResetController {
         .status(200)
         .json(await this.resetPasswordUseCase.execute(dto.token, dto.newPassword));
     } catch (error) {
-      console.error("Error al restablecer contraseña:", error.message);
-      return res.status(400).json({ message: error.message });
+      console.error("Error al restablecer contraseña:", error);
+      if (error instanceof InvalidResetTokenException) {
+        return res.status(400).json({ message: ErrorMessages.INVALID_RESET_TOKEN });
+      }
+      return res.status(400).json({ message: ErrorMessages.PASSWORD_RESET_FAILED });
     }
   };
 }

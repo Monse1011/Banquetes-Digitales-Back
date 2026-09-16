@@ -19,43 +19,13 @@ function validateEnv() {
   }
 }
 
-// Repositories
-const {
-  PostgresClientRepository,
-} = require("../infrastructure/repositories/client/postgres-client-repository");
-const {
-  PostgresServiceRepository,
-} = require("../infrastructure/repositories/service/postgres-service-repository");
-const {
-  PostgresReservationRequestRepository,
-} = require("../infrastructure/repositories/reservation-request/postgres-reservation-request-repository");
-
 // Authentication repositories
 const PostgresUserRepository = require("../infrastructure/repositories/auth/postgres-user-repository");
 const PostgresBlockRepository = require("../infrastructure/repositories/auth/postgres-block-repository");
 const PostgresPasswordResetRepository = require("../infrastructure/repositories/password-reset/postgres-password-reset-repository");
 
-// Services
-const PostgresFolioGenerator = require("../infrastructure/services/reservation-request/postgres-folio-generator");
 const JwtTokenService = require("../infrastructure/security/jwt-token-service");
 const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
-
-// Use cases
-const {
-  UpsertClientByEmailUseCase,
-} = require("../application/use-cases/client/upsert-client-by-email-use-case");
-const {
-  CreateReservationRequestUseCase,
-} = require("../application/use-cases/reservation-request/create-reservation-request-use-case");
-const {
-  ApproveReservationRequestUseCase,
-} = require("../application/use-cases/reservation-request/approve-reservation-request-use-case");
-const {
-  GetReservationRequestUseCase,
-} = require("../application/use-cases/reservation-request/get-reservation-request-use-case");
-const {
-  GetReservationRequestsUseCase,
-} = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
 
 // Authentication use cases
 const AuthenticateUser = require("../application/use-cases/auth/authenticate-user");
@@ -81,12 +51,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Business repositories
-  const clientRepository = new PostgresClientRepository(pool);
-  const serviceRepository = new PostgresServiceRepository(pool);
-  const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
-  const folioGenerator = new PostgresFolioGenerator(pool);
-
   // Authentication repositories
   const userRepository = new PostgresUserRepository(pool);
   const blockRepository = new PostgresBlockRepository(pool);
@@ -111,34 +75,9 @@ async function main() {
   const resetPassword = new ResetPassword(userRepository, passwordResetRepository, tokenService);
 
   // Authentication controllers
-  const authController = new AuthController(authenticateUser, changePassword);
+  const authController = new AuthController(authenticateUser, changePassword, userRepository);
 
   const passwordResetController = new PasswordResetController(requestPasswordReset, resetPassword);
-
-  // Business use cases
-  const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
-
-  const createReservationRequestUseCase = new CreateReservationRequestUseCase(
-    upsertClientByEmailUseCase,
-    reservationRequestRepository,
-    folioGenerator
-  );
-
-  const approveReservationRequestUseCase = new ApproveReservationRequestUseCase(
-    reservationRequestRepository
-  );
-
-  const getReservationRequestUseCase = new GetReservationRequestUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository
-  );
-
-  const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository
-  );
 
   const app = createApp({
     // Authentication
@@ -146,16 +85,6 @@ async function main() {
     passwordResetController,
     tokenService,
 
-    // Business
-    clientRepository,
-    serviceRepository,
-    reservationRequestRepository,
-    folioGenerator,
-    upsertClientByEmailUseCase,
-    createReservationRequestUseCase,
-    approveReservationRequestUseCase,
-    getReservationRequestUseCase,
-    getReservationRequestsUseCase,
   });
 
   const port = process.env.PORT || 3000;
