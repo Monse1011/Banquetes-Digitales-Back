@@ -5,10 +5,10 @@ const SecurityConstants = Object.freeze({
   AUTH_COOKIE_NAME: "auth_token",
 });
 
-function getAuthCookieOptions() {
+function getAuthCookieOptions({ secure = false } = {}) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     sameSite: "lax",
     path: "/",
   };

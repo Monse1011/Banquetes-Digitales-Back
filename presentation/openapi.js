@@ -89,10 +89,10 @@ const openApiDocument = {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["token", "newPassword"],
+                required: ["token", "new_password"],
                 properties: {
                   token: { type: "string" },
-                  newPassword: { type: "string", format: "password" },
+                  new_password: { type: "string", format: "password" },
                 },
               },
             },

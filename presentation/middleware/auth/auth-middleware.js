@@ -11,10 +11,14 @@ function createAuthMiddleware(tokenService) {
   return (req, res, next) => {
     try {
       const token = getCookie(req, SecurityConstants.AUTH_COOKIE_NAME);
-      if (!token) return res.status(401).json({ message: AuthMessages.TOKEN_MISSING });
+      if (!token) {
+        console.warn("Authentication failed: token cookie is missing");
+        return res.status(401).json({ message: AuthMessages.TOKEN_MISSING });
+      }
       req.user = tokenService.verifyToken(token);
       next();
     } catch (error) {
+      console.warn("Authentication failed: invalid or expired token", error.name);
       return res.status(401).json({ message: AuthMessages.TOKEN_INVALID });
     }
   };

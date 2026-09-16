@@ -12,7 +12,7 @@ class PasswordResetController {
   requestReset = async (req, res) => {
     try {
       const { email } = req.body || {};
-      if (!email) return res.status(400).json({ message: "El correo electrónico es obligatorio" });
+      if (!email) return res.status(400).json({ message: ErrorMessages.EMAIL_REQUIRED });
       const dto = new ForgotPasswordRequestDTO({ email });
       return res.status(200).json(await this.requestPasswordReset.execute(dto.email));
     } catch (error) {
@@ -26,12 +26,11 @@ class PasswordResetController {
   resetPassword = async (req, res) => {
     try {
       const dto = new ResetPasswordRequestDTO(req.body || {});
-      const { token, newPassword } = dto;
-      if (!token || !newPassword)
-        return res.status(400).json({ message: "El token y la nueva contraseña son obligatorios" });
+      if (!dto.token || !dto.new_password)
+        return res.status(400).json({ message: ErrorMessages.RESET_PASSWORD_REQUIRED_FIELDS });
       return res
         .status(200)
-        .json(await this.resetPasswordUseCase.execute(dto.token, dto.newPassword));
+        .json(await this.resetPasswordUseCase.execute(dto.token, dto.new_password));
     } catch (error) {
       console.error("Error al restablecer contraseña:", error);
       if (error instanceof InvalidResetTokenException) {

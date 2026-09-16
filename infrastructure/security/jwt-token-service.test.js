@@ -7,7 +7,7 @@ describe("JwtTokenService", () => {
 
   beforeEach(() => {
     process.env.JWT_SECRET = secret;
-    tokenService = new JwtTokenService();
+    tokenService = new JwtTokenService({ secret });
   });
 
   it("rejects an expired token", () => {

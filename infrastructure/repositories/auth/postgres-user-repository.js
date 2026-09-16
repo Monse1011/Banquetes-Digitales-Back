@@ -54,11 +54,11 @@ class PostgresUserRepository {
   }
 
   toEntity(row) {
-    const rawStatus = row.status ? String(row.status).toUpperCase() : "";
+    const rawStatus = row.status ? String(row.status).toLowerCase() : "";
     const status = rawStatus === UserStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE;
 
-    const rawRole = row.role ? String(row.role).toUpperCase() : "";
-    const role = rawRole === "ADMIN" ? UserRole.ADMIN : UserRole.LOGISTICA;
+    const rawRole = row.role ? String(row.role).toLowerCase() : "";
+    const role = rawRole === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICA;
 
     return new User(
       row.id_user,

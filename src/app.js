@@ -3,20 +3,75 @@ require("dotenv").config();
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
 
-const REQUIRED_ENV_VARS = ["JWT_SECRET"];
+const REQUIRED_ENV_VARS = [
+  "JWT_SECRET",
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_USER",
+  "SMTP_PASSWORD",
+  "RESET_PASSWORD_URL",
+];
 
-function validateEnv() {
+function getInvalidEnvironmentValues(port, smtpPort, resetPasswordUrl) {
+  const invalid = [];
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) invalid.push("PORT");
+  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535)
+    invalid.push("SMTP_PORT");
+
+  try {
+    const parsedUrl = new URL(resetPasswordUrl);
+    if (!parsedUrl.protocol || !parsedUrl.hostname) invalid.push("RESET_PASSWORD_URL");
+  } catch {
+    invalid.push("RESET_PASSWORD_URL");
+  }
+
+  return invalid;
+}
+
+function loadConfig() {
   const hasDatabaseConfig = Boolean(process.env.DATABASE_URL || process.env.PGHOST);
   const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+  const port = Number(process.env.PORT || 3000);
+  const smtpPort = Number(process.env.SMTP_PORT);
+  const resetPasswordUrl = process.env.RESET_PASSWORD_URL;
+  const invalid = getInvalidEnvironmentValues(port, smtpPort, resetPasswordUrl);
 
   if (!hasDatabaseConfig) {
     missing.push("DATABASE_URL or PGHOST");
   }
 
-  if (missing.length > 0) {
-    console.error(`Missing required environment variables: ${missing.join(", ")}`);
-    process.exit(1);
+  if (missing.length > 0 || invalid.length > 0) {
+    if (missing.length > 0) console.error(`Missing environment variables: ${missing.join(", ")}`);
+    if (invalid.length > 0) console.error(`Invalid environment variables: ${invalid.join(", ")}`);
+    throw new Error("Invalid environment configuration");
   }
+
+  console.log(`Environment loaded for port ${port} with SMTP host ${process.env.SMTP_HOST}`);
+
+  return {
+    port,
+    database: {
+      url: process.env.DATABASE_URL,
+      host: process.env.PGHOST,
+      port: process.env.PGPORT,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
+    },
+    jwt: {
+      secret: process.env.JWT_SECRET,
+      expiresIn: process.env.JWT_EXPIRES_IN,
+    },
+    email: {
+      host: process.env.SMTP_HOST,
+      port: smtpPort,
+      user: process.env.SMTP_USER,
+      password: process.env.SMTP_PASSWORD,
+      resetPasswordUrl: process.env.RESET_PASSWORD_URL,
+    },
+    authCookie: { secure: process.env.NODE_ENV === "production" },
+  };
 }
 
 // Authentication repositories
@@ -39,9 +94,9 @@ const AuthController = require("../presentation/controller/auth/auth-controller"
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
 
 async function main() {
-  validateEnv();
+  const config = loadConfig();
 
-  const pool = createPostgresPool();
+  const pool = createPostgresPool(config.database);
 
   try {
     await pool.query("SELECT 1");
@@ -57,8 +112,8 @@ async function main() {
   const passwordResetRepository = new PostgresPasswordResetRepository(pool);
 
   // Authentication services
-  const tokenService = new JwtTokenService();
-  const emailService = new NodemailerEmailService();
+  const tokenService = new JwtTokenService(config.jwt);
+  const emailService = new NodemailerEmailService(config.email);
   const blockService = new BlockService(blockRepository);
 
   // Authentication use cases
@@ -75,7 +130,12 @@ async function main() {
   const resetPassword = new ResetPassword(userRepository, passwordResetRepository, tokenService);
 
   // Authentication controllers
-  const authController = new AuthController(authenticateUser, changePassword, userRepository);
+  const authController = new AuthController(
+    authenticateUser,
+    changePassword,
+    userRepository,
+    config.authCookie
+  );
 
   const passwordResetController = new PasswordResetController(requestPasswordReset, resetPassword);
 
@@ -87,10 +147,8 @@ async function main() {
 
   });
 
-  const port = process.env.PORT || 3000;
-
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+  app.listen(config.port, () => {
+    console.log(`Server running on port ${config.port}`);
   });
 }
 

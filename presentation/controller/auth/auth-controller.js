@@ -10,10 +10,11 @@ const {
 const ErrorMessages = require("../../constants/error-messages");
 
 class AuthController {
-  constructor(authenticateUser, changePassword, userRepository = null) {
+  constructor(authenticateUser, changePassword, userRepository = null, authCookieOptions = {}) {
     this.authenticateUser = authenticateUser;
     this.changePasswordUseCase = changePassword;
     this.userRepository = userRepository;
+    this.authCookieOptions = authCookieOptions;
   }
 
   login = async (req, res) => {
@@ -22,11 +23,15 @@ class AuthController {
       if (!employeeId || !password) {
         return res
           .status(400)
-          .json({ message: "El ID de empleado y la contraseña son obligatorios" });
+          .json({ message: ErrorMessages.LOGIN_REQUIRED_FIELDS });
       }
       const dto = new LoginRequestDTO({ employeeId, password });
       const result = await this.authenticateUser.execute(dto.employeeId, dto.password);
-      res.cookie(SecurityConstants.AUTH_COOKIE_NAME, result.token, getAuthCookieOptions());
+      res.cookie(
+        SecurityConstants.AUTH_COOKIE_NAME,
+        result.token,
+        getAuthCookieOptions(this.authCookieOptions)
+      );
       return res.status(200).json({ user: result.user });
     } catch (error) {
       console.error("Error en login:", error);
@@ -60,14 +65,18 @@ class AuthController {
       if (!dto.password || !dto.new_password) {
         return res
           .status(400)
-          .json({ message: "La contraseña actual y la nueva contraseña son obligatorias" });
+          .json({ message: ErrorMessages.PASSWORD_CHANGE_REQUIRED_FIELDS });
       }
       const result = await this.changePasswordUseCase.execute(
         req.user.id_user,
         dto.password,
         dto.new_password
       );
-      res.cookie(SecurityConstants.AUTH_COOKIE_NAME, result.token, getAuthCookieOptions());
+      res.cookie(
+        SecurityConstants.AUTH_COOKIE_NAME,
+        result.token,
+        getAuthCookieOptions(this.authCookieOptions)
+      );
       return res.status(200).json({ user: result.user });
     } catch (error) {
       console.error("Error al cambiar contraseña:", error);

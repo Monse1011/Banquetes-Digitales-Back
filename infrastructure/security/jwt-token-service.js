@@ -2,6 +2,11 @@ const jwt = require("jsonwebtoken");
 const { SecurityConstants } = require("../../domain/constants/security");
 
 class JwtTokenService {
+  constructor({ secret, expiresIn = SecurityConstants.JWT_DEFAULT_TTL } = {}) {
+    this.secret = secret;
+    this.expiresIn = expiresIn;
+  }
+
   generateToken(user, extraClaims = {}) {
     return jwt.sign(
       {
@@ -10,16 +15,16 @@ class JwtTokenService {
         role: user.role,
         ...extraClaims,
       },
-      process.env.JWT_SECRET,
+      this.secret,
       {
         algorithm: SecurityConstants.JWT_ALGORITHM,
-        expiresIn: process.env.JWT_EXPIRES_IN || SecurityConstants.JWT_DEFAULT_TTL,
+        expiresIn: this.expiresIn,
       }
     );
   }
 
   verifyToken(token) {
-    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+    const payload = jwt.verify(token, this.secret, {
       algorithms: [SecurityConstants.JWT_ALGORITHM],
     });
     const currentTime = Math.floor(Date.now() / 1000);

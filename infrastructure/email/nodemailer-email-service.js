@@ -1,22 +1,25 @@
 const nodemailer = require("nodemailer");
 
 class NodemailerEmailService {
-  constructor() {
+  constructor({ host, port, user, password, resetPasswordUrl } = {}) {
+    this.user = user;
+    this.resetPasswordUrl = resetPasswordUrl;
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
+      host,
+      port: Number(port),
       secure: false,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
+        user,
+        pass: password,
       },
     });
   }
 
   async sendPasswordResetEmail(email, fullName, token) {
-    const resetUrl = `${process.env.RESET_PASSWORD_URL}?token=${encodeURIComponent(token)}`;
+    const resetUrl = `${this.resetPasswordUrl}?token=${encodeURIComponent(token)}`;
+    console.log(`Sending password reset email to ${email}`);
     await this.transporter.sendMail({
-      from: `"Banquetes Elegancia" <${process.env.SMTP_USER}>`,
+      from: `"Banquetes Elegancia" <${this.user}>`,
       to: email,
       subject: "Restablecimiento de contraseña - Banquetes Elegancia",
       html: `

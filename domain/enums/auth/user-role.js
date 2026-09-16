@@ -1,5 +1,5 @@
 const UserRole = Object.freeze({
-  ADMIN: "ADMIN",
-  LOGISTICA: "LOGISTICA",
+  ADMIN: "admin",
+  LOGISTICA: "logistica",
 });
 module.exports = UserRole;
