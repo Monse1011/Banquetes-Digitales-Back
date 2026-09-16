@@ -4,7 +4,7 @@ class GetReservationRequestsResponseDto {
     this.metadata = {
       pagination: {
         total_records: totalRecords,
-        page,
+        page: page,
         per_page: perPage,
       },
     };

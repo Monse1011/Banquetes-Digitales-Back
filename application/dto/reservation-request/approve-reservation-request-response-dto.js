@@ -3,8 +3,8 @@ class ApproveReservationRequestResponseDto {
     this.data = [
       {
         request_id: requestId,
-        folio,
-        status,
+        folio: folio,
+        status: status,
       },
     ];
   }

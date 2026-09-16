@@ -2,7 +2,7 @@ class CreateReservationResponseDto {
   constructor(folio) {
     this.data = [
       {
-        folio,
+        folio: folio,
       },
     ];
   }
