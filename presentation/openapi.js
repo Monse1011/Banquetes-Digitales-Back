@@ -26,7 +26,10 @@ const openApiDocument = {
             },
           },
         },
-        responses: { 200: { description: "Authenticated" }, 401: { description: "Invalid credentials" } },
+        responses: {
+          200: { description: "Authenticated" },
+          401: { description: "Invalid credentials" },
+        },
       },
     },
     "/api/auth/first-access": {
@@ -34,7 +37,10 @@ const openApiDocument = {
         tags: ["Authentication"],
         summary: "Check first access",
         security: [{ CookieAuth: [] }],
-        responses: { 200: { description: "First access status" }, 401: { description: "Unauthorized" } },
+        responses: {
+          200: { description: "First access status" },
+          401: { description: "Unauthorized" },
+        },
       },
     },
     "/api/auth/change-password": {
@@ -57,7 +63,10 @@ const openApiDocument = {
             },
           },
         },
-        responses: { 200: { description: "Password changed" }, 400: { description: "Invalid password" } },
+        responses: {
+          200: { description: "Password changed" },
+          400: { description: "Invalid password" },
+        },
       },
     },
     "/api/auth/forgot-password": {
@@ -76,7 +85,10 @@ const openApiDocument = {
             },
           },
         },
-        responses: { 200: { description: "Reset request processed" }, 400: { description: "Invalid request" } },
+        responses: {
+          200: { description: "Reset request processed" },
+          400: { description: "Invalid request" },
+        },
       },
     },
     "/api/auth/reset-password": {
@@ -98,7 +110,10 @@ const openApiDocument = {
             },
           },
         },
-        responses: { 200: { description: "Password reset" }, 400: { description: "Invalid reset request" } },
+        responses: {
+          200: { description: "Password reset" },
+          400: { description: "Invalid reset request" },
+        },
       },
     },
     "/api/client/request": {
@@ -139,7 +154,10 @@ const openApiDocument = {
         summary: "Approve a reservation request",
         security: [{ CookieAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
-        responses: { 200: { description: "Request approved" }, 400: { description: "Invalid request" } },
+        responses: {
+          200: { description: "Request approved" },
+          400: { description: "Invalid request" },
+        },
       },
     },
   },

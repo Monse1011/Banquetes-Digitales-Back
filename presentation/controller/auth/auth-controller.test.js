@@ -15,10 +15,7 @@ describe("AuthController", () => {
       json: vi.fn().mockReturnThis(),
     };
 
-    await authController.login(
-      { body: { employeeId: "E-001", password: "password" } },
-      response
-    );
+    await authController.login({ body: { employeeId: "E-001", password: "password" } }, response);
 
     expect(response.cookie).toHaveBeenCalledWith(
       "auth_token",

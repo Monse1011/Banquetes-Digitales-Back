@@ -27,8 +27,7 @@ function getInvalidEnvironmentValues(port, smtpPort, resetPasswordUrl) {
   const invalid = [];
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) invalid.push("PORT");
-  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535)
-    invalid.push("SMTP_PORT");
+  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) invalid.push("SMTP_PORT");
 
   try {
     const parsedUrl = new URL(resetPasswordUrl);

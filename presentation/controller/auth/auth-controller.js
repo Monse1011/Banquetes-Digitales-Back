@@ -3,10 +3,7 @@ const ChangePasswordRequestDTO = require("../../../application/dto/auth/change-p
 const InvalidCredentialsException = require("../../../domain/exceptions/auth/invalid-credentials-exception");
 const AccountBlockedException = require("../../../domain/exceptions/auth/account-blocked-exception");
 const InvalidPasswordException = require("../../../domain/exceptions/password-reset/invalid-password-exception");
-const {
-  SecurityConstants,
-  getAuthCookieOptions,
-} = require("../../../domain/constants/security");
+const { SecurityConstants, getAuthCookieOptions } = require("../../../domain/constants/security");
 const ErrorMessages = require("../../constants/error-messages");
 
 class AuthController {
@@ -21,9 +18,7 @@ class AuthController {
     try {
       const { employeeId, password } = req.body || {};
       if (!employeeId || !password) {
-        return res
-          .status(400)
-          .json({ message: ErrorMessages.LOGIN_REQUIRED_FIELDS });
+        return res.status(400).json({ message: ErrorMessages.LOGIN_REQUIRED_FIELDS });
       }
       const dto = new LoginRequestDTO({ employeeId, password });
       const result = await this.authenticateUser.execute(dto.employeeId, dto.password);
@@ -63,9 +58,7 @@ class AuthController {
     try {
       const dto = new ChangePasswordRequestDTO(req.body || {});
       if (!dto.password || !dto.new_password) {
-        return res
-          .status(400)
-          .json({ message: ErrorMessages.PASSWORD_CHANGE_REQUIRED_FIELDS });
+        return res.status(400).json({ message: ErrorMessages.PASSWORD_CHANGE_REQUIRED_FIELDS });
       }
       const result = await this.changePasswordUseCase.execute(
         req.user.id_user,
