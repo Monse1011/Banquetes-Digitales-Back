@@ -1,6 +1,6 @@
 class InvalidCredentialsException extends Error {
-  constructor() {
-    super("Credenciales incorrectas");
+  constructor(message = "Credenciales incorrectas") {
+    super(message);
     this.name = "InvalidCredentialsException";
   }
 }

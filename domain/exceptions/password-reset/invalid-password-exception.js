@@ -1,5 +1,5 @@
 class InvalidPasswordException extends Error {
-  constructor(message) {
+  constructor(message = "La contraseña es inválida") {
     super(message);
     this.name = "InvalidPasswordException";
   }

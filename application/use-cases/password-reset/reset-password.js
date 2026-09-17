@@ -35,8 +35,7 @@ class ResetPassword {
     };
 
     return {
-      requiresPasswordChange: false,
-      token: this.tokenService.generateToken(tokenClaims, { mustChangePassword: false }),
+      token: this.tokenService.generateToken(tokenClaims),
       user,
     };
   }

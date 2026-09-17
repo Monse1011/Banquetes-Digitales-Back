@@ -1,17 +1,20 @@
 function createRateLimit({ windowMs, max, message }) {
   const clients = new Map();
 
-  const cleanupIntervalId = setInterval(() => {
+  const cleanExpiredClients = () => {
     const now = Date.now();
     for (const [key, entry] of clients) {
       if (now - entry.start >= windowMs) {
         clients.delete(key);
       }
     }
-  }, windowMs);
+  };
+
+  const cleanupIntervalId = setInterval(cleanExpiredClients, windowMs);
   cleanupIntervalId.unref?.();
 
   return (req, res, next) => {
+    cleanExpiredClients();
     const key = req.ip || req.socket.remoteAddress || "unknown";
     const now = Date.now();
     const current = clients.get(key);

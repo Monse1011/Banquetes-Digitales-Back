@@ -1,111 +1,128 @@
 const openApiDocument = {
   openapi: "3.0.3",
   info: {
-    title: "Banquetes Digitales API",
+    title: "Banquetes Digitales Authentication API",
     version: "1.0.0",
-    description: "API para reservas de banquetes",
+    description: "API de autenticación y recuperación de contraseña",
   },
-  servers: [
-    {
-      url: "http://localhost:3000",
-      description: "Development server",
-    },
-  ],
+  servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
-    "/api/client/request": {
+    "/api/auth/login": {
       post: {
-        tags: ["Client"],
-        summary: "Create a new reservation request",
-        operationId: "createReservationRequest",
+        tags: ["Authentication"],
+        summary: "Authenticate a user",
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: {
                 type: "object",
-                required: [
-                  "client_full_name",
-                  "email",
-                  "phone",
-                  "event_date_time",
-                  "guest_count",
-                  "event_address",
-                  "services_ids",
-                ],
+                required: ["employeeId", "password"],
                 properties: {
-                  client_full_name: {
-                    type: "string",
-                  },
-                  email: {
-                    type: "string",
-                    format: "email",
-                  },
-                  phone: {
-                    type: "string",
-                  },
-                  event_date_time: {
-                    type: "string",
-                    format: "date-time",
-                  },
-                  guest_count: {
-                    type: "integer",
-                    minimum: 1,
-                  },
-                  event_address: {
-                    type: "string",
-                  },
-                  services_ids: {
-                    type: "array",
-                    items: {
-                      type: "integer",
-                    },
-                  },
+                  employeeId: { type: "string" },
+                  password: { type: "string", format: "password" },
                 },
               },
             },
           },
         },
         responses: {
-          201: {
-            description: "Reservation request created",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    data: {
-                      type: "object",
-                      properties: {
-                        folio: {
-                          type: "string",
-                        },
-                      },
-                    },
-                  },
+          200: { description: "Authenticated" },
+          401: { description: "Invalid credentials" },
+        },
+      },
+    },
+    "/api/auth/first-access": {
+      get: {
+        tags: ["Authentication"],
+        summary: "Check first access",
+        security: [{ CookieAuth: [] }],
+        responses: {
+          200: { description: "First access status" },
+          401: { description: "Unauthorized" },
+        },
+      },
+    },
+    "/api/auth/change-password": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Change password",
+        security: [{ CookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["password", "new_password"],
+                properties: {
+                  password: { type: "string", format: "password" },
+                  new_password: { type: "string", format: "password" },
                 },
               },
             },
           },
-          422: {
-            description: "Validation error, one message per invalid field",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    errors: {
-                      type: "object",
-                      description:
-                        "Keys match the request body fields (e.g. client_full_name, email, phone, event_date_time, guest_count, event_address, services_ids)",
-                      additionalProperties: {
-                        type: "string",
-                      },
-                    },
-                  },
+        },
+        responses: {
+          200: { description: "Password changed" },
+          400: { description: "Invalid password" },
+        },
+      },
+    },
+    "/api/auth/forgot-password": {
+      post: {
+        tags: ["Password reset"],
+        summary: "Request a password reset",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email"],
+                properties: { email: { type: "string", format: "email" } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Reset request processed" },
+          400: { description: "Invalid request" },
+        },
+      },
+    },
+    "/api/auth/reset-password": {
+      post: {
+        tags: ["Password reset"],
+        summary: "Reset a password",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["token", "new_password"],
+                properties: {
+                  token: { type: "string" },
+                  new_password: { type: "string", format: "password" },
                 },
               },
             },
           },
+        },
+        responses: {
+          200: { description: "Password reset" },
+          400: { description: "Invalid reset request" },
+        },
+      },
+    },
+    "/api/client/request": {
+      post: {
+        tags: ["Client"],
+        summary: "Create a reservation request",
+        responses: {
+          201: { description: "Reservation request created" },
+          422: { description: "Validation error" },
         },
       },
     },
@@ -113,202 +130,41 @@ const openApiDocument = {
       get: {
         tags: ["Client"],
         summary: "List available services",
-        operationId: "listServices",
-        responses: {
-          200: {
-            description: "Services list",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    data: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          id: {
-                            type: "integer",
-                          },
-                          nombre: {
-                            type: "string",
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        responses: { 200: { description: "Services list" } },
       },
     },
     "/api/admin/requests": {
       get: {
         tags: ["Admin"],
-        summary: "List all reservation requests",
-        operationId: "listRequests",
-        security: [
-          {
-            BearerAuth: [],
-          },
-        ],
-        parameters: [
-          {
-            name: "page",
-            in: "query",
-            schema: {
-              type: "integer",
-              default: 1,
-            },
-          },
-          {
-            name: "per_page",
-            in: "query",
-            schema: {
-              type: "integer",
-              default: 10,
-            },
-          },
-        ],
-        responses: {
-          200: {
-            description: "Requests list",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    data: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          folio: {
-                            type: "string",
-                          },
-                          client_name: {
-                            type: "string",
-                          },
-                          client_email: {
-                            type: "string",
-                          },
-                          requested_date: {
-                            type: "string",
-                            format: "date-time",
-                          },
-                          selected_services: {
-                            type: "array",
-                            items: {
-                              type: "string",
-                            },
-                          },
-                          status: {
-                            type: "string",
-                          },
-                        },
-                      },
-                    },
-                    pagination: {
-                      type: "object",
-                      properties: {
-                        total_records: {
-                          type: "integer",
-                        },
-                        page: {
-                          type: "integer",
-                        },
-                        per_page: {
-                          type: "integer",
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        summary: "List reservation requests",
+        security: [{ CookieAuth: [] }],
+        responses: { 200: { description: "Requests list" }, 403: { description: "Forbidden" } },
       },
     },
     "/api/admin/requests/{id}": {
       get: {
         tags: ["Admin"],
-        summary: "Get a specific reservation request",
-        operationId: "getRequest",
-        security: [
-          {
-            BearerAuth: [],
-          },
-        ],
-        parameters: [
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            schema: {
-              type: "integer",
-            },
-          },
-        ],
-        responses: {
-          200: {
-            description: "Request details",
-          },
-        },
+        summary: "Get a reservation request",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { 200: { description: "Request details" }, 404: { description: "Not found" } },
       },
       patch: {
         tags: ["Admin"],
         summary: "Approve a reservation request",
-        operationId: "approveRequest",
-        security: [
-          {
-            BearerAuth: [],
-          },
-        ],
-        parameters: [
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            schema: {
-              type: "integer",
-            },
-          },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  status: {
-                    type: "string",
-                    enum: ["Aprobada"],
-                  },
-                },
-              },
-            },
-          },
-        },
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
         responses: {
-          200: {
-            description: "Request approved",
-          },
+          200: { description: "Request approved" },
+          400: { description: "Invalid request" },
         },
       },
     },
   },
   components: {
     securitySchemes: {
-      BearerAuth: {
-        type: "http",
-        scheme: "bearer",
-      },
+      CookieAuth: { type: "apiKey", in: "cookie", name: "auth_token" },
     },
   },
 };
-
 module.exports = { openApiDocument };

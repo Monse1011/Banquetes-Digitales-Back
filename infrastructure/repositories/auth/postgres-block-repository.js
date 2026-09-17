@@ -1,6 +1,5 @@
 const Block = require("../../../domain/entities/auth/block");
-
-const BLOCK_DURATION_MINUTES = 15;
+const { SecurityConstants } = require("../../../domain/constants/security");
 
 class PostgresBlockRepository {
   constructor(pool) {
@@ -35,7 +34,7 @@ class PostgresBlockRepository {
       `
             UPDATE blocks SET blocked_until = NOW() + make_interval(mins => $2)
             WHERE id_user = $1 RETURNING *`,
-      [idUser, BLOCK_DURATION_MINUTES]
+      [idUser, SecurityConstants.BLOCK_DURATION_MINUTES]
     );
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }

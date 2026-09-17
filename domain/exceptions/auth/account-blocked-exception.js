@@ -1,6 +1,6 @@
 class AccountBlockedException extends Error {
-  constructor() {
-    super("Cuenta bloqueada temporalmente");
+  constructor(message = "Cuenta bloqueada temporalmente") {
+    super(message);
     this.name = "AccountBlockedException";
   }
 }

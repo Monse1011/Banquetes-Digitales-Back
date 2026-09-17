@@ -1,4 +1,6 @@
 const User = require("../../../domain/entities/auth/user");
+const UserStatus = require("../../../domain/enums/auth/user-status");
+const UserRole = require("../../../domain/enums/auth/user-role");
 
 class PostgresUserRepository {
   constructor(pool) {
@@ -52,14 +54,20 @@ class PostgresUserRepository {
   }
 
   toEntity(row) {
+    const rawStatus = row.status ? String(row.status).toLowerCase() : "";
+    const status = rawStatus === UserStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE;
+
+    const rawRole = row.role ? String(row.role).toLowerCase() : "";
+    const role = rawRole === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICA;
+
     return new User(
       row.id_user,
       row.id_employee,
       row.full_name,
       row.email,
       row.password_hash,
-      row.role,
-      row.status,
+      role,
+      status,
       row.creation_date,
       row.last_access
     );

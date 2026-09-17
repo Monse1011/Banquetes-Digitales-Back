@@ -3,56 +3,80 @@ const ChangePasswordRequestDTO = require("../../../application/dto/auth/change-p
 const InvalidCredentialsException = require("../../../domain/exceptions/auth/invalid-credentials-exception");
 const AccountBlockedException = require("../../../domain/exceptions/auth/account-blocked-exception");
 const InvalidPasswordException = require("../../../domain/exceptions/password-reset/invalid-password-exception");
+const { SecurityConstants, getAuthCookieOptions } = require("../../../domain/constants/security");
+const ErrorMessages = require("../../constants/error-messages");
 
 class AuthController {
-  constructor(authenticateUser, changePassword) {
+  constructor(authenticateUser, changePassword, userRepository = null, authCookieOptions = {}) {
     this.authenticateUser = authenticateUser;
     this.changePasswordUseCase = changePassword;
+    this.userRepository = userRepository;
+    this.authCookieOptions = authCookieOptions;
   }
 
   login = async (req, res) => {
     try {
       const { employeeId, password } = req.body || {};
       if (!employeeId || !password) {
-        return res
-          .status(400)
-          .json({ message: "El ID de empleado y la contraseña son obligatorios" });
+        return res.status(400).json({ message: ErrorMessages.LOGIN_REQUIRED_FIELDS });
       }
       const dto = new LoginRequestDTO({ employeeId, password });
-      return res
-        .status(200)
-        .json(await this.authenticateUser.execute(dto.employeeId, dto.password));
+      const result = await this.authenticateUser.execute(dto.employeeId, dto.password);
+      res.cookie(
+        SecurityConstants.AUTH_COOKIE_NAME,
+        result.token,
+        getAuthCookieOptions(this.authCookieOptions)
+      );
+      return res.status(200).json({ user: result.user });
     } catch (error) {
-      if (error instanceof AccountBlockedException)
-        return res.status(423).json({ message: error.message });
-      if (error instanceof InvalidCredentialsException)
-        return res.status(401).json({ message: error.message });
       console.error("Error en login:", error);
-      return res.status(500).json({ message: "No fue posible procesar el inicio de sesión" });
+      if (error instanceof AccountBlockedException)
+        return res.status(423).json({ message: ErrorMessages.ACCOUNT_BLOCKED });
+      if (error instanceof InvalidCredentialsException)
+        return res.status(401).json({ message: ErrorMessages.INVALID_CREDENTIALS });
+      return res.status(500).json({ message: ErrorMessages.LOGIN_FAILED });
+    }
+  };
+
+  firstAccess = async (req, res) => {
+    try {
+      if (!this.userRepository) {
+        return res.status(500).json({ message: ErrorMessages.FIRST_ACCESS_CHECK_FAILED });
+      }
+
+      const user = await this.userRepository.findById(req.user.id_user);
+      return res.status(200).json({
+        firstAccess: user ? user.isFirstAccess() : false,
+      });
+    } catch (error) {
+      console.error("Error al consultar primer acceso:", error);
+      return res.status(500).json({ message: ErrorMessages.FIRST_ACCESS_CHECK_FAILED });
     }
   };
 
   changePassword = async (req, res) => {
     try {
       const dto = new ChangePasswordRequestDTO(req.body || {});
-      const { currentPassword, newPassword } = dto;
-      if (!currentPassword || !newPassword) {
-        return res
-          .status(400)
-          .json({ message: "La contraseña actual y la nueva contraseña son obligatorias" });
+      if (!dto.password || !dto.new_password) {
+        return res.status(400).json({ message: ErrorMessages.PASSWORD_CHANGE_REQUIRED_FIELDS });
       }
       const result = await this.changePasswordUseCase.execute(
         req.user.id_user,
-        dto.currentPassword,
-        dto.newPassword
+        dto.password,
+        dto.new_password
       );
-      return res.status(200).json(result);
+      res.cookie(
+        SecurityConstants.AUTH_COOKIE_NAME,
+        result.token,
+        getAuthCookieOptions(this.authCookieOptions)
+      );
+      return res.status(200).json({ user: result.user });
     } catch (error) {
       console.error("Error al cambiar contraseña:", error);
       if (error instanceof InvalidPasswordException) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({ message: ErrorMessages.INVALID_PASSWORD });
       }
-      return res.status(400).json({ message: "No fue posible cambiar la contraseña" });
+      return res.status(500).json({ message: ErrorMessages.PASSWORD_CHANGE_FAILED });
     }
   };
 }

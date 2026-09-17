@@ -1,6 +1,5 @@
 class LoginResponseDTO {
-  constructor({ requiresPasswordChange, token, user }) {
-    this.requiresPasswordChange = requiresPasswordChange;
+  constructor({ token, user }) {
     this.token = token;
     this.user = user;
   }

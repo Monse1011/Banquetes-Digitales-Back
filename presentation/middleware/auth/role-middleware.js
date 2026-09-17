@@ -1,8 +1,15 @@
+const AuthMessages = require("../../constants/auth-messages");
+
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: "Usuario no autenticado" });
-    if (!allowedRoles.includes(req.user.role))
-      return res.status(403).json({ message: "No tienes permisos para realizar esta acción" });
+    if (!req.user) {
+      console.warn("Authorization failed: user is not authenticated");
+      return res.status(401).json({ message: AuthMessages.AUTHENTICATION_REQUIRED });
+    }
+    if (!allowedRoles.includes(req.user.role)) {
+      console.warn(`Authorization failed: role ${req.user.role} is not allowed`);
+      return res.status(403).json({ message: AuthMessages.FORBIDDEN });
+    }
     next();
   };
 }

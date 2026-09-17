@@ -1,16 +1,16 @@
 const { Pool } = require("pg");
 
-function createPostgresPool(overrides = {}) {
+function createPostgresPool(databaseConfig = {}, overrides = {}) {
   const config = {};
 
-  if (process.env.DATABASE_URL) {
-    config.connectionString = process.env.DATABASE_URL;
+  if (databaseConfig.url) {
+    config.connectionString = databaseConfig.url;
   } else {
-    if (process.env.PGHOST) config.host = process.env.PGHOST;
-    if (process.env.PGPORT) config.port = Number(process.env.PGPORT);
-    if (process.env.PGUSER) config.user = process.env.PGUSER;
-    if (process.env.PGPASSWORD) config.password = process.env.PGPASSWORD;
-    if (process.env.PGDATABASE) config.database = process.env.PGDATABASE;
+    if (databaseConfig.host) config.host = databaseConfig.host;
+    if (databaseConfig.port) config.port = Number(databaseConfig.port);
+    if (databaseConfig.user) config.user = databaseConfig.user;
+    if (databaseConfig.password) config.password = databaseConfig.password;
+    if (databaseConfig.database) config.database = databaseConfig.database;
   }
 
   return new Pool({ ...config, ...overrides });
