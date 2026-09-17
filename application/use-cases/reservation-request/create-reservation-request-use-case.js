@@ -15,8 +15,16 @@ class CreateReservationRequestUseCase {
     this.folioGenerator = folioGenerator;
   }
 
-  async execute(body) {
-    const dto = new CreateReservationRequestDto(body);
+  async execute(body = {}) {
+    const dto = new CreateReservationRequestDto(
+      body.client_full_name,
+      body.email,
+      body.phone,
+      body.event_date_time,
+      body.guest_count,
+      body.event_address,
+      body.services_ids
+    );
     const errors = dto.validate();
 
     if (Object.keys(errors).length > 0) {
