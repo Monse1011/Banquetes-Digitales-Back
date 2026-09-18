@@ -4,7 +4,7 @@ function validDto(overrides = {}) {
   const eventDate = new Date();
   eventDate.setDate(eventDate.getDate() + 1);
 
-  return new CreateReservationRequestDto({
+  const fields = {
     client_full_name: "John Doe",
     email: "john@example.com",
     phone: "1234567890",
@@ -13,7 +13,17 @@ function validDto(overrides = {}) {
     event_address: "123 Main St",
     services_ids: [1, 2],
     ...overrides,
-  });
+  };
+
+  return new CreateReservationRequestDto(
+    fields.client_full_name,
+    fields.email,
+    fields.phone,
+    fields.event_date_time,
+    fields.guest_count,
+    fields.event_address,
+    fields.services_ids
+  );
 }
 
 describe("CreateReservationRequestDto", () => {

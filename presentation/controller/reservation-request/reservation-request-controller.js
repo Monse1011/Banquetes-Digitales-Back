@@ -1,3 +1,7 @@
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+
 class ReservationRequestController {
   constructor(dependencies) {
     this.dependencies = dependencies;
@@ -28,8 +32,8 @@ class ReservationRequestController {
   async approve(request, response) {
     const status = request.body?.status;
 
-    if (status !== "Aprobado" && status !== "Aprobada") {
-      response.status(400).json({ message: "Status must be Aprobado" });
+    if (status !== ReservationRequestStatus.APPROVED) {
+      response.status(400).json({ message: `Status must be ${ReservationRequestStatus.APPROVED}` });
       return;
     }
 
