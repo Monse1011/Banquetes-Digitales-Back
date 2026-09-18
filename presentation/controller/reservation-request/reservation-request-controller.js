@@ -33,9 +33,7 @@ class ReservationRequestController {
     const status = request.body?.status;
 
     if (status !== ReservationRequestStatus.APPROVED) {
-      response
-        .status(400)
-        .json({ message: `Status must be ${ReservationRequestStatus.APPROVED}` });
+      response.status(400).json({ message: `Status must be ${ReservationRequestStatus.APPROVED}` });
       return;
     }
 

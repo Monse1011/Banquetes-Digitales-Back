@@ -17,15 +17,7 @@ function isPastCalendarDate(dateValue) {
 }
 
 class CreateReservationRequestDto {
-  constructor(
-    clientFullName,
-    email,
-    phone,
-    eventDateTime,
-    guestCount,
-    eventAddress,
-    servicesIds
-  ) {
+  constructor(clientFullName, email, phone, eventDateTime, guestCount, eventAddress, servicesIds) {
     this.client_full_name = clientFullName;
     this.email = email;
     this.phone = phone;
