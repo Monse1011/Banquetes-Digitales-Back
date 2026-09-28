@@ -42,6 +42,7 @@ class GetReservationRequestsUseCase {
         }
 
         return {
+          request_id: request.id,
           folio: request.folio,
           client_name: client.fullName,
           client_email: client.email,

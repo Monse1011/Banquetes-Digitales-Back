@@ -15,7 +15,7 @@ function requireAdmin(request, response, next) {
   try {
     const payload = jwt.verify(token, secret);
 
-    if (payload.role !== "Administrador") {
+    if (payload.role !== ("admin")) {
       response.status(403).json({ error: "Forbidden" });
       return;
     }
