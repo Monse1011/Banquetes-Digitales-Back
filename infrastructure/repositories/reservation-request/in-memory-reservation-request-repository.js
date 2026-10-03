@@ -2,6 +2,10 @@ const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
 const {
+  ReservationRequestStatus,
+  ActiveReservationRequestStatuses,
+} = require("../../../domain/enums/reservation-request/request-status");
+const {
   ReservationRequestSortField,
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 
@@ -18,11 +22,15 @@ class InMemoryReservationRequestRepository {
       request.clientId,
       request.userId,
       request.eventDateTime,
+      request.eventEndTime,
       request.guestCount,
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.servicesIds
+      request.servicesIds,
+      request.logisticUserId,
+      request.assignedByUserId,
+      request.assignedAt
     );
 
     this.requests.push(createdRequest);
@@ -44,6 +52,51 @@ class InMemoryReservationRequestRepository {
 
     this.requests[index] = request;
     return request;
+  }
+
+  // RF-1.2.4.1 / RF-1.2.4.3 / RF-1.2.4.4 / RF-1.2.4.7: valida estado, traslape y
+  // registra la asignación en una sola operación atómica (ejecución single-thread).
+  async assign(requestId, logisticUserId, assignedByUserId) {
+    const request = await this.findById(requestId);
+
+    if (!request) {
+      return { status: "not_found" };
+    }
+
+    if (request.logisticUserId !== null) {
+      return { status: "already_assigned" };
+    }
+
+    if (request.status !== ReservationRequestStatus.APPROVED) {
+      return { status: "not_approved" };
+    }
+
+    const overlapping = this.requests.filter(
+      (existingRequest) =>
+        existingRequest.requestId !== requestId &&
+        existingRequest.logisticUserId === logisticUserId &&
+        ActiveReservationRequestStatuses.includes(existingRequest.status) &&
+        existingRequest.eventDateTime < request.eventEndTime &&
+        existingRequest.eventEndTime > request.eventDateTime
+    );
+
+    if (overlapping.length > 0) {
+      return {
+        status: "overlap",
+        conflicts: overlapping.map((conflict) => ({
+          folio: conflict.folio,
+          startDateTime: conflict.eventDateTime,
+          endDateTime: conflict.eventEndTime,
+        })),
+      };
+    }
+
+    request.status = ReservationRequestStatus.ASSIGNED;
+    request.logisticUserId = logisticUserId;
+    request.assignedByUserId = assignedByUserId;
+    request.assignedAt = new Date();
+
+    return { status: "assigned", request };
   }
 
   async findAll(filters, sort, page, perPage) {

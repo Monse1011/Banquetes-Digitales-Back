@@ -2,8 +2,19 @@ const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
 const {
+  ReservationRequestStatus,
+  ActiveReservationRequestStatuses,
+} = require("../../../domain/enums/reservation-request/request-status");
+const {
   ReservationRequestSortField,
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
+const UserRole = require("../../../domain/enums/auth/user-role");
+const UserStatus = require("../../../domain/enums/auth/user-status");
+
+const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
+            event_date_time, event_end_time, guest_count, event_address, status,
+            request_date, logistic_user_id, assigned_by_user_id, assigned_at,
+            ARRAY[]::integer[] AS services_ids`;
 
 class PostgresReservationRequestRepository {
   constructor(pool) {
@@ -17,13 +28,10 @@ class PostgresReservationRequestRepository {
       await connection.query("BEGIN");
       const result = await connection.query(
         `INSERT INTO reservations_request
-          (folio, id_client, id_user, event_date_time, guest_count,
+          (folio, id_client, id_user, event_date_time, event_end_time, guest_count,
            event_address, status, request_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id_reservation_request, folio, id_client, id_user,
-           event_date_time, guest_count, event_address, status,
-           request_date,
-           ARRAY[]::integer[] AS services_ids`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING ${REQUEST_COLUMNS}`,
         this.requestValues(request)
       );
 
@@ -43,11 +51,15 @@ class PostgresReservationRequestRepository {
         createdRequest.clientId,
         createdRequest.userId,
         createdRequest.eventDateTime,
+        createdRequest.eventEndTime,
         createdRequest.guestCount,
         createdRequest.eventAddress,
         createdRequest.status,
         createdRequest.requestDate,
-        request.servicesIds
+        request.servicesIds,
+        createdRequest.logisticUserId,
+        createdRequest.assignedByUserId,
+        createdRequest.assignedAt
       );
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -76,12 +88,10 @@ class PostgresReservationRequestRepository {
       const result = await connection.query(
         `UPDATE reservations_request
          SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
-             guest_count = $5, event_address = $6, status = $7, request_date = $8
-         WHERE id_reservation_request = $9
-         RETURNING id_reservation_request, folio, id_client, id_user,
-           event_date_time, guest_count, event_address, status,
-           request_date,
-           ARRAY[]::integer[] AS services_ids`,
+             event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
+             request_date = $9
+         WHERE id_reservation_request = $10
+         RETURNING ${REQUEST_COLUMNS}`,
         [...this.requestValues(request), request.requestId]
       );
 
@@ -99,11 +109,15 @@ class PostgresReservationRequestRepository {
         updatedRequest.clientId,
         updatedRequest.userId,
         updatedRequest.eventDateTime,
+        updatedRequest.eventEndTime,
         updatedRequest.guestCount,
         updatedRequest.eventAddress,
         updatedRequest.status,
         updatedRequest.requestDate,
-        request.servicesIds
+        request.servicesIds,
+        updatedRequest.logisticUserId,
+        updatedRequest.assignedByUserId,
+        updatedRequest.assignedAt
       );
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -111,6 +125,113 @@ class PostgresReservationRequestRepository {
     } finally {
       connection.release();
     }
+  }
+
+  // RF-1.2.4.7: la asignación se registra de forma atómica. El bloqueo de la fila de
+  // la solicitud y de la fila del empleado impide que dos asignaciones simultáneas
+  // deriven en la misma solicitud doblemente asignada o en horarios traslapados.
+  async assign(requestId, logisticUserId, assignedByUserId) {
+    const connection = await this.pool.connect();
+
+    try {
+      await connection.query("BEGIN");
+
+      const rejection = await this.validateAssignment(connection, requestId, logisticUserId);
+
+      if (rejection) {
+        await connection.query("ROLLBACK");
+        return rejection;
+      }
+
+      // RF-1.2.4.3 / RF-1.2.4.14: cambio de estado y registro de la asignación.
+      await connection.query(
+        `UPDATE reservations_request
+         SET status = $1, logistic_user_id = $2, assigned_by_user_id = $3,
+             assigned_at = NOW()
+         WHERE id_reservation_request = $4 AND status = $5 AND logistic_user_id IS NULL`,
+        [
+          ReservationRequestStatus.ASSIGNED,
+          logisticUserId,
+          assignedByUserId,
+          requestId,
+          ReservationRequestStatus.APPROVED,
+        ]
+      );
+      await connection.query("COMMIT");
+
+      return { status: "assigned" };
+    } catch (error) {
+      await connection.query("ROLLBACK");
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async validateAssignment(connection, requestId, logisticUserId) {
+    const requestResult = await connection.query(
+      `SELECT id_reservation_request, folio, event_date_time, event_end_time,
+              status, logistic_user_id
+       FROM reservations_request
+       WHERE id_reservation_request = $1
+       FOR UPDATE`,
+      [requestId]
+    );
+    const request = requestResult.rows[0];
+
+    if (!request) {
+      return { status: "not_found" };
+    }
+
+    if (request.logistic_user_id !== null) {
+      return { status: "already_assigned" };
+    }
+
+    if (request.status !== ReservationRequestStatus.APPROVED) {
+      return { status: "not_approved" };
+    }
+
+    const userResult = await connection.query(
+      `SELECT id_user
+       FROM users
+       WHERE id_user = $1 AND role = $2 AND status = $3
+       FOR UPDATE`,
+      [logisticUserId, UserRole.LOGISTICA, UserStatus.ACTIVE]
+    );
+
+    if (!userResult.rows[0]) {
+      return { status: "user_unavailable" };
+    }
+
+    const overlapResult = await connection.query(
+      `SELECT folio, event_date_time, event_end_time
+       FROM reservations_request
+       WHERE logistic_user_id = $1
+         AND id_reservation_request <> $2
+         AND status = ANY($3)
+         AND event_date_time < $4
+         AND event_end_time > $5`,
+      [
+        logisticUserId,
+        requestId,
+        ActiveReservationRequestStatuses,
+        request.event_end_time,
+        request.event_date_time,
+      ]
+    );
+
+    if (overlapResult.rows.length > 0) {
+      return {
+        status: "overlap",
+        conflicts: overlapResult.rows.map((row) => ({
+          folio: row.folio,
+          startDateTime: new Date(row.event_date_time),
+          endDateTime: new Date(row.event_end_time),
+        })),
+      };
+    }
+
+    return undefined;
   }
 
   async findAll(filters, sort, page, perPage) {
@@ -161,8 +282,9 @@ class PostgresReservationRequestRepository {
 
   baseSelect() {
     return `SELECT rr.id_reservation_request, rr.folio, rr.id_client, rr.id_user,
-      rr.event_date_time, rr.guest_count, rr.event_address, rr.status,
-      rr.request_date,
+      rr.event_date_time, rr.event_end_time, rr.guest_count, rr.event_address,
+      rr.status, rr.request_date, rr.logistic_user_id, rr.assigned_by_user_id,
+      rr.assigned_at,
       COALESCE(
         ARRAY_AGG(rs.id_service) FILTER (WHERE rs.id_service IS NOT NULL),
         ARRAY[]::integer[]
@@ -179,6 +301,7 @@ class PostgresReservationRequestRepository {
       request.clientId,
       request.userId,
       request.eventDateTime,
+      request.eventEndTime,
       request.guestCount,
       request.eventAddress,
       request.status,
@@ -208,11 +331,15 @@ class PostgresReservationRequestRepository {
       Number(row.id_client),
       row.id_user === null ? null : Number(row.id_user),
       new Date(row.event_date_time),
+      new Date(row.event_end_time),
       row.guest_count,
       row.event_address,
       row.status,
       new Date(row.request_date),
-      serviceIds
+      serviceIds,
+      row.logistic_user_id === null ? null : Number(row.logistic_user_id),
+      row.assigned_by_user_id === null ? null : Number(row.assigned_by_user_id),
+      row.assigned_at === null ? null : new Date(row.assigned_at)
     );
   }
 

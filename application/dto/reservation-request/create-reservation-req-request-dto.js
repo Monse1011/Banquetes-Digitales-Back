@@ -17,11 +17,21 @@ function isPastCalendarDate(dateValue) {
 }
 
 class CreateReservationRequestDto {
-  constructor(clientFullName, email, phone, eventDateTime, guestCount, eventAddress, servicesIds) {
+  constructor(
+    clientFullName,
+    email,
+    phone,
+    eventDateTime,
+    eventEndTime,
+    guestCount,
+    eventAddress,
+    servicesIds
+  ) {
     this.client_full_name = clientFullName;
     this.email = email;
     this.phone = phone;
     this.event_date_time = eventDateTime;
+    this.event_end_time = eventEndTime;
     this.guest_count = guestCount;
     this.event_address = eventAddress;
     this.services_ids = servicesIds;
@@ -33,6 +43,7 @@ class CreateReservationRequestDto {
       email: this.validateEmail(),
       phone: this.validatePhone(),
       event_date_time: this.validateEventDateTime(),
+      event_end_time: this.validateEventEndTime(),
       guest_count: this.validateGuestCount(),
       event_address: this.validateEventAddress(),
       services_ids: this.validateServicesIds(),
@@ -75,6 +86,22 @@ class CreateReservationRequestDto {
 
     if (isInvalidDate || isPastCalendarDate(parsedDate)) {
       return "Seleccione una fecha válida. No puede ser anterior a la fecha actual.";
+    }
+
+    return undefined;
+  }
+
+  validateEventEndTime() {
+    const parsedStart = this.event_date_time ? new Date(this.event_date_time) : null;
+    const parsedEnd = this.event_end_time ? new Date(this.event_end_time) : null;
+    const isInvalidDate = !parsedEnd || Number.isNaN(parsedEnd.getTime());
+
+    if (isInvalidDate) {
+      return "Seleccione una fecha y hora de fin válidas.";
+    }
+
+    if (parsedStart && !Number.isNaN(parsedStart.getTime()) && parsedEnd <= parsedStart) {
+      return "La hora de fin debe ser posterior a la hora de inicio.";
     }
 
     return undefined;

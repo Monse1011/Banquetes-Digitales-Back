@@ -8,13 +8,46 @@ const { openApiDocument } = require("./openapi");
 const {
   ReservationRequestController,
 } = require("./controller/reservation-request/reservation-request-controller");
+const { UserController } = require("./controller/user/user-controller");
 const { ServiceController } = require("./controller/service/service-controller");
 const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
+const ReservationRequestNotFoundException = require("../domain/exceptions/reservation-request/reservation-request-not-found-exception");
+const RequestNotApprovedException = require("../domain/exceptions/reservation-request/request-not-approved-exception");
+const RequestAlreadyAssignedException = require("../domain/exceptions/reservation-request/request-already-assigned-exception");
+const RequestAssignmentConflictException = require("../domain/exceptions/reservation-request/request-assignment-conflict-exception");
+const LogisticsUserNotAvailableException = require("../domain/exceptions/reservation-request/logistics-user-not-available-exception");
 const InvalidCredentialsException = require("../domain/exceptions/auth/invalid-credentials-exception");
 const AccountBlockedException = require("../domain/exceptions/auth/account-blocked-exception");
 const InvalidPasswordException = require("../domain/exceptions/password-reset/invalid-password-exception");
 const InvalidResetTokenException = require("../domain/exceptions/password-reset/invalid-reset-token-exception");
 const ErrorMessages = require("./constants/error-messages");
+
+// Función 2.4: los mensajes de las excepciones de asignación son los del ERS.
+function handleAssignmentError(error, response) {
+  if (error instanceof ReservationRequestNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof RequestNotApprovedException ||
+    error instanceof RequestAlreadyAssignedException ||
+    error instanceof RequestAssignmentConflictException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof LogisticsUserNotAvailableException) {
+    response.status(409).json({
+      message: error.message,
+      ...(error.conflict ? { conflict: error.conflict } : {}),
+    });
+    return true;
+  }
+
+  return false;
+}
 
 function createApp(dependencies) {
   const app = express();
@@ -22,6 +55,7 @@ function createApp(dependencies) {
   // Authentication
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
+  const userController = new UserController(dependencies);
   const serviceController = new ServiceController(dependencies.serviceRepository);
 
   app.use(express.json());
@@ -49,7 +83,10 @@ function createApp(dependencies) {
   );
 
   app.use("/api/client", createClientRoutes(reservationRequestController, serviceController));
-  app.use("/api/admin", createAdminRoutes(reservationRequestController, authMiddleware));
+  app.use(
+    "/api/admin",
+    createAdminRoutes(reservationRequestController, userController, authMiddleware)
+  );
 
   // Error handler
   app.use((error, _request, response, _next) => {
@@ -58,6 +95,10 @@ function createApp(dependencies) {
         message: error.message,
         errors: error.errors,
       });
+      return;
+    }
+
+    if (handleAssignmentError(error, response)) {
       return;
     }
     if (error instanceof AccountBlockedException) {
