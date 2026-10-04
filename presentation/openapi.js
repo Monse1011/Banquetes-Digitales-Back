@@ -1,3 +1,25 @@
+const resourceIdParameter = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "integer" },
+};
+
+const humanResourceListParameters = [
+  { name: "status", in: "query", schema: { type: "string", enum: ["active", "inactive"] } },
+  { name: "name", in: "query", schema: { type: "string" } },
+  { name: "operative_role_id", in: "query", schema: { type: "integer" } },
+  { name: "sort_by", in: "query", schema: { type: "string", enum: ["name"] } },
+  { name: "order", in: "query", schema: { type: "string", enum: ["asc", "desc"] } },
+  { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+  { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } },
+];
+
+// El contrato del DAD envuelve los campos del body en "data".
+function dataEnvelope(schema) {
+  return { type: "object", required: ["data"], properties: { data: schema } };
+}
+
 const openApiDocument = {
   openapi: "3.0.3",
   info: {
@@ -157,6 +179,119 @@ const openApiDocument = {
         responses: {
           200: { description: "Request approved" },
           400: { description: "Invalid request" },
+        },
+      },
+    },
+    "/api/admin/resources/human": {
+      get: {
+        tags: ["Human resources"],
+        summary: "List human resources (RF-1.2.8.4 / RF-1.2.8.5)",
+        security: [{ CookieAuth: [] }],
+        parameters: humanResourceListParameters,
+        responses: { 200: { description: "Paginated human resources" } },
+      },
+      post: {
+        tags: ["Human resources"],
+        summary: "Register a human resource (RF-1.2.8.1 / RF-1.2.8.7)",
+        security: [{ CookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: dataEnvelope({
+                type: "object",
+                required: ["name", "operative_role_id"],
+                properties: {
+                  name: { type: "string", maxLength: 100 },
+                  operative_role_id: { type: "integer" },
+                  confirm_duplicate: {
+                    type: "boolean",
+                    description: "Send true to register a possible duplicate after the warning",
+                  },
+                },
+              }),
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Created; the Location header has the new resource path",
+          },
+          409: { description: "Possible duplicate; requires_confirmation is true" },
+          422: { description: "Validation error" },
+        },
+      },
+    },
+    "/api/admin/resources/human/{id}": {
+      get: {
+        tags: ["Human resources"],
+        summary: "Get a human resource (RF-1.2.8.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Human resource details" },
+          404: { description: "Not found" },
+        },
+      },
+      patch: {
+        tags: ["Human resources"],
+        summary: "Edit name and operative role (RF-1.2.8.2)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: dataEnvelope({
+                type: "object",
+                required: ["name", "operative_role_id"],
+                properties: {
+                  name: { type: "string", maxLength: 100 },
+                  operative_role_id: { type: "integer" },
+                },
+              }),
+            },
+          },
+        },
+        responses: {
+          204: { description: "Updated" },
+          404: { description: "Not found" },
+          422: { description: "Validation error" },
+        },
+      },
+      put: {
+        tags: ["Human resources"],
+        summary: "Deactivate (logical delete) or reactivate (RF-1.2.8.3)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: dataEnvelope({
+                type: "object",
+                required: ["is_active"],
+                properties: { is_active: { type: "boolean" } },
+              }),
+            },
+          },
+        },
+        responses: {
+          204: { description: "Status changed" },
+          404: { description: "Not found" },
+          422: { description: "Validation error" },
+        },
+      },
+    },
+    "/api/logistics/resources/human": {
+      get: {
+        tags: ["Logistics"],
+        summary: "List active human resources (RF-1.2.8.9)",
+        security: [{ CookieAuth: [] }],
+        parameters: humanResourceListParameters.filter((parameter) => parameter.name !== "status"),
+        responses: {
+          200: { description: "Paginated active human resources" },
+          403: { description: "Forbidden" },
         },
       },
     },

@@ -84,12 +84,12 @@ npm start
 
 ```
 ├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
-│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
+│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/, resource/, operative-role/
 │   ├── enums/             # Constantes y enumeradores del negocio, por feature
 │   ├── exceptions/        # Errores de dominio, por feature
 │   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
 ├── application/           # Casos de uso que orquestan la lógica de dominio
-│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
+│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/, resource/
 │   ├── dto/               # Entrada/salida de los casos de uso, por feature
 │   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
 │   ├── repositories/       # Contratos de los repositorios, por feature
@@ -130,6 +130,18 @@ npm start
 - **GET** `/api/admin/requests` - Listar solicitudes
 - **GET** `/api/admin/requests/:id` - Consultar una solicitud
 - **PATCH** `/api/admin/requests/:id` - Aprobar una solicitud
+
+### Recursos humanos (Administrador)
+
+- **GET** `/api/admin/resources/human` - Listar recursos humanos (`status`, `name`, `operative_role_id`, `sort_by`, `order`, `page`, `per_page`)
+- **POST** `/api/admin/resources/human` - Registrar un recurso humano (`confirm_duplicate: true` para confirmar un posible duplicado)
+- **GET** `/api/admin/resources/human/:id` - Consultar el detalle de un recurso humano
+- **PATCH** `/api/admin/resources/human/:id` - Editar nombre y rol operativo
+- **PUT** `/api/admin/resources/human/:id` - Desactivar (baja lógica) o reactivar
+
+### Logística
+
+- **GET** `/api/logistics/resources/human` - Listar recursos humanos activos
 
 ## Documentación API
 
