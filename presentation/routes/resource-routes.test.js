@@ -7,20 +7,8 @@ const {
   InMemoryOperativeRoleRepository,
 } = require("../../infrastructure/repositories/operative-role/in-memory-operative-role-repository");
 const {
-  CreateHumanResourceUseCase,
-} = require("../../application/use-cases/resource/create-human-resource-use-case");
-const {
-  UpdateHumanResourceUseCase,
-} = require("../../application/use-cases/resource/update-human-resource-use-case");
-const {
-  ChangeHumanResourceStatusUseCase,
-} = require("../../application/use-cases/resource/change-human-resource-status-use-case");
-const {
-  GetHumanResourcesUseCase,
-} = require("../../application/use-cases/resource/get-human-resources-use-case");
-const {
-  GetHumanResourceUseCase,
-} = require("../../application/use-cases/resource/get-human-resource-use-case");
+  createResourceUseCases,
+} = require("../../application/use-cases/resource/create-resource-use-cases");
 const { Resource } = require("../../domain/entities/resource/resource");
 const { OperativeRole } = require("../../domain/entities/operative-role/operative-role");
 const { ResourceType } = require("../../domain/enums/resource/resource-type");
@@ -30,16 +18,30 @@ const AUTH_COOKIE = "auth_token=valid-token";
 
 const notUsed = (_req, res) => res.status(501).end();
 
-function humanResource(id, name, isActive = true) {
+function resource(id, name, type, isActive = true) {
   const now = new Date();
+  const isHuman = type === ResourceType.HUMAN;
 
-  return new Resource(id, name, ResourceType.HUMAN, 1, 1, null, isActive, now, now, null);
+  return new Resource(
+    id,
+    name,
+    type,
+    isHuman ? 1 : null,
+    isHuman ? 1 : 10,
+    isHuman ? null : 100,
+    isActive,
+    now,
+    now,
+    null
+  );
 }
 
 function buildApp(role) {
   const resourceRepository = new InMemoryResourceRepository([
-    humanResource(1, "David Torres"),
-    humanResource(2, "Pedro Gómez", false),
+    resource(1, "David Torres", ResourceType.HUMAN),
+    resource(2, "Pedro Gómez", ResourceType.HUMAN, false),
+    resource(3, "Cable HDMI", ResourceType.MATERIAL),
+    resource(4, "Camioneta", ResourceType.LOGISTIC),
   ]);
   const operativeRoleRepository = new InMemoryOperativeRoleRepository([
     new OperativeRole(1, "Mesero", true),
@@ -49,24 +51,11 @@ function buildApp(role) {
     authController: { login: notUsed, changePassword: notUsed, firstAccess: notUsed },
     passwordResetController: { requestReset: notUsed, resetPassword: notUsed },
     tokenService: { verifyToken: () => ({ id_user: 1, role }) },
-    createHumanResourceUseCase: new CreateHumanResourceUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    updateHumanResourceUseCase: new UpdateHumanResourceUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    changeHumanResourceStatusUseCase: new ChangeHumanResourceStatusUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    getHumanResourcesUseCase: new GetHumanResourcesUseCase(resourceRepository),
-    getHumanResourceUseCase: new GetHumanResourceUseCase(resourceRepository),
+    ...createResourceUseCases(resourceRepository, operativeRoleRepository),
   });
 }
 
-describe("Human resource routes (Función 2.8)", () => {
+describe("Resource routes (Funciones 2.8 a 2.10)", () => {
   describe("as Administrador General", () => {
     let app;
 
@@ -90,14 +79,14 @@ describe("Human resource routes (Función 2.8)", () => {
       });
     });
 
-    it("creates a resource and returns its location", async () => {
+    it("creates a human resource and returns its location", async () => {
       const response = await request(app)
         .post("/api/admin/resources/human")
         .set("Cookie", AUTH_COOKIE)
         .send({ data: { name: "Ana López", operative_role_id: 1 } });
 
       expect(response.status).toBe(201);
-      expect(response.headers.location).toBe("/api/admin/resources/human/3");
+      expect(response.headers.location).toBe("/api/admin/resources/human/5");
     });
 
     it("asks for confirmation before registering a possible duplicate", async () => {
@@ -120,46 +109,104 @@ describe("Human resource routes (Función 2.8)", () => {
       expect(Object.keys(response.body.errors)).toEqual(["name", "operative_role_id"]);
     });
 
-    it("returns the detail of a resource", async () => {
-      const response = await request(app)
+    it("returns the detail, edits and deactivates a human resource", async () => {
+      const detail = await request(app)
         .get("/api/admin/resources/human/1")
         .set("Cookie", AUTH_COOKIE);
-
-      expect(response.status).toBe(200);
-      expect(response.body.data.resource).toMatchObject({ id: 1, name: "David Torres" });
-    });
-
-    it("edits the name and answers with 204", async () => {
-      const response = await request(app)
+      const update = await request(app)
         .patch("/api/admin/resources/human/1")
         .set("Cookie", AUTH_COOKIE)
         .send({ data: { name: "David Tec", operative_role_id: 1 } });
-
-      expect(response.status).toBe(204);
-    });
-
-    it("deactivates a resource and answers with 204", async () => {
-      const response = await request(app)
+      const deactivate = await request(app)
         .put("/api/admin/resources/human/1")
         .set("Cookie", AUTH_COOKIE)
         .send({ data: { is_active: false } });
 
-      expect(response.status).toBe(204);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.resource).toMatchObject({ id: 1, name: "David Torres" });
+      expect(update.status).toBe(204);
+      expect(deactivate.status).toBe(204);
     });
 
-    it("returns 404 for invalid or unknown ids", async () => {
+    it.each([
+      ["material", 3],
+      ["logistic", 4],
+    ])("manages %s resources", async (path, existingId) => {
+      const create = await request(app)
+        .post(`/api/admin/resources/${path}/`)
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: "Mesas", quantity: 4, unit_cost: 1000 } });
+      const list = await request(app)
+        .get(`/api/admin/resources/${path}?sort_by=name&order=asc`)
+        .set("Cookie", AUTH_COOKIE);
+      const update = await request(app)
+        .patch(`/api/admin/resources/${path}/${existingId}`)
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: "Nuevo nombre", quantity: 3, unit_cost: 1200 } });
+      const detail = await request(app)
+        .get(`/api/admin/resources/${path}/${existingId}`)
+        .set("Cookie", AUTH_COOKIE);
+      const deactivate = await request(app)
+        .put(`/api/admin/resources/${path}/${existingId}`)
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { is_active: false } });
+
+      expect(create.status).toBe(201);
+      expect(create.headers.location).toBe(`/api/admin/resources/${path}/5`);
+      expect(list.body.data.resources).toHaveLength(2);
+      expect(update.status).toBe(204);
+      expect(detail.body.data.resource).toMatchObject({
+        name: "Nuevo nombre",
+        quantity: 3,
+        unit_cost: 1200,
+      });
+      expect(deactivate.status).toBe(204);
+    });
+
+    it("soft deletes logistic resources with DELETE", async () => {
+      const response = await request(app)
+        .delete("/api/admin/resources/logistic/4")
+        .set("Cookie", AUTH_COOKIE);
+      const detail = await request(app)
+        .get("/api/admin/resources/logistic/4")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(response.status).toBe(204);
+      expect(detail.body.data.resource.is_active).toBe(false);
+    });
+
+    it("does not expose DELETE for material resources", async () => {
+      const response = await request(app)
+        .delete("/api/admin/resources/material/3")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(response.status).toBe(404);
+    });
+
+    it("lists resources of every type or of the requested type", async () => {
+      const all = await request(app).get("/api/admin/resources").set("Cookie", AUTH_COOKIE);
+      const materials = await request(app)
+        .get("/api/admin/resources?type=material&name=cable")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(all.body.data.resources.map((item) => item.id)).toEqual([3, 4, 1]);
+      expect(materials.body.data.resources.map((item) => item.id)).toEqual([3]);
+    });
+
+    it("returns 404 for invalid ids or resources of another type", async () => {
       const invalid = await request(app)
         .get("/api/admin/resources/human/abc")
         .set("Cookie", AUTH_COOKIE);
-      const unknown = await request(app)
-        .get("/api/admin/resources/human/99")
+      const otherType = await request(app)
+        .get("/api/admin/resources/material/4")
         .set("Cookie", AUTH_COOKIE);
 
       expect(invalid.status).toBe(404);
-      expect(unknown.status).toBe(404);
+      expect(otherType.status).toBe(404);
+      expect(otherType.body.message).toBe("El recurso material no existe.");
     });
 
-    it("cannot use the logistics listing", async () => {
+    it("cannot use the logistics listings", async () => {
       const response = await request(app)
         .get("/api/logistics/resources/human")
         .set("Cookie", AUTH_COOKIE);
@@ -175,21 +222,25 @@ describe("Human resource routes (Función 2.8)", () => {
       app = buildApp(UserRole.LOGISTICA);
     });
 
-    it("cannot manage the human resources catalog", async () => {
+    it("cannot manage the resource catalogs", async () => {
       const response = await request(app)
-        .get("/api/admin/resources/human")
+        .get("/api/admin/resources/material")
         .set("Cookie", AUTH_COOKIE);
 
       expect(response.status).toBe(403);
     });
 
-    it("only sees active human resources", async () => {
+    it.each([
+      ["human", [1]],
+      ["material", [3]],
+      ["logistic", [4]],
+    ])("only sees active %s resources", async (path, expectedIds) => {
       const response = await request(app)
-        .get("/api/logistics/resources/human?status=inactive")
+        .get(`/api/logistics/resources/${path}?status=inactive`)
         .set("Cookie", AUTH_COOKIE);
 
       expect(response.status).toBe(200);
-      expect(response.body.data.resources.map((resource) => resource.id)).toEqual([1]);
+      expect(response.body.data.resources.map((item) => item.id)).toEqual(expectedIds);
     });
   });
 

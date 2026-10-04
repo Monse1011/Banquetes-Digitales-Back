@@ -11,7 +11,12 @@ const {
   ReservationRequestController,
 } = require("./controller/reservation-request/reservation-request-controller");
 const { ServiceController } = require("./controller/service/service-controller");
+const { ResourceController } = require("./controller/resource/resource-controller");
 const { HumanResourceController } = require("./controller/resource/human-resource-controller");
+const {
+  InventoryResourceController,
+} = require("./controller/resource/inventory-resource-controller");
+const { ResourceType } = require("../domain/enums/resource/resource-type");
 const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
 const InvalidCredentialsException = require("../domain/exceptions/auth/invalid-credentials-exception");
 const AccountBlockedException = require("../domain/exceptions/auth/account-blocked-exception");
@@ -22,7 +27,7 @@ const ResourceNotFoundException = require("../domain/exceptions/resource/resourc
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
 const ErrorMessages = require("./constants/error-messages");
 
-// Función 2.8: los mensajes de las excepciones de recursos son los del ERS.
+// Funciones 2.8 a 2.10: errores de los recursos.
 function handleResourceError(error, response) {
   if (error instanceof ResourceValidationException) {
     response.status(422).json({ message: error.message, errors: error.errors });
@@ -50,7 +55,18 @@ function createApp(dependencies) {
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
   const serviceController = new ServiceController(dependencies.serviceRepository);
-  const humanResourceController = new HumanResourceController(dependencies);
+  const resourceControllers = {
+    resource: new ResourceController(dependencies.resourceUseCases),
+    human: new HumanResourceController(dependencies.humanResourceUseCases),
+    material: new InventoryResourceController(
+      dependencies.materialResourceUseCases,
+      ResourceType.MATERIAL
+    ),
+    logistic: new InventoryResourceController(
+      dependencies.logisticResourceUseCases,
+      ResourceType.LOGISTIC
+    ),
+  };
 
   app.use(express.json());
 
@@ -77,12 +93,9 @@ function createApp(dependencies) {
   );
 
   app.use("/api/client", createClientRoutes(reservationRequestController, serviceController));
-  app.use(
-    "/api/admin/resources",
-    createAdminResourceRoutes(humanResourceController, authMiddleware)
-  );
+  app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminRoutes(reservationRequestController, authMiddleware));
-  app.use("/api/logistics", createLogisticsRoutes(humanResourceController, authMiddleware));
+  app.use("/api/logistics", createLogisticsRoutes(resourceControllers, authMiddleware));
 
   // Error handler
   app.use((error, _request, response, _next) => {

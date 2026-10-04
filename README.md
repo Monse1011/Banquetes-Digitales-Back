@@ -131,17 +131,22 @@ npm start
 - **GET** `/api/admin/requests/:id` - Consultar una solicitud
 - **PATCH** `/api/admin/requests/:id` - Aprobar una solicitud
 
-### Recursos humanos (Administrador)
+### Recursos (Administrador)
 
-- **GET** `/api/admin/resources/human` - Listar recursos humanos (`status`, `name`, `operative_role_id`, `sort_by`, `order`, `page`, `per_page`)
-- **POST** `/api/admin/resources/human` - Registrar un recurso humano (`confirm_duplicate: true` para confirmar un posible duplicado)
-- **GET** `/api/admin/resources/human/:id` - Consultar el detalle de un recurso humano
-- **PATCH** `/api/admin/resources/human/:id` - Editar nombre y rol operativo
-- **PUT** `/api/admin/resources/human/:id` - Desactivar (baja lógica) o reactivar
+- **GET** `/api/admin/resources` - Ver recursos de todos los tipos (`type`, `name`, `status`, `page`, `per_page`)
+
+Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
+
+- **GET** `/api/admin/resources/<tipo>` - Listar (`status`, `name`, `order`, `page`, `per_page`; en `human` también `operative_role_id`)
+- **POST** `/api/admin/resources/<tipo>` - Registrar (en `human`, `confirm_duplicate: true` confirma un posible duplicado)
+- **GET** `/api/admin/resources/<tipo>/:id` - Consultar el detalle
+- **PATCH** `/api/admin/resources/<tipo>/:id` - Editar
+- **PUT** `/api/admin/resources/<tipo>/:id` - Desactivar (baja lógica) o reactivar
+- **DELETE** `/api/admin/resources/logistic/:id` - Borrado suave (solo recursos logísticos)
 
 ### Logística
 
-- **GET** `/api/logistics/resources/human` - Listar recursos humanos activos
+- **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo
 
 ## Documentación API
 

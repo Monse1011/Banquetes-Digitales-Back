@@ -120,48 +120,14 @@ const {
   GetReservationRequestsUseCase,
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
 
-// Human resources use cases (Función 2.8)
+// Resources use cases (Funciones 2.8 a 2.10)
 const {
-  CreateHumanResourceUseCase,
-} = require("../application/use-cases/resource/create-human-resource-use-case");
-const {
-  UpdateHumanResourceUseCase,
-} = require("../application/use-cases/resource/update-human-resource-use-case");
-const {
-  ChangeHumanResourceStatusUseCase,
-} = require("../application/use-cases/resource/change-human-resource-status-use-case");
-const {
-  GetHumanResourcesUseCase,
-} = require("../application/use-cases/resource/get-human-resources-use-case");
-const {
-  GetHumanResourceUseCase,
-} = require("../application/use-cases/resource/get-human-resource-use-case");
+  createResourceUseCases,
+} = require("../application/use-cases/resource/create-resource-use-cases");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
-
-function createHumanResourceUseCases(pool) {
-  const resourceRepository = new PostgresResourceRepository(pool);
-  const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
-
-  return {
-    createHumanResourceUseCase: new CreateHumanResourceUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    updateHumanResourceUseCase: new UpdateHumanResourceUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    changeHumanResourceStatusUseCase: new ChangeHumanResourceStatusUseCase(
-      resourceRepository,
-      operativeRoleRepository
-    ),
-    getHumanResourcesUseCase: new GetHumanResourcesUseCase(resourceRepository),
-    getHumanResourceUseCase: new GetHumanResourceUseCase(resourceRepository),
-  };
-}
 
 async function main() {
   const config = loadConfig();
@@ -247,8 +213,11 @@ async function main() {
     approveReservationRequestUseCase,
     getReservationRequestUseCase,
     getReservationRequestsUseCase,
-    // Human resources
-    ...createHumanResourceUseCases(pool),
+    // Resources
+    ...createResourceUseCases(
+      new PostgresResourceRepository(pool),
+      new PostgresOperativeRoleRepository(pool)
+    ),
   });
 
   app.listen(config.port, () => {

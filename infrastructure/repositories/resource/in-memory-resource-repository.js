@@ -46,7 +46,7 @@ class InMemoryResourceRepository {
   async findAll(filters, sort, page, perPage) {
     const filteredResources = this.resources.filter(
       (resource) =>
-        resource.type === filters.type &&
+        (!filters.type || resource.type === filters.type) &&
         (filters.isActive === undefined || resource.isActive === filters.isActive) &&
         (!filters.name || normalizeName(resource.name).includes(normalizeName(filters.name))) &&
         (filters.operativeRoleId === undefined ||
@@ -67,13 +67,14 @@ class InMemoryResourceRepository {
     };
   }
 
-  async existsActiveByNameAndRole(type, name, operativeRoleId) {
+  async existsByName(type, name, { operativeRoleId, activeOnly = false, excludeId } = {}) {
     return this.resources.some(
       (resource) =>
         resource.type === type &&
-        resource.isActive &&
         normalizeName(resource.name) === normalizeName(name) &&
-        resource.operativeRoleId === operativeRoleId
+        (operativeRoleId === undefined || resource.operativeRoleId === operativeRoleId) &&
+        (!activeOnly || resource.isActive) &&
+        (excludeId === undefined || resource.id !== excludeId)
     );
   }
 }

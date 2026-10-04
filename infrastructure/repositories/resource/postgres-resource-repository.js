@@ -79,8 +79,13 @@ class PostgresResourceRepository {
   }
 
   async findAll(filters, sort, page, perPage) {
-    const parameters = [filters.type];
-    const conditions = ["type = $1"];
+    const parameters = [];
+    const conditions = [];
+
+    if (filters.type) {
+      parameters.push(filters.type);
+      conditions.push(`type = $${parameters.length}`);
+    }
 
     if (filters.isActive !== undefined) {
       parameters.push(filters.isActive);
@@ -97,7 +102,7 @@ class PostgresResourceRepository {
       conditions.push(`operative_role_id = $${parameters.length}`);
     }
 
-    const where = ` WHERE ${conditions.join(" AND ")}`;
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const countResult = await this.pool.query(
       `SELECT COUNT(*)::int AS total_records FROM resources${where}`,
       parameters
@@ -120,17 +125,29 @@ class PostgresResourceRepository {
     };
   }
 
-  async existsActiveByNameAndRole(type, name, operativeRoleId) {
+  async existsByName(type, name, { operativeRoleId, activeOnly = false, excludeId } = {}) {
+    const parameters = [type, name];
+    const conditions = ["type = $1", "LOWER(TRIM(name)) = LOWER(TRIM($2))"];
+
+    if (operativeRoleId !== undefined) {
+      parameters.push(operativeRoleId);
+      conditions.push(`operative_role_id IS NOT DISTINCT FROM $${parameters.length}`);
+    }
+
+    if (activeOnly) {
+      conditions.push("is_active = true");
+    }
+
+    if (excludeId !== undefined) {
+      parameters.push(excludeId);
+      conditions.push(`id <> $${parameters.length}`);
+    }
+
     const result = await this.pool.query(
       `SELECT EXISTS (
-         SELECT 1
-         FROM resources
-         WHERE type = $1
-           AND is_active = true
-           AND LOWER(TRIM(name)) = LOWER(TRIM($2))
-           AND operative_role_id IS NOT DISTINCT FROM $3
+         SELECT 1 FROM resources WHERE ${conditions.join(" AND ")}
        ) AS is_duplicate`,
-      [type, name, operativeRoleId]
+      parameters
     );
 
     return result.rows[0]?.is_duplicate === true;

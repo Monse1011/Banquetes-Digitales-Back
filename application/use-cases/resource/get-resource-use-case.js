@@ -1,27 +1,48 @@
+const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const GetHumanResourceResponseDto = require("../../dto/resource/get-human-resource-response-dto");
-const { findHumanResourceOrFail } = require("../../services/resource/human-resource-guards");
+const GetInventoryResourceResponseDto = require("../../dto/resource/get-inventory-resource-response-dto");
+const { findResourceOrFail } = require("../../services/resource/resource-guards");
 const { formatDateTime } = require("../../services/date-time-formatter");
 
-class GetHumanResourceUseCase {
-  constructor(resourceRepository) {
+// Común a las Funciones 2.8, 2.9 y 2.10; se crea una instancia por tipo de recurso.
+class GetResourceUseCase {
+  constructor(resourceRepository, type) {
     this.resourceRepository = resourceRepository;
+    this.type = type;
   }
 
-  // RF-1.2.8.6: detalle del recurso humano.
+  // RF-1.2.8.6: detalle del recurso.
   async execute(id) {
-    const resource = await findHumanResourceOrFail(this.resourceRepository, id);
+    const resource = await findResourceOrFail(this.resourceRepository, id, this.type);
+    const createdAt = formatDateTime(resource.createdAt);
+    const updatedAt = formatDateTime(resource.updatedAt);
+    const deactivatedAt = formatDateTime(resource.deactivatedAt);
 
-    return new GetHumanResourceResponseDto(
+    if (resource.type === ResourceType.HUMAN) {
+      return new GetHumanResourceResponseDto(
+        resource.id,
+        resource.name,
+        resource.type,
+        resource.operativeRoleId,
+        resource.isActive,
+        createdAt,
+        updatedAt,
+        deactivatedAt
+      );
+    }
+
+    return new GetInventoryResourceResponseDto(
       resource.id,
       resource.name,
       resource.type,
-      resource.operativeRoleId,
+      resource.totalQuantity,
+      resource.unitCost,
       resource.isActive,
-      formatDateTime(resource.createdAt),
-      formatDateTime(resource.updatedAt),
-      formatDateTime(resource.deactivatedAt)
+      createdAt,
+      updatedAt,
+      deactivatedAt
     );
   }
 }
 
-module.exports = { GetHumanResourceUseCase };
+module.exports = { GetResourceUseCase };

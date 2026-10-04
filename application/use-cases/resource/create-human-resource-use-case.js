@@ -3,7 +3,7 @@ const { ResourceType } = require("../../../domain/enums/resource/resource-type")
 const ResourceValidationException = require("../../../domain/exceptions/resource/resource-validation-exception");
 const DuplicateResourceException = require("../../../domain/exceptions/resource/duplicate-resource-exception");
 const HumanResourceRequestDto = require("../../dto/resource/human-resource-request-dto");
-const { ensureActiveOperativeRole } = require("../../services/resource/human-resource-guards");
+const { ensureActiveOperativeRole } = require("../../services/resource/resource-guards");
 
 // Un recurso humano representa a una sola persona.
 const HUMAN_RESOURCE_QUANTITY = 1;
@@ -28,11 +28,10 @@ class CreateHumanResourceUseCase {
 
     // RF-1.2.8.7: un duplicado solo se registra con la confirmación del Administrador.
     if (input.confirmDuplicate !== true) {
-      const isDuplicate = await this.resourceRepository.existsActiveByNameAndRole(
-        ResourceType.HUMAN,
-        name,
-        dto.operative_role_id
-      );
+      const isDuplicate = await this.resourceRepository.existsByName(ResourceType.HUMAN, name, {
+        operativeRoleId: dto.operative_role_id,
+        activeOnly: true,
+      });
 
       if (isDuplicate) {
         throw new DuplicateResourceException();

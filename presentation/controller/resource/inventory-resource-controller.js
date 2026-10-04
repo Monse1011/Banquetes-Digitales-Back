@@ -1,35 +1,32 @@
-const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const { ResourceController } = require("./resource-controller");
 
-class HumanResourceController extends ResourceController {
-  constructor(useCases) {
-    super(useCases, ResourceType.HUMAN);
-  }
-
-  // POST /api/admin/resources/human (RF-1.2.8.1 / RF-1.2.8.7)
+// Recursos materiales (Función 2.9) y logísticos (Función 2.10); una instancia por tipo.
+class InventoryResourceController extends ResourceController {
+  // POST /api/admin/resources/<material|logistic>
   async create(request, response) {
     const data = this.bodyData(request);
     const { id } = await this.useCases.create.execute({
       name: data.name,
-      operativeRoleId: data.operative_role_id,
-      confirmDuplicate: data.confirm_duplicate,
+      quantity: data.quantity,
+      unitCost: data.unit_cost,
     });
 
     this.respondCreated(request, response, id);
   }
 
-  // PATCH /api/admin/resources/human/:id (RF-1.2.8.2)
+  // PATCH /api/admin/resources/<material|logistic>/:id
   async update(request, response) {
     const id = this.parseId(request.params.id);
     const data = this.bodyData(request);
 
     await this.useCases.update.execute(id, {
       name: data.name,
-      operativeRoleId: data.operative_role_id,
+      quantity: data.quantity,
+      unitCost: data.unit_cost,
     });
 
     response.status(204).end();
   }
 }
 
-module.exports = { HumanResourceController };
+module.exports = { InventoryResourceController };

@@ -1,9 +1,10 @@
+const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const ResourceValidationException = require("../../../domain/exceptions/resource/resource-validation-exception");
 const HumanResourceRequestDto = require("../../dto/resource/human-resource-request-dto");
 const {
-  findHumanResourceOrFail,
+  findResourceOrFail,
   ensureActiveOperativeRole,
-} = require("../../services/resource/human-resource-guards");
+} = require("../../services/resource/resource-guards");
 
 class UpdateHumanResourceUseCase {
   constructor(resourceRepository, operativeRoleRepository) {
@@ -20,7 +21,7 @@ class UpdateHumanResourceUseCase {
       throw new ResourceValidationException(errors);
     }
 
-    const resource = await findHumanResourceOrFail(this.resourceRepository, id);
+    const resource = await findResourceOrFail(this.resourceRepository, id, ResourceType.HUMAN);
 
     if (dto.operative_role_id !== resource.operativeRoleId) {
       await ensureActiveOperativeRole(this.operativeRoleRepository, dto.operative_role_id);
