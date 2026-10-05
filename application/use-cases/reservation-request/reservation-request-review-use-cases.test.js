@@ -14,12 +14,19 @@ const {
 const {
   InMemoryFolioGenerator,
 } = require("../../../infrastructure/services/reservation-request/in-memory-folio-generator");
+const {
+  InMemoryUserRepository,
+} = require("../../../infrastructure/repositories/auth/in-memory-user-repository");
 const { Service } = require("../../../domain/entities/service/service");
+const User = require("../../../domain/entities/auth/user");
+const UserRole = require("../../../domain/enums/auth/user-role");
+const UserStatus = require("../../../domain/enums/auth/user-status");
 
 describe("ReservationRequest Review UseCases", () => {
   let clientRepository;
   let serviceRepository;
   let reservationRequestRepository;
+  let userRepository;
   let approveUseCase;
   let getUseCase;
   let createUseCase;
@@ -30,6 +37,19 @@ describe("ReservationRequest Review UseCases", () => {
       new Service(1, "Catering", "Servicio de catering", "activo"),
     ]);
     reservationRequestRepository = new InMemoryReservationRequestRepository();
+    userRepository = new InMemoryUserRepository([
+      new User(
+        7,
+        "EMP-007",
+        "David Torres",
+        "david@example.com",
+        "$2b$hash",
+        UserRole.LOGISTICA,
+        UserStatus.ACTIVE,
+        new Date(),
+        new Date()
+      ),
+    ]);
 
     const folioGenerator = new InMemoryFolioGenerator();
     const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
@@ -38,7 +58,8 @@ describe("ReservationRequest Review UseCases", () => {
     getUseCase = new GetReservationRequestUseCase(
       reservationRequestRepository,
       clientRepository,
-      serviceRepository
+      serviceRepository,
+      userRepository
     );
     createUseCase = new CreateReservationRequestUseCase(
       upsertClientByEmailUseCase,
@@ -47,26 +68,33 @@ describe("ReservationRequest Review UseCases", () => {
     );
   });
 
+  async function createPendingRequest() {
+    await createUseCase.execute({
+      client_full_name: "John Doe",
+      email: "john@example.com",
+      phone: "1234567890",
+      event_date_time: new Date().toISOString(),
+      event_end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      guest_count: 100,
+      event_address: "123 Main St",
+      services_ids: [1],
+    });
+
+    const firstRequest = await reservationRequestRepository.findAll(
+      {},
+      { field: "eventDate", direction: "asc" },
+      1,
+      1
+    );
+
+    return firstRequest.requests[0].requestId;
+  }
+
   describe("ApproveReservationRequestUseCase", () => {
     it("should approve a pending request", async () => {
-      await createUseCase.execute({
-        client_full_name: "John Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-        event_date_time: new Date().toISOString(),
-        guest_count: 100,
-        event_address: "123 Main St",
-        services_ids: [1],
-      });
+      const requestId = await createPendingRequest();
 
-      const firstRequest = await reservationRequestRepository.findAll(
-        {},
-        { field: "EventDate", direction: "asc" },
-        1,
-        1
-      );
-
-      const result = await approveUseCase.execute(firstRequest.requests[0].requestId);
+      const result = await approveUseCase.execute(requestId);
 
       expect(result.data[0].status).toBe("Aprobada");
     });
@@ -83,29 +111,30 @@ describe("ReservationRequest Review UseCases", () => {
 
   describe("GetReservationRequestUseCase", () => {
     it("should get a request with full details", async () => {
-      await createUseCase.execute({
-        client_full_name: "John Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-        event_date_time: new Date().toISOString(),
-        guest_count: 100,
-        event_address: "123 Main St",
-        services_ids: [1],
-      });
+      const requestId = await createPendingRequest();
 
-      const firstRequest = await reservationRequestRepository.findAll(
-        {},
-        { field: "EventDate", direction: "asc" },
-        1,
-        1
-      );
-
-      const result = await getUseCase.execute(firstRequest.requests[0].requestId);
+      const result = await getUseCase.execute(requestId);
 
       expect(result.data[0]).toHaveProperty("request_id");
       expect(result.data[0]).toHaveProperty("folio");
       expect(result.data[0]).toHaveProperty("client_name");
+      expect(result.data[0]).toHaveProperty("event_end_time");
+      expect(result.data[0].logistic_user).toBeNull();
       expect(result.data[0].selected_services).toHaveLength(1);
+    });
+
+    it("should show the assigned logistic user in the details (RF-1.2.4.2)", async () => {
+      const requestId = await createPendingRequest();
+      await approveUseCase.execute(requestId);
+      await reservationRequestRepository.assign(requestId, 7, 1);
+
+      const result = await getUseCase.execute(requestId);
+
+      expect(result.data[0].logistic_user).toEqual({
+        id: 7,
+        full_name: "David Torres",
+        email: "david@example.com",
+      });
     });
   });
 });

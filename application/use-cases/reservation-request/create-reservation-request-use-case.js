@@ -21,6 +21,7 @@ class CreateReservationRequestUseCase {
       body.email,
       body.phone,
       body.event_date_time,
+      body.event_end_time,
       body.guest_count,
       body.event_address,
       body.services_ids
@@ -46,11 +47,15 @@ class CreateReservationRequestUseCase {
       client.clientId,
       null, // userId will be assigned later when a user processes the request
       new Date(dto.event_date_time),
+      new Date(dto.event_end_time),
       dto.guest_count,
       dto.event_address,
       ReservationRequestStatus.PENDING,
       now, // requestDateTime
-      dto.services_ids
+      dto.services_ids,
+      null, // logisticUserId will be assigned in the assignment function (RF-1.2.4.1)
+      null, // assignedByUserId
+      null // assignedAt
     );
 
     await this.reservationRequestRepository.create(reservationRequest);

@@ -2,6 +2,12 @@ const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
 
+const STATUS_BY_QUERY_VALUE = Object.freeze({
+  PENDING: ReservationRequestStatus.PENDING,
+  APPROVED: ReservationRequestStatus.APPROVED,
+  ASSIGNED: ReservationRequestStatus.ASSIGNED,
+});
+
 class ReservationRequestController {
   constructor(dependencies) {
     this.dependencies = dependencies;
@@ -14,9 +20,19 @@ class ReservationRequestController {
   }
 
   async list(request, response) {
+    const status = this.parseStatus(request.query.status);
+
+    if (request.query.status !== undefined && status === undefined) {
+      response
+        .status(400)
+        .json({ message: "El estado indicado no es válido para consultar solicitudes." });
+      return;
+    }
+
     const result = await this.dependencies.getReservationRequestsUseCase.execute({
       page: this.parsePositiveInteger(request.query.page, 1),
       perPage: this.parsePositiveInteger(request.query.per_page, 10),
+      filters: status ? { status } : {},
     });
 
     response.json(result);
@@ -42,6 +58,49 @@ class ReservationRequestController {
     );
 
     response.json(result);
+  }
+
+  // Función 2.4: PATCH /api/admin/requests/:id/assignment (respuesta solo código HTTP).
+  // data.request_id es opcional: responsable actual esperado para rechazar
+  // reasignaciones basadas en información vencida (RF-1.2.4.7).
+  async assign(request, response) {
+    const id = this.parseId(request.params.id);
+    const data = request.body?.data ?? {};
+    const userId = Number(data.user_id);
+    const hasCurrentLogisticUser = data.request_id !== undefined && data.request_id !== null;
+    const currentLogisticUserId = hasCurrentLogisticUser ? Number(data.request_id) : null;
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      response.status(400).json({ message: "El identificador del usuario es obligatorio." });
+      return;
+    }
+
+    if (
+      hasCurrentLogisticUser &&
+      (!Number.isInteger(currentLogisticUserId) || currentLogisticUserId < 1)
+    ) {
+      response
+        .status(400)
+        .json({ message: "El identificador del responsable actual no es válido." });
+      return;
+    }
+
+    await this.dependencies.assignReservationRequestUseCase.execute(
+      id,
+      userId,
+      request.user.id_user,
+      currentLogisticUserId
+    );
+
+    response.sendStatus(200);
+  }
+
+  parseStatus(value) {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    return STATUS_BY_QUERY_VALUE[value.trim().toUpperCase()];
   }
 
   parseId(value) {

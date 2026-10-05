@@ -113,6 +113,12 @@ const {
 const {
   GetReservationRequestsUseCase,
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
+const {
+  AssignReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/assign-reservation-request-use-case");
+const {
+  GetAvailableLogisticsUsersUseCase,
+} = require("../application/use-cases/reservation-request/get-available-logistics-users-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -180,12 +186,18 @@ async function main() {
   const getReservationRequestUseCase = new GetReservationRequestUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository
+    serviceRepository,
+    userRepository
   );
   const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository
+    serviceRepository,
+    userRepository
+  );
+  const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
+    reservationRequestRepository,
+    userRepository
   );
 
   const app = createApp({
@@ -202,6 +214,8 @@ async function main() {
     approveReservationRequestUseCase,
     getReservationRequestUseCase,
     getReservationRequestsUseCase,
+    assignReservationRequestUseCase,
+    getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
   });
 
   app.listen(config.port, () => {

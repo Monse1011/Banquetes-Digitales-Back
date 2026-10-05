@@ -8,9 +8,11 @@ class GetReservationRequestResponseDto {
     guestCount,
     eventAddress,
     eventDateTime,
+    eventEndTime,
     requestDate,
     status,
-    selectedServices
+    selectedServices,
+    logisticUser
   ) {
     this.data = [
       {
@@ -22,9 +24,11 @@ class GetReservationRequestResponseDto {
         guest_count: guestCount,
         event_address: eventAddress,
         event_date_time: eventDateTime,
+        event_end_time: eventEndTime,
         requested_date: requestDate,
         status,
         selected_services: selectedServices,
+        logistic_user: logisticUser,
       },
     ];
   }
