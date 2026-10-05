@@ -69,6 +69,17 @@ describe("App", () => {
         new Date(),
         new Date()
       ),
+      new User(
+        8,
+        "EMP-008",
+        "Cesar Huerta",
+        "cesar@example.com",
+        "$2b$hash",
+        UserRole.LOGISTICA,
+        UserStatus.ACTIVE,
+        new Date(),
+        new Date()
+      ),
     ]);
     const folioGenerator = new InMemoryFolioGenerator();
 
@@ -262,7 +273,7 @@ describe("App", () => {
       expect(assigned.assignedAt).toBeInstanceOf(Date);
     });
 
-    it("rejects assigning a request that is not approved (RF-1.2.4.1)", async () => {
+    it("assigns a request that is still pending (todos los estados salvo Confirmado)", async () => {
       await request(app)
         .post("/api/client/request")
         .send({
@@ -282,11 +293,10 @@ describe("App", () => {
         .set("Cookie", "auth_token=valid-token")
         .send({ data: { user_id: 7 } });
 
-      expect(response.status).toBe(409);
-      expect(response.body.message).toBe("La solicitud ya no se encuentra en estado Aprobada.");
+      expect(response.status).toBe(200);
     });
 
-    it("rejects reassigning a request that already has a user (RF-1.2.4.6)", async () => {
+    it("reassigns a request in Asignada state to another available user", async () => {
       const requestId = await createApprovedRequest();
       await request(app)
         .patch(`/api/admin/requests/${requestId}/assignment`)
@@ -296,12 +306,57 @@ describe("App", () => {
       const response = await request(app)
         .patch(`/api/admin/requests/${requestId}/assignment`)
         .set("Cookie", "auth_token=valid-token")
+        .send({ data: { user_id: 8, request_id: 7 } });
+
+      expect(response.status).toBe(200);
+      expect((await reservationRequestRepository.findById(requestId)).logisticUserId).toBe(8);
+    });
+
+    it("rejects reassignment when the shown responsible is stale (RF-1.2.4.7)", async () => {
+      const requestId = await createApprovedRequest();
+      await request(app)
+        .patch(`/api/admin/requests/${requestId}/assignment`)
+        .set("Cookie", "auth_token=valid-token")
         .send({ data: { user_id: 7 } });
+
+      const response = await request(app)
+        .patch(`/api/admin/requests/${requestId}/assignment`)
+        .set("Cookie", "auth_token=valid-token")
+        .send({ data: { user_id: 8, request_id: 99 } });
+
+      expect(response.status).toBe(409);
+      expect(response.body.message).toBe("La solicitud ya fue asignada.");
+    });
+
+    it("blocks reassignment when the request is Confirmado", async () => {
+      const requestId = await createApprovedRequest();
+      await request(app)
+        .patch(`/api/admin/requests/${requestId}/assignment`)
+        .set("Cookie", "auth_token=valid-token")
+        .send({ data: { user_id: 7 } });
+      const assigned = await reservationRequestRepository.findById(requestId);
+      assigned.status = "Confirmado";
+
+      const response = await request(app)
+        .patch(`/api/admin/requests/${requestId}/assignment`)
+        .set("Cookie", "auth_token=valid-token")
+        .send({ data: { user_id: 8, request_id: 7 } });
 
       expect(response.status).toBe(409);
       expect(response.body.message).toBe(
-        "La solicitud ya cuenta con un responsable asignado y no puede reasignarse."
+        "La solicitud no puede ser reasignada en su estado actual."
       );
+    });
+
+    it("rejects an invalid current responsible identifier with 400", async () => {
+      const requestId = await createApprovedRequest();
+
+      const response = await request(app)
+        .patch(`/api/admin/requests/${requestId}/assignment`)
+        .set("Cookie", "auth_token=valid-token")
+        .send({ data: { user_id: 7, request_id: "abc" } });
+
+      expect(response.status).toBe(400);
     });
 
     it("rejects users that are not available with the RF message (RF-1.2.4.5)", async () => {
@@ -385,6 +440,7 @@ describe("App", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.users).toEqual([
+        { id: 8, employee_id: "EMP-008", full_name: "Cesar Huerta" },
         { id: 7, employee_id: "EMP-007", full_name: "David Torres" },
       ]);
     });

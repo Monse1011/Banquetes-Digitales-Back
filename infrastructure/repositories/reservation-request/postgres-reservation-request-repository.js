@@ -4,6 +4,7 @@ const {
 const {
   ReservationRequestStatus,
   ActiveReservationRequestStatuses,
+  ReassignableReservationRequestStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
 const {
   ReservationRequestSortField,
@@ -127,10 +128,12 @@ class PostgresReservationRequestRepository {
     }
   }
 
-  // RF-1.2.4.7: la asignación se registra de forma atómica. El bloqueo de la fila de
-  // la solicitud y de la fila del empleado impide que dos asignaciones simultáneas
+  // RF-1.2.4.7: la (re)asignación se registra de forma atómica. El bloqueo de la fila
+  // de la solicitud y de la fila del empleado impide que dos asignaciones simultáneas
   // deriven en la misma solicitud doblemente asignada o en horarios traslapados.
-  async assign(requestId, logisticUserId, assignedByUserId) {
+  // currentLogisticUserId actúa como_expected de concurrencia optimista: si el
+  // responsable actual ya no coincide, la actualización no afecta filas.
+  async assign(requestId, logisticUserId, assignedByUserId, currentLogisticUserId = null) {
     const connection = await this.pool.connect();
 
     try {
@@ -144,19 +147,27 @@ class PostgresReservationRequestRepository {
       }
 
       // RF-1.2.4.3 / RF-1.2.4.14: cambio de estado y registro de la asignación.
-      await connection.query(
+      const updateResult = await connection.query(
         `UPDATE reservations_request
          SET status = $1, logistic_user_id = $2, assigned_by_user_id = $3,
              assigned_at = NOW()
-         WHERE id_reservation_request = $4 AND status = $5 AND logistic_user_id IS NULL`,
+         WHERE id_reservation_request = $4 AND status = ANY($5)
+           AND ($6::bigint IS NULL OR logistic_user_id IS NOT DISTINCT FROM $6::bigint)`,
         [
           ReservationRequestStatus.ASSIGNED,
           logisticUserId,
           assignedByUserId,
           requestId,
-          ReservationRequestStatus.APPROVED,
+          ReassignableReservationRequestStatuses,
+          currentLogisticUserId,
         ]
       );
+
+      if (updateResult.rowCount === 0) {
+        await connection.query("ROLLBACK");
+        return { status: "assignment_conflict" };
+      }
+
       await connection.query("COMMIT");
 
       return { status: "assigned" };
@@ -170,8 +181,7 @@ class PostgresReservationRequestRepository {
 
   async validateAssignment(connection, requestId, logisticUserId) {
     const requestResult = await connection.query(
-      `SELECT id_reservation_request, folio, event_date_time, event_end_time,
-              status, logistic_user_id
+      `SELECT id_reservation_request, event_date_time, event_end_time, status
        FROM reservations_request
        WHERE id_reservation_request = $1
        FOR UPDATE`,
@@ -183,12 +193,8 @@ class PostgresReservationRequestRepository {
       return { status: "not_found" };
     }
 
-    if (request.logistic_user_id !== null) {
-      return { status: "already_assigned" };
-    }
-
-    if (request.status !== ReservationRequestStatus.APPROVED) {
-      return { status: "not_approved" };
+    if (!ReassignableReservationRequestStatuses.includes(request.status)) {
+      return { status: "not_reassignable" };
     }
 
     const userResult = await connection.query(

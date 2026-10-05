@@ -108,24 +108,38 @@ describe("InMemoryReservationRequestRepository", () => {
       expect(created.assignedAt).toBeInstanceOf(Date);
     });
 
-    it("should reject assignment of a non-approved request (RF-1.2.4.1)", async () => {
-      const created = await repository.create(buildRequest());
-
-      const result = await repository.assign(created.requestId, 7, 1);
-
-      expect(result.status).toBe("not_approved");
-      expect(created.logisticUserId).toBeNull();
-    });
-
-    it("should reject assignment when already assigned (RF-1.2.4.6/7)", async () => {
+    it("should reassign a request that already has a responsible", async () => {
       const created = await repository.create(
         buildRequest({ status: ReservationRequestStatus.APPROVED })
       );
       await repository.assign(created.requestId, 7, 1);
 
-      const result = await repository.assign(created.requestId, 8, 1);
+      const result = await repository.assign(created.requestId, 8, 1, 7);
 
-      expect(result.status).toBe("already_assigned");
+      expect(result.status).toBe("assigned");
+      expect(created.logisticUserId).toBe(8);
+    });
+
+    it("should reject reassignment when the current responsible no longer matches", async () => {
+      const created = await repository.create(
+        buildRequest({ status: ReservationRequestStatus.APPROVED })
+      );
+      await repository.assign(created.requestId, 7, 1);
+
+      const result = await repository.assign(created.requestId, 8, 1, 99);
+
+      expect(result.status).toBe("assignment_conflict");
+      expect(created.logisticUserId).toBe(7);
+    });
+
+    it("should reject requests that cannot be reassigned (RF-1.2.4.2 bloqueo)", async () => {
+      const created = await repository.create(
+        buildRequest({ status: ReservationRequestStatus.CONFIRMED, logisticUserId: 7 })
+      );
+
+      const result = await repository.assign(created.requestId, 8, 1, 7);
+
+      expect(result.status).toBe("not_reassignable");
       expect(created.logisticUserId).toBe(7);
     });
 

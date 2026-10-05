@@ -12,8 +12,7 @@ const { UserController } = require("./controller/user/user-controller");
 const { ServiceController } = require("./controller/service/service-controller");
 const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
 const ReservationRequestNotFoundException = require("../domain/exceptions/reservation-request/reservation-request-not-found-exception");
-const RequestNotApprovedException = require("../domain/exceptions/reservation-request/request-not-approved-exception");
-const RequestAlreadyAssignedException = require("../domain/exceptions/reservation-request/request-already-assigned-exception");
+const RequestNotReassignableException = require("../domain/exceptions/reservation-request/request-not-reassignable-exception");
 const RequestAssignmentConflictException = require("../domain/exceptions/reservation-request/request-assignment-conflict-exception");
 const LogisticsUserNotAvailableException = require("../domain/exceptions/reservation-request/logistics-user-not-available-exception");
 const InvalidCredentialsException = require("../domain/exceptions/auth/invalid-credentials-exception");
@@ -30,8 +29,7 @@ function handleAssignmentError(error, response) {
   }
 
   if (
-    error instanceof RequestNotApprovedException ||
-    error instanceof RequestAlreadyAssignedException ||
+    error instanceof RequestNotReassignableException ||
     error instanceof RequestAssignmentConflictException
   ) {
     response.status(409).json({ message: error.message });

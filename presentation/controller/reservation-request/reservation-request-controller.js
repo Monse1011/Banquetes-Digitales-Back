@@ -61,19 +61,35 @@ class ReservationRequestController {
   }
 
   // Función 2.4: PATCH /api/admin/requests/:id/assignment (respuesta solo código HTTP).
+  // data.request_id es opcional: responsable actual esperado para rechazar
+  // reasignaciones basadas en información vencida (RF-1.2.4.7).
   async assign(request, response) {
     const id = this.parseId(request.params.id);
-    const userId = Number(request.body?.data?.user_id);
+    const data = request.body?.data ?? {};
+    const userId = Number(data.user_id);
+    const hasCurrentLogisticUser = data.request_id !== undefined && data.request_id !== null;
+    const currentLogisticUserId = hasCurrentLogisticUser ? Number(data.request_id) : null;
 
     if (!Number.isInteger(userId) || userId < 1) {
       response.status(400).json({ message: "El identificador del usuario es obligatorio." });
       return;
     }
 
+    if (
+      hasCurrentLogisticUser &&
+      (!Number.isInteger(currentLogisticUserId) || currentLogisticUserId < 1)
+    ) {
+      response
+        .status(400)
+        .json({ message: "El identificador del responsable actual no es válido." });
+      return;
+    }
+
     await this.dependencies.assignReservationRequestUseCase.execute(
       id,
       userId,
-      request.user.id_user
+      request.user.id_user,
+      currentLogisticUserId
     );
 
     response.sendStatus(200);

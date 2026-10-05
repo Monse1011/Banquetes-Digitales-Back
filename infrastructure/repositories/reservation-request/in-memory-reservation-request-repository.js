@@ -4,6 +4,7 @@ const {
 const {
   ReservationRequestStatus,
   ActiveReservationRequestStatuses,
+  ReassignableReservationRequestStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
 const {
   ReservationRequestSortField,
@@ -54,21 +55,22 @@ class InMemoryReservationRequestRepository {
     return request;
   }
 
-  // RF-1.2.4.1 / RF-1.2.4.3 / RF-1.2.4.4 / RF-1.2.4.7: valida estado, traslape y
-  // registra la asignación en una sola operación atómica (ejecución single-thread).
-  async assign(requestId, logisticUserId, assignedByUserId) {
+  // RF-1.2.4.3 / RF-1.2.4.4 / RF-1.2.4.7: valida estado, responsable actual esperado
+  // y traslape, y registra la (re)asignación en una sola operación atómica
+  // (ejecución single-thread).
+  async assign(requestId, logisticUserId, assignedByUserId, currentLogisticUserId = null) {
     const request = await this.findById(requestId);
 
     if (!request) {
       return { status: "not_found" };
     }
 
-    if (request.logisticUserId !== null) {
-      return { status: "already_assigned" };
+    if (!ReassignableReservationRequestStatuses.includes(request.status)) {
+      return { status: "not_reassignable" };
     }
 
-    if (request.status !== ReservationRequestStatus.APPROVED) {
-      return { status: "not_approved" };
+    if (currentLogisticUserId !== null && request.logisticUserId !== currentLogisticUserId) {
+      return { status: "assignment_conflict" };
     }
 
     const overlapping = this.requests.filter(

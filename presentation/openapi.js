@@ -177,7 +177,7 @@ const openApiDocument = {
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],
-        summary: "Assign an approved request to a logistic user (Función 2.4)",
+        summary: "Assign or reassign the logistic user of a request (Función 2.4)",
         security: [{ CookieAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
         requestBody: {
@@ -191,7 +191,15 @@ const openApiDocument = {
                   data: {
                     type: "object",
                     required: ["user_id"],
-                    properties: { user_id: { type: "integer" } },
+                    properties: {
+                      user_id: { type: "integer" },
+                      request_id: {
+                        type: "integer",
+                        nullable: true,
+                        description:
+                          "Responsable actual esperado (concurrencia optimista, RF-1.2.4.7)",
+                      },
+                    },
                   },
                 },
               },
@@ -199,12 +207,12 @@ const openApiDocument = {
           },
         },
         responses: {
-          200: { description: "Request assigned (status becomes Asignada)" },
-          400: { description: "Invalid user identifier" },
+          200: { description: "Request assigned or reassigned" },
+          400: { description: "Invalid user identifiers" },
           404: { description: "Request not found" },
           409: {
             description:
-              "Request not approved, already assigned or logistic user not available (includes conflict when caused by overlap)",
+              "Status not reassignable (Confirmado), the current responsible changed (La solicitud ya fue asignada.) or logistic user not available (includes conflict when caused by overlap)",
           },
         },
       },
