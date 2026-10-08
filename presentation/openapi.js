@@ -327,16 +327,30 @@ const openApiDocument = {
     },
     "/api/admin/requests": {
       get: {
-        tags: ["Admin"],
-        summary: "List reservation requests",
+        tags: ["Admin", "Event assignment"],
+        summary: "List reservation requests (RF-1.2.4.8 pending assignment with status=APPROVED)",
         security: [{ CookieAuth: [] }],
-        responses: { 200: { description: "Requests list" }, 403: { description: "Forbidden" } },
+        parameters: [
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["PENDING", "APPROVED", "ASSIGNED"] },
+          },
+          { name: "page", in: "query", required: false, schema: { type: "integer" } },
+          { name: "per_page", in: "query", required: false, schema: { type: "integer" } },
+        ],
+        responses: {
+          200: { description: "Requests list" },
+          400: { description: "Invalid status filter" },
+          403: { description: "Forbidden" },
+        },
       },
     },
     "/api/admin/requests/{id}": {
       get: {
-        tags: ["Admin"],
-        summary: "Get a reservation request",
+        tags: ["Admin", "Event assignment"],
+        summary: "Get a reservation request with its assigned logistic user (RF-1.2.4.2/9)",
         security: [{ CookieAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
         responses: { 200: { description: "Request details" }, 404: { description: "Not found" } },
@@ -353,6 +367,57 @@ const openApiDocument = {
       },
     },
     ...resourcePaths,
+    "/api/admin/requests/{id}/assignment": {
+      patch: {
+        tags: ["Event assignment"],
+        summary: "Assign or reassign the logistic user of a request (Función 2.4)",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["data"],
+                properties: {
+                  data: {
+                    type: "object",
+                    required: ["user_id"],
+                    properties: {
+                      user_id: { type: "integer" },
+                      request_id: {
+                        type: "integer",
+                        nullable: true,
+                        description:
+                          "Responsable actual esperado (concurrencia optimista, RF-1.2.4.7)",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Request assigned or reassigned" },
+          400: { description: "Invalid user identifiers" },
+          404: { description: "Request not found" },
+          409: {
+            description:
+              "Status not reassignable (Confirmado), the current responsible changed (La solicitud ya fue asignada.) or logistic user not available (includes conflict when caused by overlap)",
+          },
+        },
+      },
+    },
+    "/api/admin/users/usersavailable": {
+      get: {
+        tags: ["Event assignment"],
+        summary: "List active Personal de Logística users for assignment (RF-1.2.4.10)",
+        security: [{ CookieAuth: [] }],
+        responses: { 200: { description: "Available users" } },
+      },
+    },
   },
   components: {
     securitySchemes: {

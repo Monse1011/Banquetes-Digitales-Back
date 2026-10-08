@@ -48,6 +48,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/banquetes_db
 psql -U postgres -d banquetes_db -f database.sql
 ```
 
+5. Aplicar los cambios de esquema del Incremento 2 (Función 2.4 - Asignación de eventos):
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-2/assignment.sql
+```
+
 ## Desarrollo
 
 Iniciar servidor en modo desarrollo con auto-reload:

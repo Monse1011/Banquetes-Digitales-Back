@@ -119,6 +119,12 @@ const {
 const {
   GetReservationRequestsUseCase,
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
+const {
+  AssignReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/assign-reservation-request-use-case");
+const {
+  GetAvailableLogisticsUsersUseCase,
+} = require("../application/use-cases/reservation-request/get-available-logistics-users-use-case");
 
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
@@ -128,6 +134,14 @@ const {
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
+
+// Funciones 2.8 a 2.10: recursos humanos, materiales y logísticos.
+function createPostgresResourceUseCases(pool) {
+  return createResourceUseCases(
+    new PostgresResourceRepository(pool),
+    new PostgresOperativeRoleRepository(pool)
+  );
+}
 
 async function main() {
   const config = loadConfig();
@@ -191,12 +205,18 @@ async function main() {
   const getReservationRequestUseCase = new GetReservationRequestUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository
+    serviceRepository,
+    userRepository
   );
   const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository
+    serviceRepository,
+    userRepository
+  );
+  const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
+    reservationRequestRepository,
+    userRepository
   );
 
   const app = createApp({
@@ -213,11 +233,10 @@ async function main() {
     approveReservationRequestUseCase,
     getReservationRequestUseCase,
     getReservationRequestsUseCase,
+    assignReservationRequestUseCase,
+    getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
     // Resources
-    ...createResourceUseCases(
-      new PostgresResourceRepository(pool),
-      new PostgresOperativeRoleRepository(pool)
-    ),
+    ...createPostgresResourceUseCases(pool),
   });
 
   app.listen(config.port, () => {

@@ -3,12 +3,17 @@ const {
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 const GetReservationRequestsResponseDto = require("../../dto/reservation-request/get-reservation-requests-response-dto");
 const ReservationRequestSummaryDto = require("../../dto/reservation-request/reservation-request-summary-dto");
+const {
+  formatDate,
+  formatTime,
+} = require("../../services/reservation-request/date-time-formatter");
 
 class GetReservationRequestsUseCase {
-  constructor(reservationRequestRepository, clientRepository, serviceRepository) {
+  constructor(reservationRequestRepository, clientRepository, serviceRepository, userRepository) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.clientRepository = clientRepository;
     this.serviceRepository = serviceRepository;
+    this.userRepository = userRepository;
   }
 
   // inputs are received from query
@@ -35,8 +40,14 @@ class GetReservationRequestsUseCase {
       result.requests.flatMap((request) => request.servicesIds)
     );
 
+    // RF-1.2.4.2: el responsable asignado se muestra en la lista.
+    const logisticUsers = await this.userRepository.findByIds(
+      result.requests.map((request) => request.logisticUserId).filter((id) => id !== null)
+    );
+
     const clientsById = new Map(clients.map((client) => [client.clientId, client]));
     const servicesById = new Map(services.map((service) => [service.id, service]));
+    const logisticUsersById = new Map(logisticUsers.map((user) => [user.id, user]));
 
     const data = result.requests.map((request) => {
       const client = clientsById.get(request.clientId);
@@ -54,11 +65,35 @@ class GetReservationRequestsUseCase {
         request.servicesIds
           .map((serviceId) => servicesById.get(serviceId)?.name)
           .filter((name) => name !== undefined),
-        request.status
+        request.status,
+        formatDate(request.eventDateTime),
+        formatTime(request.eventDateTime),
+        formatTime(request.eventEndTime),
+        request.eventAddress,
+        request.guestCount,
+        this.toLogisticUser(request.logisticUserId, logisticUsersById)
       );
     });
 
     return new GetReservationRequestsResponseDto(data, result.totalRecords, page, perPage);
+  }
+
+  toLogisticUser(logisticUserId, logisticUsersById) {
+    if (logisticUserId === null) {
+      return null;
+    }
+
+    const user = logisticUsersById.get(logisticUserId);
+
+    if (!user) {
+      throw new Error(`Logistic user ${logisticUserId} not found`);
+    }
+
+    return {
+      id: user.id,
+      full_name: user.fullName,
+      email: user.email,
+    };
   }
 }
 

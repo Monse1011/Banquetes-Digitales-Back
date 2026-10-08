@@ -9,6 +9,7 @@ function validDto(overrides = {}) {
     email: "john@example.com",
     phone: "1234567890",
     event_date_time: eventDate.toISOString(),
+    event_end_time: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toISOString(),
     guest_count: 100,
     event_address: "123 Main St",
     services_ids: [1, 2],
@@ -20,6 +21,7 @@ function validDto(overrides = {}) {
     fields.email,
     fields.phone,
     fields.event_date_time,
+    fields.event_end_time,
     fields.guest_count,
     fields.event_address,
     fields.services_ids
@@ -59,6 +61,20 @@ describe("CreateReservationRequestDto", () => {
     const errors = validDto({ event_date_time: new Date().toISOString() }).validate();
 
     expect(errors.event_date_time).toBeUndefined();
+  });
+
+  it("should reject a missing or invalid event end time", () => {
+    const missingErrors = validDto({ event_end_time: undefined }).validate();
+    const invalidErrors = validDto({ event_end_time: "not-a-date" }).validate();
+
+    expect(missingErrors.event_end_time).toBeDefined();
+    expect(invalidErrors.event_end_time).toBeDefined();
+  });
+
+  it("should reject an event end time not after the start time", () => {
+    const errors = validDto({ event_end_time: validDto().event_date_time }).validate();
+
+    expect(errors.event_end_time).toBeDefined();
   });
 
   it("should reject a guest count of zero or a non-integer", () => {
