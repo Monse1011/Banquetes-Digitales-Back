@@ -17,6 +17,7 @@ const {
 const ResourceValidationException = require("../../../domain/exceptions/resource/resource-validation-exception");
 const ResourceNotFoundException = require("../../../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../../../domain/exceptions/resource/duplicate-resource-exception");
+const ResourceConcurrencyException = require("../../../domain/exceptions/resource/resource-concurrency-exception");
 
 const CREATED_AT = new Date(2026, 8, 1, 9, 30, 0);
 
@@ -184,7 +185,9 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
             name: "Van",
             operativeRoleId: WAITER_ROLE_ID,
           })
-        ).rejects.toThrow(new ResourceNotFoundException(ResourceNotFoundMessages.humano));
+        ).rejects.toThrow(
+          new ResourceNotFoundException(ResourceNotFoundMessages[ResourceType.HUMAN])
+        );
       });
     });
 
@@ -281,7 +284,9 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           filters: { type: ResourceType.MATERIAL },
         });
 
-        expect(result.data.resources.every((resource) => resource.type === "humano")).toBe(true);
+        expect(
+          result.data.resources.every((resource) => resource.type === ResourceType.HUMAN)
+        ).toBe(true);
       });
     });
 
@@ -415,6 +420,13 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
       ]);
 
       const list = await useCases[useCasesKey].getResources.execute();
+      // NC-08: solo el listado de materiales del DAD incluye las fechas.
+      const materialDates = {
+        created_at: "2026-09-01T09:30:00",
+        updated_at: "2026-09-01T09:30:00",
+        deactivated_at: null,
+      };
+      const listDates = type === ResourceType.MATERIAL ? materialDates : {};
 
       expect(list.data.resources).toEqual([
         {
@@ -424,6 +436,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           quantity: 4,
           unit_cost: 1000,
           is_active: true,
+          ...listDates,
         },
       ]);
       expect((await useCases[useCasesKey].getResource.execute(1)).data.resource).toMatchObject({
@@ -436,6 +449,71 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
       await expect(useCases[useCasesKey].getResource.execute(2)).rejects.toThrow(
         new ResourceNotFoundException(ResourceNotFoundMessages[type])
       );
+    });
+  });
+
+  // NC-07: una edición no puede pisar una baja lógica intercalada, ni al revés.
+  describe("concurrency between edit and status change", () => {
+    // Ejecuta `operation` justo después de que el caso de uso lea el recurso.
+    function interleaveAfterRead(operation) {
+      const originalFindById = resourceRepository.findById.bind(resourceRepository);
+
+      resourceRepository.findById = async (id) => {
+        const resource = await originalFindById(id);
+
+        resourceRepository.findById = originalFindById;
+        await operation(id);
+        return resource;
+      };
+    }
+
+    beforeEach(() => {
+      setUp([inventoryResource(1, "Mesas", ResourceType.MATERIAL, 4, 1000)]);
+    });
+
+    it("rejects an edit read before a deactivation and keeps the resource inactive", async () => {
+      const { update, changeStatus } = useCases.materialResourceUseCases;
+
+      interleaveAfterRead((id) => changeStatus.execute(id, false));
+
+      await expect(
+        update.execute(1, { name: "Mesas redondas", quantity: 8, unitCost: 1000 })
+      ).rejects.toThrow(ResourceConcurrencyException);
+      expect(await resourceRepository.findById(1)).toMatchObject({
+        name: "Mesas",
+        totalQuantity: 4,
+        isActive: false,
+      });
+    });
+
+    it("rejects a deactivation read before an edit and keeps the edit", async () => {
+      const { update, changeStatus } = useCases.materialResourceUseCases;
+
+      interleaveAfterRead((id) =>
+        update.execute(id, { name: "Mesas redondas", quantity: 8, unitCost: 1000 })
+      );
+
+      await expect(changeStatus.execute(1, false)).rejects.toThrow(ResourceConcurrencyException);
+      expect(await resourceRepository.findById(1)).toMatchObject({
+        name: "Mesas redondas",
+        isActive: true,
+      });
+    });
+
+    it("never writes the status when saving details, nor details when saving the status", async () => {
+      const resource = await resourceRepository.findById(1);
+
+      resource.isActive = false;
+      resource.name = "Ignorado por updateStatus";
+      const afterDetails = await resourceRepository.updateDetails({ ...resource, name: "Mesas 2" });
+      const afterStatus = await resourceRepository.updateStatus({
+        ...afterDetails,
+        isActive: false,
+        name: "Ignorado",
+      });
+
+      expect(afterDetails).toMatchObject({ name: "Mesas 2", isActive: true, version: 1 });
+      expect(afterStatus).toMatchObject({ name: "Mesas 2", isActive: false, version: 2 });
     });
   });
 

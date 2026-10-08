@@ -48,6 +48,10 @@ const inventoryResourceBody = {
   },
 };
 
+const concurrencyConflictResponse = {
+  409: { description: "The resource was changed by another operation; reload and retry" },
+};
+
 const duplicateWarningResponse = {
   409: { description: "Possible duplicate; requires_confirmation is true" },
 };
@@ -59,7 +63,11 @@ function softDeleteOperation(tag) {
       summary: "Soft delete a resource",
       security: [{ CookieAuth: [] }],
       parameters: [resourceIdParameter],
-      responses: { 204: { description: "Deactivated" }, 404: { description: "Not found" } },
+      responses: {
+        204: { description: "Deactivated" },
+        404: { description: "Not found" },
+        ...concurrencyConflictResponse,
+      },
     },
   };
 }
@@ -112,6 +120,7 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
         responses: {
           204: { description: "Updated" },
           404: { description: "Not found" },
+          ...concurrencyConflictResponse,
           422: { description: "Validation error" },
         },
       },
@@ -124,6 +133,7 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
         responses: {
           204: { description: "Status changed" },
           404: { description: "Not found" },
+          ...concurrencyConflictResponse,
           422: { description: "Validation error" },
         },
       },
@@ -151,7 +161,7 @@ const resourcePaths = {
         {
           name: "type",
           in: "query",
-          schema: { type: "string", enum: ["humano", "material", "logistico"] },
+          schema: { type: "string", enum: ["HUMAN", "MATERIAL", "LOGISTIC"] },
         },
         ...inventoryListParameters,
       ],

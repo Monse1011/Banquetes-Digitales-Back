@@ -1,8 +1,13 @@
 /**
+ * updateDetails y updateStatus solo guardan si la versión leída sigue vigente (control
+ * optimista); si otra operación cambió el recurso, devuelven null.
+ *
  * @typedef {Object} ResourceRepository
  * @property {(resource: Resource) => Promise<Resource>} create
  * @property {(id: number) => Promise<Resource | null>} findById
- * @property {(resource: Resource) => Promise<Resource>} update
+ * @property {(resource: Resource) => Promise<Resource | null>} updateDetails nombre, rol
+ * operativo, cantidad y costo unitario
+ * @property {(resource: Resource) => Promise<Resource | null>} updateStatus estado y fecha de baja
  * @property {(filters: {type?: string, isActive: boolean, name?: string, operativeRoleId?: number},
  * sort: {field: string, direction: 'asc' | 'desc'}, page: number, perPage: number) =>
  * Promise<{resources: Resource[], totalRecords: number}>} findAll

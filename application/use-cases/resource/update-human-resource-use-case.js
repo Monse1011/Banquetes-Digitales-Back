@@ -4,6 +4,7 @@ const HumanResourceRequestDto = require("../../dto/resource/human-resource-reque
 const {
   findResourceOrFail,
   ensureActiveOperativeRole,
+  ensureSaved,
 } = require("../../services/resource/resource-guards");
 
 class UpdateHumanResourceUseCase {
@@ -31,7 +32,7 @@ class UpdateHumanResourceUseCase {
     resource.operativeRoleId = dto.operative_role_id;
     resource.updatedAt = new Date();
 
-    await this.resourceRepository.update(resource);
+    ensureSaved(await this.resourceRepository.updateDetails(resource));
   }
 }
 

@@ -1,6 +1,10 @@
 const ResourceValidationException = require("../../../domain/exceptions/resource/resource-validation-exception");
 const InventoryResourceRequestDto = require("../../dto/resource/inventory-resource-request-dto");
-const { findResourceOrFail, ensureUniqueName } = require("../../services/resource/resource-guards");
+const {
+  findResourceOrFail,
+  ensureUniqueName,
+  ensureSaved,
+} = require("../../services/resource/resource-guards");
 
 // Edición de recursos materiales (Función 2.9) y logísticos (Función 2.10); una instancia por tipo.
 // RF-1.2.9.2 / RF-1.2.10.2: se modifican el nombre, la cantidad en stock y el costo unitario.
@@ -28,7 +32,7 @@ class UpdateInventoryResourceUseCase {
     resource.unitCost = dto.unit_cost;
     resource.updatedAt = new Date();
 
-    await this.resourceRepository.update(resource);
+    ensureSaved(await this.resourceRepository.updateDetails(resource));
   }
 }
 

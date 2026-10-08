@@ -3,6 +3,8 @@ const { ResourceSortField } = require("../../../domain/enums/resource/resource-s
 const GetResourcesResponseDto = require("../../dto/resource/get-resources-response-dto");
 const HumanResourceSummaryDto = require("../../dto/resource/human-resource-summary-dto");
 const InventoryResourceSummaryDto = require("../../dto/resource/inventory-resource-summary-dto");
+const MaterialResourceSummaryDto = require("../../dto/resource/material-resource-summary-dto");
+const { formatDateTime } = require("../../services/date-time-formatter");
 
 function toSummaryDto(resource) {
   if (resource.type === ResourceType.HUMAN) {
@@ -12,6 +14,20 @@ function toSummaryDto(resource) {
       resource.type,
       resource.operativeRoleId,
       resource.isActive
+    );
+  }
+
+  if (resource.type === ResourceType.MATERIAL) {
+    return new MaterialResourceSummaryDto(
+      resource.id,
+      resource.name,
+      resource.type,
+      resource.totalQuantity,
+      resource.unitCost,
+      resource.isActive,
+      formatDateTime(resource.createdAt),
+      formatDateTime(resource.updatedAt),
+      formatDateTime(resource.deactivatedAt)
     );
   }
 

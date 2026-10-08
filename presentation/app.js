@@ -30,6 +30,7 @@ const InvalidResetTokenException = require("../domain/exceptions/password-reset/
 const ResourceValidationException = require("../domain/exceptions/resource/resource-validation-exception");
 const ResourceNotFoundException = require("../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
+const ResourceConcurrencyException = require("../domain/exceptions/resource/resource-concurrency-exception");
 const ErrorMessages = require("./constants/error-messages");
 
 // Funciones 2.8 a 2.10: errores de los recursos.
@@ -41,6 +42,11 @@ function handleResourceError(error, response) {
 
   if (error instanceof ResourceNotFoundException) {
     response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ResourceConcurrencyException) {
+    response.status(409).json({ message: error.message });
     return true;
   }
 

@@ -9,7 +9,8 @@ class Resource {
     isActive,
     createdAt,
     updatedAt,
-    deactivatedAt
+    deactivatedAt,
+    version = 0
   ) {
     this.id = id;
     this.name = name;
@@ -21,6 +22,8 @@ class Resource {
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.deactivatedAt = deactivatedAt;
+    // Control de concurrencia optimista: aumenta con cada modificación guardada.
+    this.version = version;
   }
 
   // RF-1.2.8.3: la eliminación es lógica.

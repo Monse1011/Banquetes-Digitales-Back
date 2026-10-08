@@ -70,7 +70,7 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.resources).toEqual([
-        { id: 1, name: "David Torres", type: "humano", operative_role_id: 1, is_active: true },
+        { id: 1, name: "David Torres", type: "HUMAN", operative_role_id: 1, is_active: true },
       ]);
       expect(response.body.metadata.pagination).toEqual({
         total_records: 1,
@@ -186,11 +186,19 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
     it("lists resources of every type or of the requested type", async () => {
       const all = await request(app).get("/api/admin/resources").set("Cookie", AUTH_COOKIE);
       const materials = await request(app)
-        .get("/api/admin/resources?type=material&name=cable")
+        .get("/api/admin/resources?type=MATERIAL&name=cable")
+        .set("Cookie", AUTH_COOKIE);
+
+      const humans = await request(app)
+        .get("/api/admin/resources?type=HUMAN")
         .set("Cookie", AUTH_COOKIE);
 
       expect(all.body.data.resources.map((item) => item.id)).toEqual([3, 4, 1]);
       expect(materials.body.data.resources.map((item) => item.id)).toEqual([3]);
+      // NC-06: el filtro usa los valores del contrato (HUMAN, MATERIAL, LOGISTIC).
+      expect(humans.body.data.resources).toEqual([
+        { id: 1, name: "David Torres", type: "HUMAN", operative_role_id: 1, is_active: true },
+      ]);
     });
 
     it("returns 404 for invalid ids or resources of another type", async () => {

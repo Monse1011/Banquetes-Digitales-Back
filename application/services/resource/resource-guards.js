@@ -3,6 +3,7 @@ const {
   ResourceNotFoundMessages,
   ResourceDuplicateNameMessages,
 } = require("../../../domain/constants/resource-messages");
+const ResourceConcurrencyException = require("../../../domain/exceptions/resource/resource-concurrency-exception");
 const ResourceNotFoundException = require("../../../domain/exceptions/resource/resource-not-found-exception");
 const ResourceValidationException = require("../../../domain/exceptions/resource/resource-validation-exception");
 
@@ -37,4 +38,13 @@ async function ensureUniqueName(resourceRepository, type, name, excludeId) {
   }
 }
 
-module.exports = { findResourceOrFail, ensureActiveOperativeRole, ensureUniqueName };
+// NC-07: el repositorio devuelve null cuando otra operación modificó el recurso después de leerlo.
+function ensureSaved(savedResource) {
+  if (!savedResource) {
+    throw new ResourceConcurrencyException();
+  }
+
+  return savedResource;
+}
+
+module.exports = { findResourceOrFail, ensureActiveOperativeRole, ensureUniqueName, ensureSaved };

@@ -1,8 +1,20 @@
 const { Resource } = require("../../../domain/entities/resource/resource");
 const { ResourceSortField } = require("../../../domain/enums/resource/resource-sort-field");
+const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 
 const RESOURCE_COLUMNS = `id, name, type, operative_role_id, total_quantity, unit_cost,
-  is_active, created_at, updated_at, deactivated_at`;
+  is_active, created_at, updated_at, deactivated_at, version`;
+
+// La columna type guarda los valores en español; el dominio y la API usan los del contrato.
+const DATABASE_TYPES = Object.freeze({
+  [ResourceType.HUMAN]: "humano",
+  [ResourceType.MATERIAL]: "material",
+  [ResourceType.LOGISTIC]: "logistico",
+});
+
+const DOMAIN_TYPES = Object.freeze(
+  Object.fromEntries(Object.entries(DATABASE_TYPES).map(([domain, database]) => [database, domain]))
+);
 
 // Evita que %, _ o \ escritos por el usuario actúen como comodines en ILIKE.
 function escapeLikePattern(value) {
@@ -23,7 +35,7 @@ class PostgresResourceRepository {
        RETURNING ${RESOURCE_COLUMNS}`,
       [
         resource.name,
-        resource.type,
+        DATABASE_TYPES[resource.type],
         resource.operativeRoleId,
         resource.totalQuantity,
         resource.unitCost,
@@ -52,30 +64,39 @@ class PostgresResourceRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
-  async update(resource) {
+  // Solo escribe los datos editables; nunca el estado. Devuelve null si la versión cambió.
+  async updateDetails(resource) {
     const result = await this.pool.query(
       `UPDATE resources
        SET name = $1, operative_role_id = $2, total_quantity = $3, unit_cost = $4,
-           is_active = $5, updated_at = $6, deactivated_at = $7
-       WHERE id = $8
+           updated_at = $5, version = version + 1
+       WHERE id = $6 AND version = $7
        RETURNING ${RESOURCE_COLUMNS}`,
       [
         resource.name,
         resource.operativeRoleId,
         resource.totalQuantity,
         resource.unitCost,
-        resource.isActive,
         resource.updatedAt,
-        resource.deactivatedAt,
         resource.id,
+        resource.version,
       ]
     );
 
-    if (!result.rows[0]) {
-      throw new Error("Resource not found");
-    }
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
+  }
 
-    return this.toEntity(result.rows[0]);
+  // Solo escribe el estado; nunca los datos editables. Devuelve null si la versión cambió.
+  async updateStatus(resource) {
+    const result = await this.pool.query(
+      `UPDATE resources
+       SET is_active = $1, deactivated_at = $2, updated_at = $3, version = version + 1
+       WHERE id = $4 AND version = $5
+       RETURNING ${RESOURCE_COLUMNS}`,
+      [resource.isActive, resource.deactivatedAt, resource.updatedAt, resource.id, resource.version]
+    );
+
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async findAll(filters, sort, page, perPage) {
@@ -83,7 +104,7 @@ class PostgresResourceRepository {
     const conditions = [];
 
     if (filters.type) {
-      parameters.push(filters.type);
+      parameters.push(DATABASE_TYPES[filters.type]);
       conditions.push(`type = $${parameters.length}`);
     }
 
@@ -126,7 +147,7 @@ class PostgresResourceRepository {
   }
 
   async existsByName(type, name, { operativeRoleId, activeOnly = false, excludeId } = {}) {
-    const parameters = [type, name];
+    const parameters = [DATABASE_TYPES[type], name];
     const conditions = ["type = $1", "LOWER(TRIM(name)) = LOWER(TRIM($2))"];
 
     if (operativeRoleId !== undefined) {
@@ -164,14 +185,15 @@ class PostgresResourceRepository {
     return new Resource(
       Number(row.id),
       row.name,
-      row.type,
+      DOMAIN_TYPES[row.type],
       row.operative_role_id === null ? null : Number(row.operative_role_id),
       row.total_quantity,
       row.unit_cost === null ? null : Number(row.unit_cost),
       row.is_active,
       new Date(row.created_at),
       new Date(row.updated_at),
-      row.deactivated_at === null ? null : new Date(row.deactivated_at)
+      row.deactivated_at === null ? null : new Date(row.deactivated_at),
+      row.version
     );
   }
 }

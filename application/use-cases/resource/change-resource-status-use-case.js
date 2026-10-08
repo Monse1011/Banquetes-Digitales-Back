@@ -3,6 +3,7 @@ const ResourceValidationException = require("../../../domain/exceptions/resource
 const {
   findResourceOrFail,
   ensureActiveOperativeRole,
+  ensureSaved,
 } = require("../../services/resource/resource-guards");
 
 // Común a las Funciones 2.8, 2.9 y 2.10; se crea una instancia por tipo de recurso.
@@ -36,7 +37,7 @@ class ChangeResourceStatusUseCase {
       resource.activate(now);
     }
 
-    await this.resourceRepository.update(resource);
+    ensureSaved(await this.resourceRepository.updateStatus(resource));
   }
 }
 
