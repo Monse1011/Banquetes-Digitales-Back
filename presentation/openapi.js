@@ -1,3 +1,5 @@
+const { ReservationRequestStatus } = require("../domain/enums/reservation-request/request-status");
+
 const resourceIdParameter = {
   name: "id",
   in: "path",
@@ -72,6 +74,44 @@ function softDeleteOperation(tag) {
   };
 }
 
+// Función 3.2: la disponibilidad se calcula para el periodo del evento de la solicitud.
+const requestIdQueryParameter = {
+  name: "request_id",
+  in: "query",
+  schema: { type: "integer" },
+  description:
+    "Agrega available_quantity, assignment y metadata.request para la solicitud (RF-2.3.2.5)",
+};
+
+// RF-2.3.2.1 / RF-2.3.2.21
+const resourceConfirmationAccessResponses = {
+  403: { description: "Not the logistic user responsible for the request" },
+  404: { description: "Request not found" },
+  409: { description: "La solicitud no se encuentra en un estado que permita confirmar recursos." },
+};
+
+const observationsSchema = { type: "string", maxLength: 200, nullable: true };
+
+function logisticsResourcePath(path, listParameters) {
+  return {
+    [`/api/logistics/resources/${path}`]: {
+      get: {
+        tags: ["Logistics"],
+        summary: `List active ${path} resources (with request_id: availability for the event, Función 3.2)`,
+        security: [{ CookieAuth: [] }],
+        parameters: [
+          ...listParameters.filter((parameter) => parameter.name !== "status"),
+          requestIdQueryParameter,
+        ],
+        responses: {
+          200: { description: "Paginated active resources" },
+          ...resourceConfirmationAccessResponses,
+        },
+      },
+    },
+  };
+}
+
 // Rutas de las Funciones 2.8 (human), 2.9 (material) y 2.10 (logistic).
 function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = false } = {}) {
   const security = [{ CookieAuth: [] }];
@@ -139,15 +179,7 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
       },
       ...(softDelete ? softDeleteOperation(tag) : {}),
     },
-    [`/api/logistics/resources/${path}`]: {
-      get: {
-        tags: ["Logistics"],
-        summary: `List active ${path} resources`,
-        security,
-        parameters: listParameters.filter((parameter) => parameter.name !== "status"),
-        responses: { 200: { description: "Paginated active resources" } },
-      },
-    },
+    ...logisticsResourcePath(path, listParameters),
   };
 }
 
@@ -198,6 +230,98 @@ const resourcePaths = {
       softDelete: true,
     }
   ),
+};
+
+const requestPathParameter = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "integer" },
+};
+
+// Función 3.2 - Confirmación de recursos.
+const resourceConfirmationPaths = {
+  "/api/logistics/requests/{id}/resources": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Register requested resources; sufficient ones are assigned provisionally",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["data"],
+              properties: {
+                data: {
+                  type: "array",
+                  minItems: 1,
+                  items: {
+                    type: "object",
+                    required: ["resource_id", "quantity"],
+                    properties: {
+                      resource_id: { type: "integer" },
+                      quantity: { type: "integer", minimum: 1 },
+                      usage_start: { type: "string", example: "2026-12-24 18:00:00" },
+                      usage_end: { type: "string", example: "2026-12-24 23:00:00" },
+                      observation: observationsSchema,
+                    },
+                  },
+                },
+                observations: observationsSchema,
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        204: { description: "Resources registered" },
+        ...resourceConfirmationAccessResponses,
+        409: {
+          description:
+            "Status does not allow confirming resources, or the availability changed (La disponibilidad del recurso cambió. Actualice la información.)",
+        },
+        422: { description: "Validation error" },
+      },
+    },
+  },
+  "/api/logistics/requests/{id}/resources/confirm": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Finish the confirmation (Coordinación Lista / Coordinación Incompleta)",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: { type: "object", properties: { observations: observationsSchema } },
+          },
+        },
+      },
+      responses: {
+        200: { description: "Confirmation saved" },
+        400: { description: "A Suficiente resource is not assigned" },
+        ...resourceConfirmationAccessResponses,
+        409: { description: "Status does not allow confirming resources, or availability changed" },
+        422: { description: "No resources registered or invalid observations" },
+      },
+    },
+  },
+  "/api/logistics/requests/{id}/resources/cancel": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Discard provisional assignments and pending observations",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      responses: {
+        200: { description: "Provisional assignments released" },
+        403: { description: "Not the logistic user responsible for the request" },
+        404: { description: "Request not found" },
+      },
+    },
+  },
 };
 
 const openApiDocument = {
@@ -345,7 +469,7 @@ const openApiDocument = {
             name: "status",
             in: "query",
             required: false,
-            schema: { type: "string", enum: ["PENDING", "APPROVED", "ASSIGNED"] },
+            schema: { type: "string", enum: Object.keys(ReservationRequestStatus) },
           },
           { name: "page", in: "query", required: false, schema: { type: "integer" } },
           { name: "per_page", in: "query", required: false, schema: { type: "integer" } },
@@ -377,6 +501,7 @@ const openApiDocument = {
       },
     },
     ...resourcePaths,
+    ...resourceConfirmationPaths,
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],

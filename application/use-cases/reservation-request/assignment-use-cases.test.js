@@ -96,7 +96,7 @@ describe("AssignReservationRequestUseCase", () => {
     expect(created.assignedByUserId).toBe(1);
   });
 
-  it("accepts requests in any state except Confirmado", async () => {
+  it("accepts requests that have not started the resource confirmation", async () => {
     const pending = await reservationRequestRepository.create(
       buildRequest({ status: ReservationRequestStatus.PENDING })
     );
@@ -115,6 +115,21 @@ describe("AssignReservationRequestUseCase", () => {
       RequestNotReassignableException
     );
     expect(created.logisticUserId).toBe(7);
+  });
+
+  it.each([
+    ReservationRequestStatus.REJECTED,
+    ReservationRequestStatus.COORDINATION_READY,
+    ReservationRequestStatus.COORDINATION_INCOMPLETE,
+    ReservationRequestStatus.PROPOSAL_GENERATED,
+    ReservationRequestStatus.COMPLETED,
+    ReservationRequestStatus.CANCELLED,
+  ])("blocks reassignment when the request is %s", async (status) => {
+    const created = await reservationRequestRepository.create(buildRequest({ status }));
+
+    await expect(useCase.execute(created.requestId, 8, 1)).rejects.toThrow(
+      RequestNotReassignableException
+    );
   });
 
   it("rejects when the request does not exist", async () => {
