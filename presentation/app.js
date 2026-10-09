@@ -12,6 +12,8 @@ const {
 } = require("./controller/reservation-request/reservation-request-controller");
 const { UserController } = require("./controller/user/user-controller");
 const { ServiceController } = require("./controller/service/service-controller");
+const CalendarController = require("./controller/calendar/calendar-controller");
+const { createCalendarRoutes } = require("./routes/calendar-routes");
 const { ResourceController } = require("./controller/resource/resource-controller");
 const { HumanResourceController } = require("./controller/resource/human-resource-controller");
 const {
@@ -93,6 +95,7 @@ function createApp(dependencies) {
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
   const serviceController = new ServiceController(dependencies.serviceRepository);
+  const calendarController = new CalendarController(dependencies);
   const resourceControllers = {
     resource: new ResourceController(dependencies.resourceUseCases),
     human: new HumanResourceController(dependencies.humanResourceUseCases),
@@ -136,6 +139,7 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
+  app.use("/api/calendar", createCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsRoutes(resourceControllers, authMiddleware));
 
   // Error handler
