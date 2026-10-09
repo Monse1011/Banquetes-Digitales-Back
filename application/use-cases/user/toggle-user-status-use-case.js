@@ -14,7 +14,7 @@ class ToggleUserStatusUseCase {
       }
     }
     if (isActive !== undefined) {
-      return (isActive === true || isActive === "true") ? UserStatus.ACTIVE : UserStatus.INACTIVE;
+      return isActive === true || isActive === "true" ? UserStatus.ACTIVE : UserStatus.INACTIVE;
     }
     const err = new Error("Estado no válido. Debe ser ACTIVE o INACTIVE.");
     err.status = 400;

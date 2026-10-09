@@ -22,7 +22,7 @@ class UserRepositoryImpl extends UserRepository {
       must_change_password: row.must_change_password,
       last_access: row.last_access ? row.last_access.toISOString() : null,
       created_at: row.created_at ? row.created_at.toISOString() : null,
-      updated_at: row.updated_at ? row.updated_at.toISOString() : null
+      updated_at: row.updated_at ? row.updated_at.toISOString() : null,
     });
   }
 
@@ -68,7 +68,7 @@ class UserRepositoryImpl extends UserRepository {
     params.push(perPage, offset);
 
     const dataResult = await this.pool.query(dataQuery, params);
-    const users = dataResult.rows.map(row => this.mapRowToEntity(row));
+    const users = dataResult.rows.map((row) => this.mapRowToEntity(row));
 
     return { users, total_records: totalRecords };
   }
@@ -104,7 +104,7 @@ class UserRepositoryImpl extends UserRepository {
     password_hash: passwordHash,
     role,
     status,
-    must_change_password: mustChangePassword
+    must_change_password: mustChangePassword,
   }) {
     const query = `
       INSERT INTO users (
@@ -115,15 +115,7 @@ class UserRepositoryImpl extends UserRepository {
       RETURNING id, employee_id, full_name, email, role,
                 status, must_change_password, created_at, updated_at
     `;
-    const values = [
-      employeeId,
-      fullName,
-      email,
-      passwordHash,
-      role,
-      status,
-      mustChangePassword
-    ];
+    const values = [employeeId, fullName, email, passwordHash, role, status, mustChangePassword];
     const result = await this.pool.query(query, values);
     return this.mapRowToEntity(result.rows[0]);
   }
@@ -186,11 +178,21 @@ class UserRepositoryImpl extends UserRepository {
 
   async hasActiveRequests(userId) {
     const activeStatuses = [
-      "ASSIGNED", "Asignada", "ASIGNADA",
-      "COORDINATION_READY", "Coordinación Lista", "Coordinacion Lista",
-      "COORDINATION_INCOMPLETE", "Coordinación Incompleta", "Coordinacion Incompleta",
-      "PROPOSAL_GENERATED", "Propuesta generada", "PROPUESTA_GENERADA",
-      "CONFIRMED", "Confirmado", "CONFIRMADO"
+      "ASSIGNED",
+      "Asignada",
+      "ASIGNADA",
+      "COORDINATION_READY",
+      "Coordinación Lista",
+      "Coordinacion Lista",
+      "COORDINATION_INCOMPLETE",
+      "Coordinación Incompleta",
+      "Coordinacion Incompleta",
+      "PROPOSAL_GENERATED",
+      "Propuesta generada",
+      "PROPUESTA_GENERADA",
+      "CONFIRMED",
+      "Confirmado",
+      "CONFIRMADO",
     ];
 
     const query = `
@@ -226,13 +228,13 @@ class UserRepositoryImpl extends UserRepository {
     `;
     try {
       const result = await this.pool.query(query, [userId]);
-      return result.rows.map(r => ({
+      return result.rows.map((r) => ({
         id: r.id,
         folio: r.folio,
         event_date: r.event_date,
         start_time: r.start_time,
         end_time: r.end_time,
-        status: r.status
+        status: r.status,
       }));
     } catch (_err) {
       return [];

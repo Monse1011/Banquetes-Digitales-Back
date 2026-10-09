@@ -12,23 +12,23 @@ class ListUsersUseCase {
       role: role ? role.toUpperCase() : null,
       status: status ? status.toUpperCase() : null,
       page: pageNum,
-      per_page: perPageNum
+      per_page: perPageNum,
     });
 
     return {
-      users: users.map(u => ({
+      users: users.map((u) => ({
         id: u.id,
         employee_id: u.employee_id,
         full_name: u.full_name,
         email: u.email,
         role: u.role,
-        status: u.status
+        status: u.status,
       })),
       pagination: {
         total_records: totalRecords,
         page: pageNum,
-        per_page: perPageNum
-      }
+        per_page: perPageNum,
+      },
     };
   }
 }

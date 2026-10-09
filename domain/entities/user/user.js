@@ -13,7 +13,7 @@ class User {
     must_change_password: mustChangePassword = true,
     last_access: lastAccess = null,
     created_at: createdAt = null,
-    updated_at: updatedAt = null
+    updated_at: updatedAt = null,
   }) {
     this.id = id;
     this.employee_id = employeeId;

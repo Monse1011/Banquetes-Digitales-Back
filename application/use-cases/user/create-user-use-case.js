@@ -25,7 +25,10 @@ class CreateUserUseCase {
     for (let i = 0; i < 6; i++) {
       pwd += all[crypto.randomInt(0, all.length)];
     }
-    return pwd.split("").sort(() => 0.5 - Math.random()).join("");
+    return pwd
+      .split("")
+      .sort(() => 0.5 - Math.random())
+      .join("");
   }
 
   validateInputs(fullName, email, role) {
@@ -71,7 +74,7 @@ class CreateUserUseCase {
       await this.emailService.sendCredentials({
         to: newUser.email,
         fullName: newUser.full_name,
-        tempPassword
+        tempPassword,
       });
     } catch (mailError) {
       console.error("Advertencia al enviar correo con credenciales temporales:", mailError.message);
@@ -93,7 +96,7 @@ class CreateUserUseCase {
       password_hash: passwordHash,
       role: normalizedRole,
       status: UserStatus.ACTIVE,
-      must_change_password: true
+      must_change_password: true,
     });
 
     await this.sendWelcomeEmail(newUser, tempPassword);
@@ -105,7 +108,7 @@ class CreateUserUseCase {
       email: newUser.email,
       role: newUser.role,
       status: newUser.status,
-      created_at: newUser.created_at
+      created_at: newUser.created_at,
     };
   }
 }

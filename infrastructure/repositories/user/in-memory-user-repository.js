@@ -6,8 +6,8 @@ const UserStatus = require("../../../domain/enums/user/user-status");
 class InMemoryUserRepository extends UserRepository {
   constructor(initialUsers = []) {
     super();
-    this.users = initialUsers.map(u => (u instanceof User ? u : new User(u)));
-    const ids = this.users.map(u => Number(u.id) || 0);
+    this.users = initialUsers.map((u) => (u instanceof User ? u : new User(u)));
+    const ids = this.users.map((u) => Number(u.id) || 0);
     this.nextId = this.users.length > 0 ? Math.max(...ids) + 1 : 1;
     this.activeRequestsMap = new Map();
     this.assignedRequestsMap = new Map();
@@ -18,18 +18,19 @@ class InMemoryUserRepository extends UserRepository {
 
     if (search) {
       const q = search.toLowerCase();
-      filtered = filtered.filter(u =>
-        (u.full_name && u.full_name.toLowerCase().includes(q)) ||
-        (u.email && u.email.toLowerCase().includes(q))
+      filtered = filtered.filter(
+        (u) =>
+          (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q))
       );
     }
 
     if (role) {
-      filtered = filtered.filter(u => u.role === role);
+      filtered = filtered.filter((u) => u.role === role);
     }
 
     if (status) {
-      filtered = filtered.filter(u => u.status === status);
+      filtered = filtered.filter((u) => u.status === status);
     }
 
     const totalRecords = filtered.length;
@@ -40,12 +41,12 @@ class InMemoryUserRepository extends UserRepository {
   }
 
   async findById(id) {
-    const user = this.users.find(u => String(u.id) === String(id));
+    const user = this.users.find((u) => String(u.id) === String(id));
     return user ? new User(user) : null;
   }
 
   async findByEmail(email) {
-    const user = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = this.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     return user ? new User(user) : null;
   }
 
@@ -55,21 +56,21 @@ class InMemoryUserRepository extends UserRepository {
       id,
       ...userData,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     });
     this.users.push(user);
     return new User(user);
   }
 
   async update(id, updates) {
-    const index = this.users.findIndex(u => String(u.id) === String(id));
+    const index = this.users.findIndex((u) => String(u.id) === String(id));
     if (index === -1) return null;
 
     const current = this.users[index];
     const updated = new User({
       ...current,
       ...updates,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     });
     this.users[index] = updated;
     return new User(updated);
@@ -80,9 +81,8 @@ class InMemoryUserRepository extends UserRepository {
   }
 
   async countActiveAdmins() {
-    return this.users.filter(
-      u => u.role === UserRole.ADMIN && u.status === UserStatus.ACTIVE
-    ).length;
+    return this.users.filter((u) => u.role === UserRole.ADMIN && u.status === UserStatus.ACTIVE)
+      .length;
   }
 
   async hasActiveRequests(userId) {
@@ -94,7 +94,9 @@ class InMemoryUserRepository extends UserRepository {
   }
 
   async findAvailableLogisticsUsers() {
-    return this.users.filter(u => u.role === UserRole.LOGISTICS && u.status === UserStatus.ACTIVE);
+    return this.users.filter(
+      (u) => u.role === UserRole.LOGISTICS && u.status === UserStatus.ACTIVE
+    );
   }
 
   async findAssignedRequestsByUserId(userId) {

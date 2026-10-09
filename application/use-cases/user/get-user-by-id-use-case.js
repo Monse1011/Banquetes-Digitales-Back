@@ -28,7 +28,7 @@ class GetUserByIdUseCase {
       last_access: user.last_access,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      ...(assignedRequests !== undefined ? { assigned_requests: assignedRequests } : {})
+      ...(assignedRequests !== undefined ? { assigned_requests: assignedRequests } : {}),
     };
   }
 }

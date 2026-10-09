@@ -1,6 +1,6 @@
 const UserStatus = Object.freeze({
   ACTIVE: "ACTIVE",
-  INACTIVE: "INACTIVE"
+  INACTIVE: "INACTIVE",
 });
 
 module.exports = UserStatus;

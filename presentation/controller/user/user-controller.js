@@ -18,16 +18,16 @@ class UserController {
       role,
       status,
       page,
-      per_page: perPage
+      per_page: perPage,
     });
 
     return response.status(200).json({
       data: {
-        users: result.users
+        users: result.users,
       },
       metadata: {
-        pagination: result.pagination
-      }
+        pagination: result.pagination,
+      },
     });
   }
 
@@ -37,7 +37,7 @@ class UserController {
     const user = await this.dependencies.getUserByIdUseCase.execute(id);
 
     return response.status(200).json({
-      data: { user }
+      data: { user },
     });
   }
 
@@ -49,14 +49,14 @@ class UserController {
     const createdUser = await this.dependencies.createUserUseCase.execute({
       full_name: fullName,
       email,
-      role
+      role,
     });
 
     response.setHeader("Location", `/api/admin/users/${createdUser.id}`);
     return response.status(201).json({
       data: {
-        user: createdUser
-      }
+        user: createdUser,
+      },
     });
   }
 
@@ -69,13 +69,13 @@ class UserController {
     const updatedUser = await this.dependencies.updateUserUseCase.execute(id, {
       full_name: fullName,
       email,
-      role
+      role,
     });
 
     return response.status(200).json({
       data: {
-        user: updatedUser
-      }
+        user: updatedUser,
+      },
     });
   }
 
@@ -89,7 +89,7 @@ class UserController {
     await this.dependencies.toggleUserStatusUseCase.execute(id, {
       status,
       is_active: isActive,
-      currentUserId
+      currentUserId,
     });
 
     return response.sendStatus(200);
