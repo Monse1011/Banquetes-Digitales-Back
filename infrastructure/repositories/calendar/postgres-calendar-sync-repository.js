@@ -32,11 +32,11 @@ class PostgresCalendarSyncRepository {
 
     return row
       ? {
-        id: Number(row.id_outbox),
-        eventId: Number(row.id_event),
-        operation: row.operation,
-        attempts: row.attempts,
-      }
+          id: Number(row.id_outbox),
+          eventId: Number(row.id_event),
+          operation: row.operation,
+          attempts: row.attempts,
+        }
       : null;
   }
 
