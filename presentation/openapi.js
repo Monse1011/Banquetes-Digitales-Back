@@ -1,3 +1,10 @@
+const resourceIdParameter = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "integer" },
+};
+
 const openApiDocument = {
   openapi: "3.0.3",
   info: {
@@ -7,6 +14,63 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
+    "/api/calendar": {
+      get: {
+        summary: "Consulta el calendario",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [
+          { name: "date", in: "query", schema: { type: "string", format: "date" } },
+          { name: "include_cancelled", in: "query", schema: { type: "boolean" } },
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } }
+        ],
+        responses: { 200: { description: "Lista de eventos" } }
+      },
+      post: {
+        summary: "Agenda un evento",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", properties: { request_id: { type: "integer" } } } } }
+        },
+        responses: { 201: { description: "Evento agendado" } }
+      }
+    },
+    "/api/calendar/{id}": {
+      put: {
+        summary: "Edita un evento",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", properties: { start_at: { type: "string", format: "date-time" }, end_at: { type: "string", format: "date-time" }, location: { type: "string" } } } } }
+        },
+        responses: { 200: { description: "Evento editado" } }
+      },
+      delete: {
+        summary: "Cancela un evento",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", properties: { confirmed: { type: "boolean" } } } } }
+        },
+        responses: { 200: { description: "Evento cancelado" } }
+      }
+    },
+    "/api/calendar/{id}/sync": {
+      post: {
+        summary: "Reintenta sincronizar un evento",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: { 200: { description: "Sincronización reintentada" } }
+      }
+    },
     "/api/auth/login": {
       post: {
         tags: ["Authentication"],

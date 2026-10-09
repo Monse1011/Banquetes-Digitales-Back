@@ -10,6 +10,8 @@ const {
 } = require("./controller/reservation-request/reservation-request-controller");
 const { UserController } = require("./controller/user/user-controller");
 const { ServiceController } = require("./controller/service/service-controller");
+const CalendarController = require("./controller/calendar/calendar-controller");
+const { createCalendarRoutes } = require("./routes/calendar-routes");
 const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
 const ReservationRequestNotFoundException = require("../domain/exceptions/reservation-request/reservation-request-not-found-exception");
 const RequestNotReassignableException = require("../domain/exceptions/reservation-request/request-not-reassignable-exception");
@@ -55,6 +57,7 @@ function createApp(dependencies) {
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
   const serviceController = new ServiceController(dependencies.serviceRepository);
+  const calendarController = new CalendarController(dependencies);
 
   app.use(express.json());
 
@@ -85,6 +88,7 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
+  app.use("/api/calendar", createCalendarRoutes(calendarController, authMiddleware));
 
   // Error handler
   app.use((error, _request, response, _next) => {
