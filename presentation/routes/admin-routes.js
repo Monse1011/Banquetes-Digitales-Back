@@ -27,6 +27,26 @@ function createAdminRoutes(reservationRequestController, userController, authMid
     userController.available(request, response).catch(next);
   });
 
+  router.get("/users", (request, response, next) => {
+    userController.list(request, response).catch(next);
+  });
+
+  router.get("/users/:id", (request, response, next) => {
+    userController.getById(request, response).catch(next);
+  });
+
+  router.post("/users", (request, response, next) => {
+    userController.create(request, response).catch(next);
+  });
+
+  router.patch("/users/:id", (request, response, next) => {
+    userController.update(request, response).catch(next);
+  });
+
+  router.put("/users/:id", (request, response, next) => {
+    userController.toggleStatus(request, response).catch(next);
+  });
+
   return router;
 }
 
