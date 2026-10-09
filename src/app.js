@@ -19,6 +19,19 @@ const {
 const {
   PostgresOperativeRoleRepository,
 } = require("../infrastructure/repositories/operative-role/postgres-operative-role-repository");
+const {
+  PostgresAssignedResourceRepository,
+} = require("../infrastructure/repositories/proposal/postgres-assigned-resource-repository");
+const {
+  PostgresDerivedInformationRepository,
+} = require("../infrastructure/repositories/proposal/postgres-derived-information-repository");
+const {
+  PostgresProposalRepository,
+} = require("../infrastructure/repositories/proposal/postgres-proposal-repository");
+const {
+  PostgresAuditLogRepository,
+} = require("../infrastructure/repositories/proposal/postgres-audit-log-repository");
+const { PdfkitPdfGenerator } = require("../infrastructure/services/proposal/pdfkit-pdf-generator");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -87,6 +100,9 @@ function loadConfig() {
       resetPasswordUrl: process.env.RESET_PASSWORD_URL,
     },
     authCookie: { secure: process.env.NODE_ENV === "production" },
+    proposalStorage: {
+      storageDir: process.env.PROPOSAL_STORAGE_DIR || "storage/proposals",
+    },
   };
 }
 
@@ -130,6 +146,22 @@ const {
 const {
   createResourceUseCases,
 } = require("../application/use-cases/resource/create-resource-use-cases");
+
+// Proposal use cases (Función 3.4)
+const {
+  GetRequestAgreementsUseCase,
+} = require("../application/use-cases/proposal/get-request-agreements-use-case");
+const {
+  SaveAgreementsUseCase,
+} = require("../application/use-cases/proposal/save-agreements-use-case");
+const {
+  GenerateProposalUseCase,
+} = require("../application/use-cases/proposal/generate-proposal-use-case");
+const { GetProposalUseCase } = require("../application/use-cases/proposal/get-proposal-use-case");
+const {
+  DownloadProposalUseCase,
+} = require("../application/use-cases/proposal/download-proposal-use-case");
+const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -219,6 +251,50 @@ async function main() {
     userRepository
   );
 
+  // Función 3.4 - Contacto con el cliente.
+  const assignedResourceRepository = new PostgresAssignedResourceRepository(pool);
+  const derivedInformationRepository = new PostgresDerivedInformationRepository(pool);
+  const proposalRepository = new PostgresProposalRepository(pool);
+  const auditLogRepository = new PostgresAuditLogRepository(pool);
+  const pdfGenerator = new PdfkitPdfGenerator(config.proposalStorage);
+
+  const getRequestAgreementsUseCase = new GetRequestAgreementsUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    assignedResourceRepository,
+    derivedInformationRepository
+  );
+  const saveAgreementsUseCase = new SaveAgreementsUseCase(
+    reservationRequestRepository,
+    assignedResourceRepository,
+    derivedInformationRepository
+  );
+  const generateProposalUseCase = new GenerateProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    assignedResourceRepository,
+    pdfGenerator
+  );
+  const getProposalUseCase = new GetProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository
+  );
+  const downloadProposalUseCase = new DownloadProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    pdfGenerator
+  );
+  const sendProposalUseCase = new SendProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    proposalRepository,
+    pdfGenerator,
+    emailService,
+    auditLogRepository
+  );
+
   const app = createApp({
     // Authentication
     authController,
@@ -237,6 +313,13 @@ async function main() {
     getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
     // Resources
     ...createPostgresResourceUseCases(pool),
+    // Proposals (Función 3.4)
+    getRequestAgreementsUseCase,
+    saveAgreementsUseCase,
+    generateProposalUseCase,
+    getProposalUseCase,
+    downloadProposalUseCase,
+    sendProposalUseCase,
   });
 
   app.listen(config.port, () => {

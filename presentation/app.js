@@ -31,6 +31,18 @@ const ResourceValidationException = require("../domain/exceptions/resource/resou
 const ResourceNotFoundException = require("../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
 const ResourceConcurrencyException = require("../domain/exceptions/resource/resource-concurrency-exception");
+const AgreementsValidationException = require("../domain/exceptions/proposal/agreements-validation-exception");
+const RequestNotInAgreementsStateException = require("../domain/exceptions/proposal/request-not-in-agreements-state-exception");
+const ProposalGenerationNotAllowedException = require("../domain/exceptions/proposal/proposal-generation-not-allowed-exception");
+const ProposalAlreadyGeneratedException = require("../domain/exceptions/proposal/proposal-already-generated-exception");
+const ProposalNotFoundException = require("../domain/exceptions/proposal/proposal-not-found-exception");
+const DerivedInformationNotFoundException = require("../domain/exceptions/proposal/derived-information-not-found-exception");
+const ResourceAvailabilityExceededException = require("../domain/exceptions/proposal/resource-availability-exceeded-exception");
+const ScheduleConflictException = require("../domain/exceptions/proposal/schedule-conflict-exception");
+const ProposalGenerationFailedException = require("../domain/exceptions/proposal/proposal-generation-failed-exception");
+const ProposalSendFailedException = require("../domain/exceptions/proposal/proposal-send-failed-exception");
+const { AgreementsController } = require("./controller/proposal/agreements-controller");
+const { ProposalController } = require("./controller/proposal/proposal-controller");
 const ErrorMessages = require("./constants/error-messages");
 
 // Funciones 2.8 a 2.10: errores de los recursos.
@@ -85,6 +97,60 @@ function handleAssignmentError(error, response) {
   return false;
 }
 
+// Función 3.4: validaciones y conflictos de acuerdos y propuestas.
+function handleProposalConflictError(error, response) {
+  if (error instanceof AgreementsValidationException) {
+    response.status(400).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  if (
+    error instanceof ResourceAvailabilityExceededException ||
+    error instanceof ScheduleConflictException
+  ) {
+    response.status(409).json({ message: error.message, conflicts: error.conflicts });
+    return true;
+  }
+
+  if (
+    error instanceof RequestNotInAgreementsStateException ||
+    error instanceof ProposalGenerationNotAllowedException ||
+    error instanceof ProposalAlreadyGeneratedException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  return false;
+}
+
+// Función 3.4: errores de propuestas inexistentes y fallos de generación o envío.
+function handleProposalFailureError(error, response) {
+  if (
+    error instanceof ProposalNotFoundException ||
+    error instanceof DerivedInformationNotFoundException
+  ) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof ProposalGenerationFailedException ||
+    error instanceof ProposalSendFailedException
+  ) {
+    response.status(500).json({ message: error.message });
+    return true;
+  }
+
+  return false;
+}
+
+function handleProposalError(error, response) {
+  return (
+    handleProposalConflictError(error, response) || handleProposalFailureError(error, response)
+  );
+}
+
 function createApp(dependencies) {
   const app = express();
 
@@ -104,6 +170,10 @@ function createApp(dependencies) {
       dependencies.logisticResourceUseCases,
       ResourceType.LOGISTIC
     ),
+  };
+  const proposalControllers = {
+    agreementsController: new AgreementsController(dependencies),
+    proposalController: new ProposalController(dependencies),
   };
 
   app.use(express.json());
@@ -136,7 +206,10 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
-  app.use("/api/logistics", createLogisticsRoutes(resourceControllers, authMiddleware));
+  app.use(
+    "/api/logistics",
+    createLogisticsRoutes(resourceControllers, authMiddleware, proposalControllers)
+  );
 
   // Error handler
   app.use((error, _request, response, _next) => {
@@ -151,6 +224,10 @@ function createApp(dependencies) {
     }
 
     if (handleAssignmentError(error, response)) {
+      return;
+    }
+
+    if (handleProposalError(error, response)) {
       return;
     }
     if (error instanceof AccountBlockedException) {

@@ -377,6 +377,111 @@ const openApiDocument = {
       },
     },
     ...resourcePaths,
+    "/api/logistics/requests/{id}": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Request detail with client contact data and assigned resources (RF-2.3.4.1)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Agreements form preloaded" },
+          404: { description: "Request not found or not owned by the user" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/derived-information": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Save client agreements without changing the request status (RF-2.3.4.11)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["location", "start_datetime", "end_datetime", "adjusted_resources"],
+          properties: {
+            location: { type: "string", maxLength: 255 },
+            start_datetime: { type: "string", format: "date-time" },
+            end_datetime: { type: "string", format: "date-time" },
+            observations: { type: "string" },
+            adjusted_resources: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["resource_id", "quantity"],
+                properties: {
+                  resource_id: { type: "integer" },
+                  quantity: { type: "integer", minimum: 0 },
+                },
+              },
+            },
+          },
+        }),
+        responses: {
+          201: { description: "Agreements saved" },
+          400: { description: "Required fields missing" },
+          404: { description: "Request not found or not owned by the user" },
+          409: { description: "Invalid state or availability exceeded" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Generate the formal proposal PDF (RF-2.3.4.4)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["derived_information_id"],
+          properties: {
+            derived_information_id: { type: "integer" },
+            client_observations: { type: "string" },
+          },
+        }),
+        responses: {
+          201: { description: "Proposal generated and request moved to Propuesta generada" },
+          400: { description: "Required fields missing" },
+          404: { description: "Agreements not found for the request" },
+          409: { description: "Invalid state or proposal already generated" },
+          500: { description: "PDF generation failed; status unchanged" },
+        },
+      },
+      get: {
+        tags: ["Proposals"],
+        summary: "Get the generated proposal of the request (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal data with pdf_url" },
+          404: { description: "Proposal not found or not visible in current status" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/download": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Download the immutable proposal PDF (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "PDF file", content: { "application/pdf": {} } },
+          404: { description: "Proposal not found" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/send": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Send the proposal PDF to the client email (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal sent" },
+          404: { description: "Proposal not found" },
+          500: { description: "Email sending failed" },
+        },
+      },
+    },
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],
