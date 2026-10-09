@@ -1,3 +1,4 @@
+/* global vi */
 const request = require("supertest");
 const { createApp } = require("../app");
 const UserRole = require("../../domain/enums/auth/user-role");
@@ -45,7 +46,7 @@ describe("Calendar Routes (Función 3.3)", () => {
         events: [{ id: 1, title: "Test Event" }],
         totalRecords: 1,
         page: 1,
-        perPage: 10
+        perPage: 10,
       });
 
       const response = await request(app)
@@ -58,7 +59,8 @@ describe("Calendar Routes (Función 3.3)", () => {
 
     it("schedules an event", async () => {
       mockSchedule.mockResolvedValue({
-        id: 1, syncStatus: "Sincronizado"
+        id: 1,
+        syncStatus: "Sincronizado",
       });
 
       const response = await request(app)
@@ -72,25 +74,28 @@ describe("Calendar Routes (Función 3.3)", () => {
 
     it("edits an event", async () => {
       mockEdit.mockResolvedValue({
-        id: 1, syncStatus: "Sincronizado"
+        id: 1,
+        syncStatus: "Sincronizado",
       });
 
-      const response = await request(app)
-        .put("/api/calendar/1")
-        .set("Cookie", AUTH_COOKIE)
-        .send({ start_at: "2024-01-01T10:00:00Z", end_at: "2024-01-01T12:00:00Z", location: "Loc" });
+      const response = await request(app).put("/api/calendar/1").set("Cookie", AUTH_COOKIE).send({
+        start_at: "2024-01-01T10:00:00Z",
+        end_at: "2024-01-01T12:00:00Z",
+        location: "Loc",
+      });
 
       expect(response.status).toBe(200);
       expect(mockEdit).toHaveBeenCalledWith(1, expect.any(Object), {
         startAt: "2024-01-01T10:00:00Z",
         endAt: "2024-01-01T12:00:00Z",
-        location: "Loc"
+        location: "Loc",
       });
     });
 
     it("cancels an event", async () => {
       mockCancel.mockResolvedValue({
-        id: 1, syncStatus: "Sincronizado"
+        id: 1,
+        syncStatus: "Sincronizado",
       });
 
       const response = await request(app)
@@ -104,12 +109,11 @@ describe("Calendar Routes (Función 3.3)", () => {
 
     it("retries sync", async () => {
       mockRetrySync.mockResolvedValue({
-        id: 1, syncStatus: "Pendiente de sincronización"
+        id: 1,
+        syncStatus: "Pendiente de sincronización",
       });
 
-      const response = await request(app)
-        .post("/api/calendar/1/sync")
-        .set("Cookie", AUTH_COOKIE);
+      const response = await request(app).post("/api/calendar/1/sync").set("Cookie", AUTH_COOKIE);
 
       expect(response.status).toBe(200);
       expect(mockRetrySync).toHaveBeenCalledWith(1, expect.any(Object));

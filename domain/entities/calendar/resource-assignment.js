@@ -1,6 +1,5 @@
-const {
-  ResourceAssignmentStatus,
-} = require("../../enums/calendar/resource-assignment-status");
+/* eslint-disable default-param-last */
+const { ResourceAssignmentStatus } = require("../../enums/calendar/resource-assignment-status");
 
 // Función 3.3: asignación de una cantidad de un recurso a una solicitud.
 class ResourceAssignment {

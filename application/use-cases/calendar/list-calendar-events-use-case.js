@@ -1,10 +1,7 @@
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
 const { CalendarRules } = require("../../../domain/constants/calendar-rules");
 const CalendarValidationException = require("../../../domain/exceptions/calendar/calendar-validation-exception");
-const {
-  assertCanListEvents,
-  isAdmin,
-} = require("../../services/calendar/calendar-access-policy");
+const { assertCanListEvents, isAdmin } = require("../../services/calendar/calendar-access-policy");
 const { toCalendarEventDto } = require("../../dto/calendar/calendar-event-dto");
 
 const DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;

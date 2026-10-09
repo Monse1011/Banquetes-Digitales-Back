@@ -23,9 +23,9 @@ const openApiDocument = {
           { name: "date", in: "query", schema: { type: "string", format: "date" } },
           { name: "include_cancelled", in: "query", schema: { type: "boolean" } },
           { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
-          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } }
+          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } },
         ],
-        responses: { 200: { description: "Lista de eventos" } }
+        responses: { 200: { description: "Lista de eventos" } },
       },
       post: {
         summary: "Agenda un evento",
@@ -33,10 +33,14 @@ const openApiDocument = {
         security: [{ cookieAuth: [] }],
         requestBody: {
           required: true,
-          content: { "application/json": { schema: { type: "object", properties: { request_id: { type: "integer" } } } } }
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { request_id: { type: "integer" } } },
+            },
+          },
         },
-        responses: { 201: { description: "Evento agendado" } }
-      }
+        responses: { 201: { description: "Evento agendado" } },
+      },
     },
     "/api/calendar/{id}": {
       put: {
@@ -46,9 +50,20 @@ const openApiDocument = {
         parameters: [resourceIdParameter],
         requestBody: {
           required: true,
-          content: { "application/json": { schema: { type: "object", properties: { start_at: { type: "string", format: "date-time" }, end_at: { type: "string", format: "date-time" }, location: { type: "string" } } } } }
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  start_at: { type: "string", format: "date-time" },
+                  end_at: { type: "string", format: "date-time" },
+                  location: { type: "string" },
+                },
+              },
+            },
+          },
         },
-        responses: { 200: { description: "Evento editado" } }
+        responses: { 200: { description: "Evento editado" } },
       },
       delete: {
         summary: "Cancela un evento",
@@ -57,10 +72,14 @@ const openApiDocument = {
         parameters: [resourceIdParameter],
         requestBody: {
           required: true,
-          content: { "application/json": { schema: { type: "object", properties: { confirmed: { type: "boolean" } } } } }
+          content: {
+            "application/json": {
+              schema: { type: "object", properties: { confirmed: { type: "boolean" } } },
+            },
+          },
         },
-        responses: { 200: { description: "Evento cancelado" } }
-      }
+        responses: { 200: { description: "Evento cancelado" } },
+      },
     },
     "/api/calendar/{id}/sync": {
       post: {
@@ -68,8 +87,8 @@ const openApiDocument = {
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
         parameters: [resourceIdParameter],
-        responses: { 200: { description: "Sincronización reintentada" } }
-      }
+        responses: { 200: { description: "Sincronización reintentada" } },
+      },
     },
     "/api/auth/login": {
       post: {

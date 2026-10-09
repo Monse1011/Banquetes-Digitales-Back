@@ -23,7 +23,8 @@ const CalendarMessages = Object.freeze({
   CANCEL_NOT_CONFIRMED_STATE: "Solo se pueden cancelar eventos en estado «Confirmado».",
   IMMUTABLE_FIELDS:
     "El responsable de logística y los recursos de un evento confirmado no pueden modificarse.",
-  EDIT_NO_CHANGES: "Indique al menos un dato a modificar: fecha, hora de inicio, hora de fin o ubicación.",
+  EDIT_NO_CHANGES:
+    "Indique al menos un dato a modificar: fecha, hora de inicio, hora de fin o ubicación.",
   INVALID_DATE: "Indique una fecha válida con formato AAAA-MM-DD.",
   INVALID_TIME: "Indique una hora válida con formato HH:mm.",
   INVALID_LOCATION: "La ubicación del evento no puede estar vacía.",

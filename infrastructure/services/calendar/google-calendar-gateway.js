@@ -1,5 +1,8 @@
-const jwt = require('jsonwebtoken');
-const { GoogleCalendarSyncException } = require('../../../domain/exceptions/calendar/google-calendar-sync-exception');
+/* eslint-disable no-underscore-dangle, no-unused-vars */
+const jwt = require("jsonwebtoken");
+const {
+  GoogleCalendarSyncException,
+} = require("../../../domain/exceptions/calendar/google-calendar-sync-exception");
 
 class GoogleCalendarGateway {
   constructor(config = {}) {
@@ -12,7 +15,7 @@ class GoogleCalendarGateway {
 
   async _getAccessToken() {
     if (!this.calendarId || !this.clientEmail || !this.privateKey) {
-      throw new GoogleCalendarSyncException('Credenciales de Google Calendar no configuradas');
+      throw new GoogleCalendarSyncException("Credenciales de Google Calendar no configuradas");
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -22,28 +25,30 @@ class GoogleCalendarGateway {
 
     const claim = {
       iss: this.clientEmail,
-      scope: 'https://www.googleapis.com/auth/calendar',
-      aud: 'https://oauth2.googleapis.com/token',
+      scope: "https://www.googleapis.com/auth/calendar",
+      aud: "https://oauth2.googleapis.com/token",
       exp: now + 3600,
       iat: now,
     };
 
     let tokenJwt;
     try {
-      const privateKeyStr = this.privateKey.replace(/\\n/g, '\n');
-      tokenJwt = jwt.sign(claim, privateKeyStr, { algorithm: 'RS256' });
+      const privateKeyStr = this.privateKey.replace(/\\n/g, "\n");
+      tokenJwt = jwt.sign(claim, privateKeyStr, { algorithm: "RS256" });
     } catch (err) {
-      throw new GoogleCalendarSyncException('Error firmando JWT para Google Calendar: ' + err.message);
+      throw new GoogleCalendarSyncException(
+        "Error firmando JWT para Google Calendar: " + err.message
+      );
     }
 
     try {
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
+      const response = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
           assertion: tokenJwt,
         }),
       });
@@ -58,7 +63,9 @@ class GoogleCalendarGateway {
       this.tokenExp = now + data.expires_in;
       return this.accessToken;
     } catch (err) {
-      throw new GoogleCalendarSyncException('Fallo al obtener el token de acceso de Google: ' + err.message);
+      throw new GoogleCalendarSyncException(
+        "Fallo al obtener el token de acceso de Google: " + err.message
+      );
     }
   }
 
@@ -67,24 +74,25 @@ class GoogleCalendarGateway {
       const token = await this._getAccessToken();
       const encodedCalendarId = encodeURIComponent(this.calendarId);
 
-      const safeGoogleEventId = googleEventId.toLowerCase().replace(/[^a-v0-9]/g, '') || `evt${Date.now()}`;
-      
+      const safeGoogleEventId =
+        googleEventId.toLowerCase().replace(/[^a-v0-9]/g, "") || `evt${Date.now()}`;
+
       const payload = {
         id: safeGoogleEventId,
         summary: event.summary,
         description: event.description,
-        location: event.location || '',
+        location: event.location || "",
         start: { dateTime: event.startAt.toISOString() },
         end: { dateTime: event.endAt.toISOString() },
       };
 
       const url = `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events/${safeGoogleEventId}`;
-      
+
       const response = await fetch(url, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
@@ -96,7 +104,9 @@ class GoogleCalendarGateway {
 
       return { googleEventId: safeGoogleEventId };
     } catch (err) {
-      throw new GoogleCalendarSyncException('Fallo al sincronizar evento con Google Calendar: ' + err.message);
+      throw new GoogleCalendarSyncException(
+        "Fallo al sincronizar evento con Google Calendar: " + err.message
+      );
     }
   }
 
@@ -105,14 +115,14 @@ class GoogleCalendarGateway {
       if (!googleEventId) return;
       const token = await this._getAccessToken();
       const encodedCalendarId = encodeURIComponent(this.calendarId);
-      
-      const safeGoogleEventId = googleEventId.toLowerCase().replace(/[^a-v0-9]/g, '');
+
+      const safeGoogleEventId = googleEventId.toLowerCase().replace(/[^a-v0-9]/g, "");
       const url = `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events/${safeGoogleEventId}`;
 
       const response = await fetch(url, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -121,7 +131,9 @@ class GoogleCalendarGateway {
         throw new Error(`API Calendar (DELETE) respondió con estado ${response.status}: ${text}`);
       }
     } catch (err) {
-      throw new GoogleCalendarSyncException('Fallo al eliminar evento de Google Calendar: ' + err.message);
+      throw new GoogleCalendarSyncException(
+        "Fallo al eliminar evento de Google Calendar: " + err.message
+      );
     }
   }
 }

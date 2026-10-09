@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
 
 const DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -76,8 +77,18 @@ class EditCalendarEventRequestDto {
   resolve(event, now) {
     const errors = {};
     const date = this.resolveDate(event, errors);
-    const startTime = this.resolveTime(this.start_time, localTimeParts(event.startAt), "start_time", errors);
-    const endTime = this.resolveTime(this.end_time, localTimeParts(event.endAt), "end_time", errors);
+    const startTime = this.resolveTime(
+      this.start_time,
+      localTimeParts(event.startAt),
+      "start_time",
+      errors
+    );
+    const endTime = this.resolveTime(
+      this.end_time,
+      localTimeParts(event.endAt),
+      "end_time",
+      errors
+    );
     const location = this.resolveLocation(event, errors);
 
     if (Object.keys(errors).length > 0) {
@@ -85,7 +96,13 @@ class EditCalendarEventRequestDto {
     }
 
     const offset = daysBetween(event.startAt, event.endAt);
-    const startAt = new Date(date.year, date.month - 1, date.day, startTime.hours, startTime.minutes);
+    const startAt = new Date(
+      date.year,
+      date.month - 1,
+      date.day,
+      startTime.hours,
+      startTime.minutes
+    );
     const endAt = new Date(
       date.year,
       date.month - 1,

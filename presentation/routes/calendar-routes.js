@@ -11,31 +11,24 @@ function createCalendarRoutes(calendarController, authMiddleware) {
   const requireAdminOrLogistics = requireRole(UserRole.ADMIN, UserRole.LOGISTICA);
 
   // E. Consulta del calendario (Admin y Logística)
-  router.get("/",
-    requireAdminOrLogistics,
-    calendarController.list.bind(calendarController)
-  );
+  router.get("/", requireAdminOrLogistics, calendarController.list.bind(calendarController));
 
   // A. Agendar un evento (Admin o el responsable de logística)
-  router.post("/",
-    requireAdminOrLogistics,
-    calendarController.schedule.bind(calendarController)
-  );
+  router.post("/", requireAdminOrLogistics, calendarController.schedule.bind(calendarController));
 
   // C. Edición de eventos confirmados (Admin o el responsable)
-  router.put("/:id",
-    requireAdminOrLogistics,
-    calendarController.edit.bind(calendarController)
-  );
+  router.put("/:id", requireAdminOrLogistics, calendarController.edit.bind(calendarController));
 
   // D. Cancelación de eventos (Admin o el responsable)
-  router.delete("/:id",
+  router.delete(
+    "/:id",
     requireAdminOrLogistics,
     calendarController.cancel.bind(calendarController)
   );
 
   // B. Sincronización con Google Calendar (Reintento manual)
-  router.post("/:id/sync",
+  router.post(
+    "/:id/sync",
     requireAdminOrLogistics,
     calendarController.retrySync.bind(calendarController)
   );

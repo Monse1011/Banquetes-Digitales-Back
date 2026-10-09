@@ -1,4 +1,7 @@
-const { formatDate, formatTime } = require("../../services/reservation-request/date-time-formatter");
+const {
+  formatDate,
+  formatTime,
+} = require("../../services/reservation-request/date-time-formatter");
 
 // Un conflicto de disponibilidad con la forma de la API (snake_case, fecha y horas locales).
 function toConflictDto(conflict) {
