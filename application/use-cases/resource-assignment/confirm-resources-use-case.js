@@ -10,11 +10,8 @@ const {
 const ResourceAssignmentValidationException = require("../../../domain/exceptions/resource-assignment/resource-assignment-validation-exception");
 const ResourceAvailabilityChangedException = require("../../../domain/exceptions/resource-assignment/resource-availability-changed-exception");
 const UnassignedSufficientResourcesException = require("../../../domain/exceptions/resource-assignment/unassigned-sufficient-resources-exception");
+const ConfirmResourcesRequestDto = require("../../dto/resource-assignment/confirm-resources-request-dto");
 const ConfirmResourcesResponseDto = require("../../dto/resource-assignment/confirm-resources-response-dto");
-const {
-  isValidObservation,
-  normalizeObservation,
-} = require("../../dto/resource-assignment/assign-resources-request-dto");
 const {
   findConfirmableRequest,
 } = require("../../services/resource-assignment/request-access-guard");
@@ -23,9 +20,12 @@ const {
   availableQuantity,
 } = require("../../services/resource-assignment/resource-availability");
 const { formatDateTime } = require("../../services/date-time-formatter");
-const { currentAssignmentsByResource } = require("./get-request-resources-availability-use-case");
+const {
+  currentAssignmentsByResource,
+  normalizeObservation,
+} = require("../../services/resource-assignment/assignment-review");
 
-// Función 3.2 - Finalizar confirmación (POST /api/logistics/requests/:id/resources/confirm).
+// Función 3.2 - POST /api/logistics/requests/:id/resources/confirm ("Finalizar confirmación").
 // RF-2.3.2.14: guarda la suficiencia de cada recurso con la cantidad solicitada y disponible,
 // fecha, hora y usuario, y convierte las asignaciones provisionales en "Confirmada".
 class ConfirmResourcesUseCase {
@@ -33,19 +33,22 @@ class ConfirmResourcesUseCase {
     resourceRepository,
     reservationRequestRepository,
     resourceAssignmentRepository,
+    resourceConfirmationRepository,
     userRepository
   ) {
     this.resourceRepository = resourceRepository;
     this.reservationRequestRepository = reservationRequestRepository;
     this.resourceAssignmentRepository = resourceAssignmentRepository;
+    this.resourceConfirmationRepository = resourceConfirmationRepository;
     this.userRepository = userRepository;
   }
 
   async execute(requestId, user, input = {}) {
-    if (!isValidObservation(input.observations)) {
-      throw new ResourceAssignmentValidationException({
-        observations: ResourceAssignmentMessages.OBSERVATIONS_INVALID,
-      });
+    const dto = new ConfirmResourcesRequestDto(input.observations);
+    const errors = dto.validate();
+
+    if (Object.keys(errors).length > 0) {
+      throw new ResourceAssignmentValidationException(errors);
     }
 
     const request = await findConfirmableRequest(
@@ -53,11 +56,11 @@ class ConfirmResourcesUseCase {
       requestId,
       user
     );
-    const requestAssignments = await this.resourceAssignmentRepository.findActiveByRequest(
+    const requestAssignments = await this.resourceAssignmentRepository.findByRequest(
       request.requestId
     );
-    // RF-2.3.2.19: en "Coordinación Incompleta" se recalcula con las asignaciones confirmadas
-    // y las provisionales de la sesión; estas reemplazan a las confirmadas del mismo recurso.
+    // RF-2.3.2.19: en "Coordinación Incompleta" se recalcula con las confirmadas y las
+    // provisionales de la sesión; estas reemplazan a las confirmadas del mismo recurso.
     const reviewed = [...currentAssignmentsByResource(requestAssignments).values()];
     const replacedIds = requestAssignments
       .filter((assignment) => !reviewed.includes(assignment))
@@ -69,106 +72,86 @@ class ConfirmResourcesUseCase {
       });
     }
 
-    const { available, versions } = await this.currentAvailability(request, reviewed);
+    const period = blockingPeriod(request.eventDateTime, request.eventEndTime);
+    const resources = await Promise.all(
+      reviewed.map((assignment) => this.resourceRepository.findById(assignment.resourceId))
+    );
+    const blocking = await this.resourceAssignmentRepository.findBlocking(
+      reviewed.map((assignment) => assignment.resourceId),
+      period,
+      request.requestId
+    );
+    const available = resources.map((resource) => availableQuantity(resource, blocking, period));
+
     this.ensureReviewStillValid(reviewed, available);
 
     const now = new Date();
-    const insufficient = reviewed.filter((assignment) => !assignment.isSufficient).length;
-    // RF-2.3.2.17 / RF-2.3.2.18
-    const confirmation = new ResourceConfirmation(
-      request.requestId,
-      user.id,
-      now,
-      request.status,
-      insufficient === 0
-        ? ReservationRequestStatus.COORDINATION_READY
-        : ReservationRequestStatus.COORDINATION_INCOMPLETE,
-      reviewed.length - insufficient,
-      insufficient,
-      await this.finalObservations(request.requestId, input.observations)
-    );
+    reviewed.forEach((assignment, index) => assignment.confirm(available[index], user.id, now));
 
-    reviewed.forEach((assignment) => {
-      assignment.confirm(available.get(assignment.id), user.id, now);
-    });
-
-    const saved = await this.resourceAssignmentRepository.confirm(
-      reviewed,
-      replacedIds,
-      versions,
-      confirmation
-    );
-
-    if (!saved) {
+    if (!(await this.resourceAssignmentRepository.confirm(reviewed, replacedIds, blocking))) {
       throw new ResourceAvailabilityChangedException();
     }
 
+    const confirmation = await this.saveConfirmation(request, reviewed, user, now, dto);
+
+    // RF-2.3.2.17 / RF-2.3.2.18
     request.status = confirmation.currentStatus;
     await this.reservationRequestRepository.update(request);
 
     const confirmedBy = await this.userRepository.findById(user.id);
 
     return new ConfirmResourcesResponseDto(
-      request,
-      confirmation,
+      request.requestId,
+      request.folio,
+      confirmation.previousStatus,
+      confirmation.currentStatus,
       formatDateTime(now),
-      confirmedBy?.fullName ?? null
+      confirmedBy?.fullName ?? null,
+      confirmation.sufficientResources,
+      confirmation.insufficientResources
     );
-  }
-
-  // Disponibilidad actual de cada recurso revisado, sin contar las asignaciones de la propia
-  // solicitud.
-  async currentAvailability(request, reviewed) {
-    const period = blockingPeriod(request.eventDateTime, request.eventEndTime);
-    const resources = await Promise.all(
-      reviewed.map((assignment) => this.resourceRepository.findById(assignment.resourceId))
-    );
-    const { assignments, versions } = await this.resourceAssignmentRepository.findBlocking(
-      reviewed.map((assignment) => assignment.resourceId),
-      period,
-      request.requestId
-    );
-
-    return {
-      available: new Map(
-        reviewed.map((assignment, index) => [
-          assignment.id,
-          availableQuantity(resources[index], assignments, period),
-        ])
-      ),
-      versions,
-    };
   }
 
   ensureReviewStillValid(reviewed, available) {
     // RF-2.3.2.22: un recurso asignado ya no alcanza (otra asignación, baja o menos stock).
-    if (
-      reviewed.some(
-        (assignment) =>
-          assignment.isSufficient && available.get(assignment.id) < assignment.assignedQuantity
-      )
-    ) {
+    if (reviewed.some((assignment, index) => available[index] < assignment.quantity)) {
       throw new ResourceAvailabilityChangedException();
     }
 
     // RF-2.3.2.20: un recurso registrado como "Insuficiente" ya alcanza y no se asignó.
     if (
       reviewed.some(
-        (assignment) =>
-          !assignment.isSufficient && available.get(assignment.id) >= assignment.requestedQuantity
+        (assignment, index) =>
+          !assignment.isSufficient() && available[index] >= assignment.requestedQuantity
       )
     ) {
       throw new UnassignedSufficientResourcesException();
     }
   }
 
-  // RF-2.3.2.15: las del body tienen prioridad sobre las registradas durante la sesión.
-  async finalObservations(requestId, observations) {
-    if (observations !== undefined && observations !== null) {
-      return normalizeObservation(observations);
-    }
+  // RF-2.3.2.15: las observaciones del body tienen prioridad sobre las de la sesión.
+  async saveConfirmation(request, reviewed, user, now, dto) {
+    const insufficient = reviewed.filter((assignment) => !assignment.isSufficient()).length;
+    const observations =
+      normalizeObservation(dto.observations) ??
+      (await this.resourceConfirmationRepository.findPendingObservations(request.requestId));
 
-    return this.resourceAssignmentRepository.findPendingObservations(requestId);
+    await this.resourceConfirmationRepository.deletePendingObservations(request.requestId);
+
+    return this.resourceConfirmationRepository.create(
+      new ResourceConfirmation(
+        request.requestId,
+        user.id,
+        now,
+        request.status,
+        insufficient === 0
+          ? ReservationRequestStatus.COORDINATION_READY
+          : ReservationRequestStatus.COORDINATION_INCOMPLETE,
+        reviewed.length - insufficient,
+        insufficient,
+        observations
+      )
+    );
   }
 }
 

@@ -8,7 +8,7 @@ function assignment(requestId, quantity, start, end, resourceId = 1) {
   return {
     requestId,
     resourceId,
-    assignedQuantity: quantity,
+    quantity,
     eventStart: new Date(2026, 11, 24, start),
     eventEnd: new Date(2026, 11, 24, end),
   };

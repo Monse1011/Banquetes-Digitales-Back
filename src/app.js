@@ -22,6 +22,9 @@ const {
 const {
   InMemoryResourceAssignmentRepository,
 } = require("../infrastructure/repositories/resource-assignment/in-memory-resource-assignment-repository");
+const {
+  InMemoryResourceConfirmationRepository,
+} = require("../infrastructure/repositories/resource-assignment/in-memory-resource-confirmation-repository");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -149,13 +152,14 @@ function createResourceDependencies(pool, reservationRequestRepository, userRepo
 
   return {
     ...createResourceUseCases(resourceRepository, operativeRoleRepository),
-    ...createResourceAssignmentUseCases({
+    ...createResourceAssignmentUseCases(
       resourceRepository,
       reservationRequestRepository,
-      resourceAssignmentRepository: new InMemoryResourceAssignmentRepository(),
+      new InMemoryResourceAssignmentRepository(),
+      new InMemoryResourceConfirmationRepository(),
       operativeRoleRepository,
-      userRepository,
-    }),
+      userRepository
+    ),
   };
 }
 

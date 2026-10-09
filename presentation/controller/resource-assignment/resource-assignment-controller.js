@@ -27,7 +27,7 @@ class ResourceAssignmentController {
     await this.useCases.assignResources.execute(
       this.parseRequestId(request.params.id),
       this.sessionUser(request),
-      { items: body.data, observations: body.observations }
+      { data: body.data, observations: body.observations }
     );
 
     response.status(204).end();

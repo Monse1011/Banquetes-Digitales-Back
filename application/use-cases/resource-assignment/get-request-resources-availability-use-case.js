@@ -1,5 +1,6 @@
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const { ResourceSortField } = require("../../../domain/enums/resource/resource-sort-field");
+const ResourceAvailabilityDto = require("../../dto/resource-assignment/resource-availability-dto");
 const RequestResourcesAvailabilityResponseDto = require("../../dto/resource-assignment/request-resources-availability-response-dto");
 const { toSummaryDto } = require("../resource/get-resources-use-case");
 const {
@@ -9,34 +10,25 @@ const {
   blockingPeriod,
   availableQuantity,
 } = require("../../services/resource-assignment/resource-availability");
+const {
+  currentAssignmentsByResource,
+} = require("../../services/resource-assignment/assignment-review");
+const { formatDate, formatTime } = require("../../services/date-time-formatter");
 
-// La provisional de la sesión reemplaza a la confirmada del mismo recurso (RF-2.3.2.19).
-function currentAssignmentsByResource(assignments) {
-  const byResource = new Map();
-
-  assignments.forEach((assignment) => {
-    const current = byResource.get(assignment.resourceId);
-
-    if (!current || assignment.isProvisional) {
-      byResource.set(assignment.resourceId, assignment);
-    }
-  });
-
-  return byResource;
-}
-
-// Función 3.2 - RF-2.3.2.5: listas de recursos activos de un tipo con la cantidad disponible
-// para el periodo del evento de la solicitud. Una instancia sirve para los tres tipos.
+// Función 3.2 - RF-2.3.2.5: recursos activos de un tipo con su cantidad disponible para el
+// periodo del evento de la solicitud. Una instancia sirve para los tres tipos.
 class GetRequestResourcesAvailabilityUseCase {
   constructor(
     resourceRepository,
     reservationRequestRepository,
     resourceAssignmentRepository,
+    resourceConfirmationRepository,
     operativeRoleRepository
   ) {
     this.resourceRepository = resourceRepository;
     this.reservationRequestRepository = reservationRequestRepository;
     this.resourceAssignmentRepository = resourceAssignmentRepository;
+    this.resourceConfirmationRepository = resourceConfirmationRepository;
     this.operativeRoleRepository = operativeRoleRepository;
   }
 
@@ -51,46 +43,50 @@ class GetRequestResourcesAvailabilityUseCase {
     const sort = input.sort ?? { field: ResourceSortField.NAME, direction: "asc" };
     // RF-1.2.8.3: los recursos inactivos no aparecen como disponibles.
     const filters = { ...input.filters, isActive: true, type };
-    const { resources, totalRecords } = await this.resourceRepository.findAll(
-      filters,
-      sort,
-      page,
-      perPage
-    );
 
+    const result = await this.resourceRepository.findAll(filters, sort, page, perPage);
     const period = blockingPeriod(request.eventDateTime, request.eventEndTime);
-    const { assignments } = await this.resourceAssignmentRepository.findBlocking(
-      resources.map((resource) => resource.id),
+    const blocking = await this.resourceAssignmentRepository.findBlocking(
+      result.resources.map((resource) => resource.id),
       period,
       request.requestId
     );
     const requestAssignments = currentAssignmentsByResource(
-      await this.resourceAssignmentRepository.findActiveByRequest(request.requestId)
+      await this.resourceAssignmentRepository.findByRequest(request.requestId)
     );
-    const operativeRoles = await this.operativeRoleNames(resources);
-
-    const items = resources.map((resource) => ({
-      summary: toSummaryDto(resource),
-      operativeRole:
-        resource.type === ResourceType.HUMAN
-          ? (operativeRoles.get(resource.operativeRoleId) ?? null)
-          : undefined,
-      available: availableQuantity(resource, assignments, period),
-      assignment: requestAssignments.get(resource.id) ?? null,
-    }));
+    const operativeRoles = await this.findOperativeRoleNames(result.resources);
+    const confirmation = await this.resourceConfirmationRepository.findLatestByRequest(
+      request.requestId
+    );
 
     return new RequestResourcesAvailabilityResponseDto(
-      items,
-      totalRecords,
+      result.resources.map(
+        (resource) =>
+          new ResourceAvailabilityDto(
+            toSummaryDto(resource),
+            resource.type === ResourceType.HUMAN
+              ? (operativeRoles.get(resource.operativeRoleId) ?? null)
+              : undefined,
+            availableQuantity(resource, blocking, period),
+            requestAssignments.get(resource.id) ?? null
+          )
+      ),
+      result.totalRecords,
       page,
       perPage,
-      request,
-      await this.observations(request.requestId)
+      request.requestId,
+      request.folio,
+      request.status,
+      formatDate(request.eventDateTime),
+      formatTime(request.eventDateTime),
+      formatTime(request.eventEndTime),
+      confirmation?.observations ?? null,
+      await this.resourceConfirmationRepository.findPendingObservations(request.requestId)
     );
   }
 
   // RF-2.3.2.7: los recursos humanos se eligen por el rol operativo requerido.
-  async operativeRoleNames(resources) {
+  async findOperativeRoleNames(resources) {
     const roleIds = [
       ...new Set(
         resources
@@ -104,15 +100,6 @@ class GetRequestResourcesAvailabilityUseCase {
 
     return new Map(roles.filter(Boolean).map((role) => [role.id, role.name]));
   }
-
-  async observations(requestId) {
-    const confirmation = await this.resourceAssignmentRepository.findLatestConfirmation(requestId);
-
-    return {
-      confirmed: confirmation?.observations ?? null,
-      pending: await this.resourceAssignmentRepository.findPendingObservations(requestId),
-    };
-  }
 }
 
-module.exports = { GetRequestResourcesAvailabilityUseCase, currentAssignmentsByResource };
+module.exports = { GetRequestResourcesAvailabilityUseCase };

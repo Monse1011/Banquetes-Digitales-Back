@@ -19,7 +19,7 @@ function collapseByRequest(assignments) {
   assignments.forEach((assignment) => {
     const current = byRequest.get(assignment.requestId);
 
-    if (!current || assignment.assignedQuantity > current.assignedQuantity) {
+    if (!current || assignment.quantity > current.quantity) {
       byRequest.set(assignment.requestId, assignment);
     }
   });
@@ -35,13 +35,13 @@ function peakCommittedQuantity(assignments, period) {
   collapseByRequest(assignments).forEach((assignment) => {
     const assignmentPeriod = blockingPeriod(assignment.eventStart, assignment.eventEnd);
 
-    if (assignment.assignedQuantity === 0 || !periodsOverlap(assignmentPeriod, period)) return;
+    if (assignment.quantity === 0 || !periodsOverlap(assignmentPeriod, period)) return;
 
     const start = Math.max(assignmentPeriod.start.getTime(), period.start.getTime());
     const end = Math.min(assignmentPeriod.end.getTime(), period.end.getTime());
 
-    changes.push({ time: start, quantity: assignment.assignedQuantity });
-    changes.push({ time: end, quantity: -assignment.assignedQuantity });
+    changes.push({ time: start, quantity: assignment.quantity });
+    changes.push({ time: end, quantity: -assignment.quantity });
   });
 
   // Con la misma hora, primero se liberan las cantidades y luego se ocupan.

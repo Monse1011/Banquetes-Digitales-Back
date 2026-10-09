@@ -18,14 +18,15 @@ function copyOf(assignment, overrides = {}) {
     values.id,
     values.requestId,
     values.resourceId,
+    values.quantity,
     values.requestedQuantity,
     values.availableQuantity,
     values.sufficiency,
     values.status,
-    values.eventStart,
-    values.eventEnd,
     values.usageStart,
     values.usageEnd,
+    values.eventStart,
+    values.eventEnd,
     values.observation,
     values.createdByUserId,
     values.createdAt,
@@ -34,33 +35,20 @@ function copyOf(assignment, overrides = {}) {
   );
 }
 
-// Cada operación revisa las versiones y escribe sin ceder el control (sin await), así que es
-// atómica dentro del proceso.
+function sameIds(left, right) {
+  const leftIds = left.map((assignment) => assignment.id).sort();
+  const rightIds = right.map((assignment) => assignment.id).sort();
+
+  return leftIds.length === rightIds.length && leftIds.every((id, index) => id === rightIds[index]);
+}
+
 class InMemoryResourceAssignmentRepository {
   constructor(assignments = []) {
     this.assignments = assignments.map((assignment) => copyOf(assignment));
     this.nextId = assignments.reduce((maxId, assignment) => Math.max(maxId, assignment.id), 0) + 1;
-    this.versions = new Map();
-    this.pendingObservations = new Map();
-    this.confirmations = [];
   }
 
-  async findBlocking(resourceIds, period, excludeRequestId) {
-    const assignments = this.assignments.filter(
-      (assignment) =>
-        resourceIds.includes(assignment.resourceId) &&
-        assignment.requestId !== excludeRequestId &&
-        BlockingAssignmentStatuses.includes(assignment.status) &&
-        periodsOverlap(blockingPeriod(assignment.eventStart, assignment.eventEnd), period)
-    );
-
-    return {
-      assignments: assignments.map((assignment) => copyOf(assignment)),
-      versions: Object.fromEntries(resourceIds.map((id) => [id, this.versionOf(id)])),
-    };
-  }
-
-  async findActiveByRequest(requestId) {
+  async findByRequest(requestId) {
     return this.assignments
       .filter(
         (assignment) =>
@@ -70,100 +58,85 @@ class InMemoryResourceAssignmentRepository {
       .map((assignment) => copyOf(assignment));
   }
 
-  async saveProvisional(requestId, assignments, expectedVersions) {
-    if (!this.hasExpectedVersions(expectedVersions)) return null;
-
-    const resourceIds = assignments.map((assignment) => assignment.resourceId);
-
-    // La nueva provisional reemplaza a la provisional previa del mismo recurso.
-    this.assignments.forEach((existing, index) => {
-      if (
-        existing.requestId === requestId &&
-        existing.isProvisional &&
-        resourceIds.includes(existing.resourceId)
-      ) {
-        this.assignments[index] = copyOf(existing, { status: AssignmentStatus.RELEASED });
-      }
-    });
-
-    const saved = assignments.map((assignment) => copyOf(assignment, { id: this.nextId++ }));
-
-    this.assignments.push(...saved);
-    this.bumpVersions(resourceIds);
-
-    return saved.map((assignment) => copyOf(assignment));
+  async findBlocking(resourceIds, period, excludeRequestId) {
+    return this.blockingAssignments(resourceIds, period, excludeRequestId).map((assignment) =>
+      copyOf(assignment)
+    );
   }
 
-  async confirm(confirmed, releasedIds, expectedVersions, confirmation) {
-    if (!this.hasExpectedVersions(expectedVersions)) return null;
+  async saveProvisional(assignments, blocking) {
+    if (!this.isStillBlockedBy(assignments, blocking)) return null;
 
-    const changes = new Map([
-      ...confirmed.map((assignment) => [assignment.id, copyOf(assignment)]),
-      ...releasedIds.map((id) => [id, { status: AssignmentStatus.RELEASED }]),
-    ]);
+    const resourceIds = assignments.map((assignment) => assignment.resourceId);
+    const { requestId } = assignments[0];
 
-    this.assignments.forEach((existing, index) => {
-      if (changes.has(existing.id)) {
-        this.assignments[index] = copyOf(existing, changes.get(existing.id));
-      }
+    this.assignments = this.assignments.map((existing) =>
+      existing.requestId === requestId &&
+      existing.isProvisional() &&
+      resourceIds.includes(existing.resourceId)
+        ? copyOf(existing, { status: AssignmentStatus.RELEASED })
+        : existing
+    );
+
+    const savedAssignments = assignments.map((assignment) =>
+      copyOf(assignment, { id: this.nextId++ })
+    );
+
+    this.assignments.push(...savedAssignments);
+    return savedAssignments.map((assignment) => copyOf(assignment));
+  }
+
+  async confirm(assignments, releasedIds, blocking) {
+    if (!this.isStillBlockedBy(assignments, blocking)) return null;
+
+    this.assignments = this.assignments.map((existing) => {
+      const confirmed = assignments.find((assignment) => assignment.id === existing.id);
+
+      if (confirmed) return copyOf(confirmed);
+
+      return releasedIds.includes(existing.id)
+        ? copyOf(existing, { status: AssignmentStatus.RELEASED })
+        : existing;
     });
 
-    const releasedResourceIds = this.assignments
-      .filter((assignment) => releasedIds.includes(assignment.id))
-      .map((assignment) => assignment.resourceId);
-
-    this.bumpVersions(releasedResourceIds);
-    this.confirmations.push(confirmation);
-    this.pendingObservations.delete(confirmation.requestId);
-
-    return true;
+    return assignments.map((assignment) => copyOf(assignment));
   }
 
   async releaseProvisional(requestId) {
-    const releasedResourceIds = [];
+    const released = [];
 
-    this.assignments.forEach((existing, index) => {
-      if (existing.requestId === requestId && existing.isProvisional) {
-        this.assignments[index] = copyOf(existing, { status: AssignmentStatus.RELEASED });
-        releasedResourceIds.push(existing.resourceId);
-      }
+    this.assignments = this.assignments.map((existing) => {
+      if (existing.requestId !== requestId || !existing.isProvisional()) return existing;
+
+      const releasedAssignment = copyOf(existing, { status: AssignmentStatus.RELEASED });
+      released.push(releasedAssignment);
+
+      return releasedAssignment;
     });
 
-    this.bumpVersions(releasedResourceIds);
-    this.pendingObservations.delete(requestId);
-
-    return releasedResourceIds.length;
+    return released.map((assignment) => copyOf(assignment));
   }
 
-  async savePendingObservations(requestId, observations) {
-    this.pendingObservations.set(requestId, observations);
-  }
-
-  async findPendingObservations(requestId) {
-    return this.pendingObservations.get(requestId) ?? null;
-  }
-
-  async findLatestConfirmation(requestId) {
-    return (
-      this.confirmations.filter((confirmation) => confirmation.requestId === requestId).at(-1) ??
-      null
+  // RF-2.3.2.22: las asignaciones que bloquean esos recursos siguen siendo las leídas.
+  isStillBlockedBy(assignments, blocking) {
+    const { requestId, eventStart, eventEnd } = assignments[0];
+    const current = this.blockingAssignments(
+      assignments.map((assignment) => assignment.resourceId),
+      blockingPeriod(eventStart, eventEnd),
+      requestId
     );
+
+    return sameIds(current, blocking);
   }
 
-  versionOf(resourceId) {
-    return this.versions.get(resourceId) ?? 0;
-  }
-
-  hasExpectedVersions(expectedVersions) {
-    return Object.entries(expectedVersions).every(
-      ([resourceId, version]) => this.versionOf(Number(resourceId)) === version
+  blockingAssignments(resourceIds, period, excludeRequestId) {
+    return this.assignments.filter(
+      (assignment) =>
+        resourceIds.includes(assignment.resourceId) &&
+        assignment.requestId !== excludeRequestId &&
+        BlockingAssignmentStatuses.includes(assignment.status) &&
+        periodsOverlap(blockingPeriod(assignment.eventStart, assignment.eventEnd), period)
     );
-  }
-
-  bumpVersions(resourceIds) {
-    new Set(resourceIds).forEach((resourceId) => {
-      this.versions.set(resourceId, this.versionOf(resourceId) + 1);
-    });
   }
 }
 

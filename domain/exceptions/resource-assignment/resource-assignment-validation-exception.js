@@ -1,8 +1,6 @@
-const { ResourceAssignmentMessages } = require("../../constants/resource-assignment-messages");
-
 class ResourceAssignmentValidationException extends Error {
   constructor(errors) {
-    super(ResourceAssignmentMessages.INVALID_DATA);
+    super("La asignación de recursos contiene datos inválidos");
     this.name = "ResourceAssignmentValidationException";
     this.errors = errors;
   }

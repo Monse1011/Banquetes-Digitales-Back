@@ -16,6 +16,9 @@ const {
   InMemoryResourceAssignmentRepository,
 } = require("../../infrastructure/repositories/resource-assignment/in-memory-resource-assignment-repository");
 const {
+  InMemoryResourceConfirmationRepository,
+} = require("../../infrastructure/repositories/resource-assignment/in-memory-resource-confirmation-repository");
+const {
   createResourceUseCases,
 } = require("../../application/use-cases/resource/create-resource-use-cases");
 const {
@@ -99,13 +102,14 @@ function buildApp() {
     passwordResetController: { requestReset: notUsed, resetPassword: notUsed },
     tokenService: { verifyToken: () => ({ ...session }) },
     ...createResourceUseCases(resourceRepository, operativeRoleRepository),
-    ...createResourceAssignmentUseCases({
+    ...createResourceAssignmentUseCases(
       resourceRepository,
       reservationRequestRepository,
-      resourceAssignmentRepository: new InMemoryResourceAssignmentRepository(),
+      new InMemoryResourceAssignmentRepository(),
+      new InMemoryResourceConfirmationRepository(),
       operativeRoleRepository,
-      userRepository,
-    }),
+      userRepository
+    ),
   });
 
   return {
