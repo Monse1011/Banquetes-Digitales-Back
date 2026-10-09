@@ -90,12 +90,12 @@ npm start
 
 ```
 ├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
-│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
+│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/, resource/, operative-role/
 │   ├── enums/             # Constantes y enumeradores del negocio, por feature
 │   ├── exceptions/        # Errores de dominio, por feature
 │   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
 ├── application/           # Casos de uso que orquestan la lógica de dominio
-│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
+│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/, resource/
 │   ├── dto/               # Entrada/salida de los casos de uso, por feature
 │   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
 │   ├── repositories/       # Contratos de los repositorios, por feature
@@ -136,6 +136,23 @@ npm start
 - **GET** `/api/admin/requests` - Listar solicitudes
 - **GET** `/api/admin/requests/:id` - Consultar una solicitud
 - **PATCH** `/api/admin/requests/:id` - Aprobar una solicitud
+
+### Recursos (Administrador)
+
+- **GET** `/api/admin/resources` - Ver recursos de todos los tipos (`type`, `name`, `status`, `page`, `per_page`)
+
+Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
+
+- **GET** `/api/admin/resources/<tipo>` - Listar (`status`, `name`, `order`, `page`, `per_page`; en `human` también `operative_role_id`)
+- **POST** `/api/admin/resources/<tipo>` - Registrar (en `human`, `confirm_duplicate: true` confirma un posible duplicado)
+- **GET** `/api/admin/resources/<tipo>/:id` - Consultar el detalle
+- **PATCH** `/api/admin/resources/<tipo>/:id` - Editar
+- **PUT** `/api/admin/resources/<tipo>/:id` - Desactivar (baja lógica) o reactivar
+- **DELETE** `/api/admin/resources/logistic/:id` - Borrado suave (solo recursos logísticos)
+
+### Logística
+
+- **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo
 
 ## Documentación API
 

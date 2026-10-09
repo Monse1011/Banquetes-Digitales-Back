@@ -14,6 +14,12 @@ const {
   PostgresReservationRequestRepository,
 } = require("../infrastructure/repositories/reservation-request/postgres-reservation-request-repository");
 const PostgresFolioGenerator = require("../infrastructure/services/reservation-request/postgres-folio-generator");
+const {
+  PostgresResourceRepository,
+} = require("../infrastructure/repositories/resource/postgres-resource-repository");
+const {
+  PostgresOperativeRoleRepository,
+} = require("../infrastructure/repositories/operative-role/postgres-operative-role-repository");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -143,9 +149,22 @@ const PostgresCalendarEventRepository = require("../infrastructure/repositories/
 const PostgresCalendarSyncRepository = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
 const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 const { SyncProcessor } = require("../application/services/calendar/sync-processor");
+// Resources use cases (Funciones 2.8 a 2.10)
+const {
+  createResourceUseCases,
+} = require("../application/use-cases/resource/create-resource-use-cases");
+
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
+
+// Funciones 2.8 a 2.10: recursos humanos, materiales y logísticos.
+function createPostgresResourceUseCases(pool) {
+  return createResourceUseCases(
+    new PostgresResourceRepository(pool),
+    new PostgresOperativeRoleRepository(pool)
+  );
+}
 
 async function main() {
   const config = loadConfig();
@@ -266,6 +285,8 @@ async function main() {
     cancelEventUseCase,
     listCalendarEventsUseCase,
     retryCalendarSyncUseCase,
+    // Resources
+    ...createPostgresResourceUseCases(pool),
   });
 
   // Start background jobs for calendar sync and finalization

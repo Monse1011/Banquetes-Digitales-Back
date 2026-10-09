@@ -5,6 +5,201 @@ const resourceIdParameter = {
   schema: { type: "integer" },
 };
 
+const resourceListParameters = [
+  { name: "status", in: "query", schema: { type: "string", enum: ["active", "inactive"] } },
+  { name: "name", in: "query", schema: { type: "string" } },
+  { name: "operative_role_id", in: "query", schema: { type: "integer" } },
+  { name: "sort_by", in: "query", schema: { type: "string", enum: ["name"] } },
+  { name: "order", in: "query", schema: { type: "string", enum: ["asc", "desc"] } },
+  { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+  { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } },
+];
+
+// El rol operativo solo existe en los recursos humanos.
+const inventoryListParameters = resourceListParameters.filter(
+  (parameter) => parameter.name !== "operative_role_id"
+);
+
+// El contrato del DAD envuelve los campos del body en "data".
+function dataEnvelope(schema) {
+  return { type: "object", required: ["data"], properties: { data: schema } };
+}
+
+function jsonBody(schema) {
+  return { required: true, content: { "application/json": { schema: dataEnvelope(schema) } } };
+}
+
+const humanResourceBody = {
+  type: "object",
+  required: ["name", "operative_role_id"],
+  properties: {
+    name: { type: "string", maxLength: 100 },
+    operative_role_id: { type: "integer" },
+  },
+};
+
+const inventoryResourceBody = {
+  type: "object",
+  required: ["name", "quantity", "unit_cost"],
+  properties: {
+    name: { type: "string", maxLength: 100 },
+    quantity: { type: "integer", minimum: 0 },
+    unit_cost: { type: "number", minimum: 0 },
+  },
+};
+
+const concurrencyConflictResponse = {
+  409: { description: "The resource was changed by another operation; reload and retry" },
+};
+
+const duplicateWarningResponse = {
+  409: { description: "Possible duplicate; requires_confirmation is true" },
+};
+
+function softDeleteOperation(tag) {
+  return {
+    delete: {
+      tags: [tag],
+      summary: "Soft delete a resource",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      responses: {
+        204: { description: "Deactivated" },
+        404: { description: "Not found" },
+        ...concurrencyConflictResponse,
+      },
+    },
+  };
+}
+
+// Rutas de las Funciones 2.8 (human), 2.9 (material) y 2.10 (logistic).
+function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = false } = {}) {
+  const security = [{ CookieAuth: [] }];
+  const listParameters = path === "human" ? resourceListParameters : inventoryListParameters;
+  const statusBody = {
+    type: "object",
+    required: ["is_active"],
+    properties: { is_active: { type: "boolean" } },
+  };
+
+  return {
+    [`/api/admin/resources/${path}`]: {
+      get: {
+        tags: [tag],
+        summary: "List resources (active by default, sorted by name)",
+        security,
+        parameters: listParameters,
+        responses: { 200: { description: "Paginated resources" } },
+      },
+      post: {
+        tags: [tag],
+        summary: "Register a resource",
+        security,
+        requestBody: jsonBody(createBody),
+        responses: {
+          201: { description: "Created; the Location header has the new resource path" },
+          ...(createBody.properties.confirm_duplicate ? duplicateWarningResponse : {}),
+          422: { description: "Validation error" },
+        },
+      },
+    },
+    [`/api/admin/resources/${path}/{id}`]: {
+      get: {
+        tags: [tag],
+        summary: "Get a resource",
+        security,
+        parameters: [resourceIdParameter],
+        responses: { 200: { description: "Resource details" }, 404: { description: "Not found" } },
+      },
+      patch: {
+        tags: [tag],
+        summary: "Edit a resource",
+        security,
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody(updateBody),
+        responses: {
+          204: { description: "Updated" },
+          404: { description: "Not found" },
+          ...concurrencyConflictResponse,
+          422: { description: "Validation error" },
+        },
+      },
+      put: {
+        tags: [tag],
+        summary: "Deactivate (logical delete) or reactivate",
+        security,
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody(statusBody),
+        responses: {
+          204: { description: "Status changed" },
+          404: { description: "Not found" },
+          ...concurrencyConflictResponse,
+          422: { description: "Validation error" },
+        },
+      },
+      ...(softDelete ? softDeleteOperation(tag) : {}),
+    },
+    [`/api/logistics/resources/${path}`]: {
+      get: {
+        tags: ["Logistics"],
+        summary: `List active ${path} resources`,
+        security,
+        parameters: listParameters.filter((parameter) => parameter.name !== "status"),
+        responses: { 200: { description: "Paginated active resources" } },
+      },
+    },
+  };
+}
+
+const resourcePaths = {
+  "/api/admin/resources": {
+    get: {
+      tags: ["Resources"],
+      summary: "List resources by type",
+      security: [{ CookieAuth: [] }],
+      parameters: [
+        {
+          name: "type",
+          in: "query",
+          schema: { type: "string", enum: ["HUMAN", "MATERIAL", "LOGISTIC"] },
+        },
+        ...inventoryListParameters,
+      ],
+      responses: { 200: { description: "Paginated resources" } },
+    },
+  },
+  ...resourceTypePaths(
+    "human",
+    "Human resources",
+    {
+      ...humanResourceBody,
+      properties: {
+        ...humanResourceBody.properties,
+        confirm_duplicate: {
+          type: "boolean",
+          description: "Send true to register a possible duplicate after the 409 warning",
+        },
+      },
+    },
+    humanResourceBody
+  ),
+  ...resourceTypePaths(
+    "material",
+    "Material resources",
+    inventoryResourceBody,
+    inventoryResourceBody
+  ),
+  ...resourceTypePaths(
+    "logistic",
+    "Logistic resources",
+    inventoryResourceBody,
+    inventoryResourceBody,
+    {
+      softDelete: true,
+    }
+  ),
+};
+
 const openApiDocument = {
   openapi: "3.0.3",
   info: {
@@ -257,6 +452,7 @@ const openApiDocument = {
         },
       },
     },
+    ...resourcePaths,
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],
