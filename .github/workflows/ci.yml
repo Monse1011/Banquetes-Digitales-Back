@@ -5,10 +5,13 @@ on:
     branches:
       - develop
       - "feature/**"
+      - "feat/**"
 
   pull_request:
     branches:
       - develop
+    
+
 
 jobs:
   quality:
