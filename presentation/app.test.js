@@ -433,6 +433,22 @@ describe("App", () => {
       expect(detail.body.data[0].logistic_user.id).toBe(7);
     });
 
+    it("filters by any RequestStatus key of the DAD and rejects unknown ones", async () => {
+      const requestId = await createApprovedRequest();
+      (await reservationRequestRepository.findById(requestId)).status = "Coordinación Incompleta";
+
+      const list = await request(app)
+        .get("/api/admin/requests?status=coordination_incomplete")
+        .set("Cookie", "auth_token=valid-token");
+      const invalid = await request(app)
+        .get("/api/admin/requests?status=Asignada")
+        .set("Cookie", "auth_token=valid-token");
+
+      expect(list.status).toBe(200);
+      expect(list.body.data.map((item) => item.request_id)).toEqual([requestId]);
+      expect(invalid.status).toBe(400);
+    });
+
     it("lists active logistics users for assignment (RF-1.2.4.10/12)", async () => {
       const response = await request(app)
         .get("/api/admin/users/usersavailable")

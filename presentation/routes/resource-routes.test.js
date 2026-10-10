@@ -214,12 +214,13 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       expect(otherType.body.message).toBe("El recurso material no existe.");
     });
 
-    it("cannot use the logistics listings", async () => {
+    // RF-2.3.2.21: el Administrador General también confirma recursos (Función 3.2).
+    it("can use the logistics listings", async () => {
       const response = await request(app)
         .get("/api/logistics/resources/human")
         .set("Cookie", AUTH_COOKIE);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(200);
     });
   });
 

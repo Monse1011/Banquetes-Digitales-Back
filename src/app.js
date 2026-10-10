@@ -19,6 +19,15 @@ const {
 const {
   PostgresOperativeRoleRepository,
 } = require("../infrastructure/repositories/operative-role/postgres-operative-role-repository");
+const {
+  PostgresResourceAssignmentRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-assignment-repository");
+const {
+  PostgresResourceConfirmationRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-confirmation-repository");
+const {
+  PostgresTransactionManager,
+} = require("../infrastructure/services/transaction/postgres-transaction-manager");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -130,17 +139,32 @@ const {
 const {
   createResourceUseCases,
 } = require("../application/use-cases/resource/create-resource-use-cases");
+const {
+  createResourceAssignmentUseCases,
+} = require("../application/use-cases/resource-assignment/create-resource-assignment-use-cases");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
 
-// Funciones 2.8 a 2.10: recursos humanos, materiales y logísticos.
-function createPostgresResourceUseCases(pool) {
-  return createResourceUseCases(
-    new PostgresResourceRepository(pool),
-    new PostgresOperativeRoleRepository(pool)
-  );
+// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Los repositorios de
+// asignaciones y confirmaciones aún usan un mock en memoria (sus tablas no tienen migración).
+function createResourceDependencies(pool, reservationRequestRepository, userRepository) {
+  const resourceRepository = new PostgresResourceRepository(pool);
+  const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
+
+  return {
+    ...createResourceUseCases(resourceRepository, operativeRoleRepository),
+    ...createResourceAssignmentUseCases(
+      resourceRepository,
+      reservationRequestRepository,
+      new PostgresResourceAssignmentRepository(pool),
+      new PostgresResourceConfirmationRepository(pool),
+      operativeRoleRepository,
+      userRepository,
+      new PostgresTransactionManager(pool)
+    ),
+  };
 }
 
 async function main() {
@@ -236,7 +260,7 @@ async function main() {
     assignReservationRequestUseCase,
     getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
     // Resources
-    ...createPostgresResourceUseCases(pool),
+    ...createResourceDependencies(pool, reservationRequestRepository, userRepository),
   });
 
   app.listen(config.port, () => {

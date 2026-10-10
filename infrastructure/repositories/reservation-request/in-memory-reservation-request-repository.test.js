@@ -171,6 +171,28 @@ describe("InMemoryReservationRequestRepository", () => {
       expect(result.conflicts[0].folio).toBe("BD-2024-00001");
     });
 
+    // RF-1.2.12.10: las solicitudes en coordinación o con propuesta siguen siendo activas.
+    it.each([
+      [ReservationRequestStatus.COORDINATION_INCOMPLETE, "overlap"],
+      [ReservationRequestStatus.PROPOSAL_GENERATED, "overlap"],
+      [ReservationRequestStatus.COMPLETED, "assigned"],
+      [ReservationRequestStatus.CANCELLED, "assigned"],
+    ])("should treat an overlapping %s request as %s", async (status, expected) => {
+      const first = await repository.create(
+        buildRequest({ status: ReservationRequestStatus.APPROVED })
+      );
+      await repository.assign(first.requestId, 7, 1);
+      first.status = status;
+
+      const second = await repository.create(
+        buildRequest({ folio: "BD-2024-00009", status: ReservationRequestStatus.APPROVED })
+      );
+
+      const result = await repository.assign(second.requestId, 7, 1);
+
+      expect(result.status).toBe(expected);
+    });
+
     it("should allow same-day events that do not overlap (RF-1.2.4.4)", async () => {
       const first = await repository.create(
         buildRequest({
