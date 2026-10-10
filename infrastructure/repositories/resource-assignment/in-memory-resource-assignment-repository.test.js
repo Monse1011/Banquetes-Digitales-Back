@@ -11,6 +11,7 @@ const {
 const {
   blockingPeriod,
 } = require("../../../application/services/resource-assignment/resource-availability");
+const { Transaction } = require("../../services/transaction/transaction");
 
 const EVENT_START = new Date("2026-12-24T18:00:00");
 const EVENT_END = new Date("2026-12-24T23:00:00");
@@ -90,5 +91,37 @@ describe("InMemoryResourceAssignmentRepository", () => {
     expect((await repository.findByRequest(1)).map((assignment) => assignment.status)).toEqual([
       AssignmentStatus.CONFIRMED,
     ]);
+  });
+
+  it("releases the provisional assignment of a single resource", async () => {
+    await repository.saveProvisional(
+      [buildAssignment(1, { resourceId: 1 }), buildAssignment(1, { resourceId: 2 })],
+      []
+    );
+
+    const released = await repository.releaseProvisionalResource(1, 2);
+
+    expect(released.status).toBe(AssignmentStatus.RELEASED);
+    expect((await repository.findByRequest(1)).map((assignment) => assignment.resourceId)).toEqual([
+      1,
+    ]);
+    expect(await repository.releaseProvisionalResource(1, 2)).toBeNull();
+  });
+
+  it("undoes only its own writes when the transaction rolls back", async () => {
+    await repository.saveProvisional([buildAssignment(1)], []);
+    const [provisional] = await repository.findByRequest(1);
+    const transaction = new Transaction();
+
+    provisional.confirm(10, 7, new Date());
+    await repository.confirm([provisional], [], [], transaction);
+    await repository.saveProvisional([buildAssignment(1, { resourceId: 2 })], [], transaction);
+    await repository.saveProvisional([buildAssignment(2, { resourceId: 3 })], []);
+    transaction.undoInMemoryChanges();
+
+    expect(await repository.findByRequest(1)).toEqual([
+      expect.objectContaining({ resourceId: 1, status: AssignmentStatus.PROVISIONAL }),
+    ]);
+    expect(await repository.findByRequest(2)).toHaveLength(1);
   });
 });

@@ -26,6 +26,10 @@ function createLogisticsRoutes(resourceControllers, authMiddleware) {
     assignmentController.assign(request, response).catch(next);
   });
 
+  router.delete("/requests/:id/resources/:resourceId", (request, response, next) => {
+    assignmentController.release(request, response).catch(next);
+  });
+
   router.post("/requests/:id/resources/confirm", (request, response, next) => {
     assignmentController.confirm(request, response).catch(next);
   });

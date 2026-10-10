@@ -2,6 +2,7 @@ const {
   GetRequestResourcesAvailabilityUseCase,
 } = require("./get-request-resources-availability-use-case");
 const { AssignResourcesUseCase } = require("./assign-resources-use-case");
+const { ReleaseProvisionalResourceUseCase } = require("./release-provisional-resource-use-case");
 const { ConfirmResourcesUseCase } = require("./confirm-resources-use-case");
 const { CancelResourceConfirmationUseCase } = require("./cancel-resource-confirmation-use-case");
 
@@ -13,7 +14,8 @@ function createResourceAssignmentUseCases(
   resourceAssignmentRepository,
   resourceConfirmationRepository,
   operativeRoleRepository,
-  userRepository
+  userRepository,
+  transactionManager
 ) {
   return {
     resourceAssignmentUseCases: {
@@ -28,19 +30,26 @@ function createResourceAssignmentUseCases(
         resourceRepository,
         reservationRequestRepository,
         resourceAssignmentRepository,
-        resourceConfirmationRepository
+        resourceConfirmationRepository,
+        transactionManager
+      ),
+      releaseResource: new ReleaseProvisionalResourceUseCase(
+        reservationRequestRepository,
+        resourceAssignmentRepository
       ),
       confirmResources: new ConfirmResourcesUseCase(
         resourceRepository,
         reservationRequestRepository,
         resourceAssignmentRepository,
         resourceConfirmationRepository,
-        userRepository
+        userRepository,
+        transactionManager
       ),
       cancelConfirmation: new CancelResourceConfirmationUseCase(
         reservationRequestRepository,
         resourceAssignmentRepository,
-        resourceConfirmationRepository
+        resourceConfirmationRepository,
+        transactionManager
       ),
     },
   };

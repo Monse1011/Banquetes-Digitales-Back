@@ -94,11 +94,9 @@ class GetRequestResourcesAvailabilityUseCase {
           .map((resource) => resource.operativeRoleId)
       ),
     ];
-    const roles = await Promise.all(
-      roleIds.map((roleId) => this.operativeRoleRepository.findById(roleId))
-    );
+    const roles = roleIds.length > 0 ? await this.operativeRoleRepository.findByIds(roleIds) : [];
 
-    return new Map(roles.filter(Boolean).map((role) => [role.id, role.name]));
+    return new Map(roles.map((role) => [role.id, role.name]));
   }
 }
 

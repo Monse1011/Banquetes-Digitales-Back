@@ -1,3 +1,4 @@
+/* global vi */
 const request = require("supertest");
 const { createApp } = require("../app");
 const {
@@ -18,6 +19,9 @@ const {
 const {
   InMemoryResourceConfirmationRepository,
 } = require("../../infrastructure/repositories/resource-assignment/in-memory-resource-confirmation-repository");
+const {
+  InMemoryTransactionManager,
+} = require("../../infrastructure/services/transaction/in-memory-transaction-manager");
 const {
   createResourceUseCases,
 } = require("../../application/use-cases/resource/create-resource-use-cases");
@@ -96,6 +100,7 @@ function buildApp() {
     user(GABRIEL_ID, "Gabriel Sánchez", UserRole.LOGISTICA),
     user(LAURA_ID, "Laura Ruiz", UserRole.LOGISTICA),
   ]);
+  const resourceConfirmationRepository = new InMemoryResourceConfirmationRepository();
 
   const app = createApp({
     authController: { login: notUsed, changePassword: notUsed, firstAccess: notUsed },
@@ -106,9 +111,10 @@ function buildApp() {
       resourceRepository,
       reservationRequestRepository,
       new InMemoryResourceAssignmentRepository(),
-      new InMemoryResourceConfirmationRepository(),
+      resourceConfirmationRepository,
       operativeRoleRepository,
-      userRepository
+      userRepository,
+      new InMemoryTransactionManager()
     ),
   });
 
@@ -117,6 +123,8 @@ function buildApp() {
     session,
     reservationRequestRepository,
     resourceRepository,
+    operativeRoleRepository,
+    resourceConfirmationRepository,
     signInAs(id, role) {
       session.id_user = id;
       session.role = role;
@@ -133,6 +141,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
 
   function post(path, body = {}) {
     return request(context.app).post(path).set("Cookie", AUTH_COOKIE).send(body);
+  }
+
+  function remove(path) {
+    return request(context.app).delete(path).set("Cookie", AUTH_COOKIE);
   }
 
   function assign(requestId, data, observations) {
@@ -289,12 +301,104 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       });
     });
 
+    it("loads the resources and operative roles in a single query each", async () => {
+      const findResource = vi.spyOn(context.resourceRepository, "findById");
+      const findResources = vi.spyOn(context.resourceRepository, "findByIds");
+      const findRoles = vi.spyOn(context.operativeRoleRepository, "findByIds");
+
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 2, quantity: 10 },
+        { resource_id: 3, quantity: 1 },
+      ]);
+      await get("/api/logistics/resources/human?request_id=1");
+
+      expect(findResource).not.toHaveBeenCalled();
+      expect(findResources).toHaveBeenCalledTimes(1);
+      expect(findResources).toHaveBeenCalledWith([1, 2, 3]);
+      expect(findRoles).toHaveBeenCalledTimes(1);
+    });
+
     it("lets the Administrador General confirm resources of any request", async () => {
       context.signInAs(ADMIN_ID, UserRole.ADMIN);
 
       const response = await assign(2, [{ resource_id: 2, quantity: 10 }]);
 
       expect(response.status).toBe(204);
+    });
+  });
+
+  describe("DELETE /api/logistics/requests/:id/resources/:resourceId", () => {
+    it("releases only the provisional assignment of that resource", async () => {
+      await assign(1, [
+        { resource_id: 2, quantity: 50 },
+        { resource_id: 3, quantity: 2 },
+      ]);
+
+      const response = await remove("/api/logistics/requests/1/resources/3");
+
+      expect(response.status).toBe(204);
+
+      const logistic = await get("/api/logistics/resources/logistic?request_id=1");
+      expect(logistic.body.data.resources[0].assignment).toBeNull();
+      const material = await get("/api/logistics/resources/material?request_id=1");
+      expect(material.body.data.resources[0].assignment.status).toBe("Provisional");
+      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      expect(await availableOf(2, "logistic", 3)).toBe(2);
+    });
+
+    it("removes an insufficient resource registered by mistake", async () => {
+      await assign(1, [{ resource_id: 3, quantity: 5, observation: "Error de captura" }]);
+
+      const response = await remove("/api/logistics/requests/1/resources/3");
+
+      expect(response.status).toBe(204);
+      const listing = await get("/api/logistics/resources/logistic?request_id=1");
+      expect(listing.body.data.resources[0].assignment).toBeNull();
+    });
+
+    it("shows the confirmed assignment again (RF-2.3.2.19)", async () => {
+      await assign(1, [{ resource_id: 3, quantity: 5 }]);
+      await post("/api/logistics/requests/1/resources/confirm");
+      await assign(1, [{ resource_id: 3, quantity: 2 }]);
+
+      const response = await remove("/api/logistics/requests/1/resources/3");
+
+      expect(response.status).toBe(204);
+      const listing = await get("/api/logistics/resources/logistic?request_id=1");
+      expect(listing.body.data.resources[0].assignment).toMatchObject({
+        status: "Confirmada",
+        requested_quantity: 5,
+      });
+    });
+
+    it("returns 404 when the resource has no provisional assignment", async () => {
+      await assign(1, [{ resource_id: 3, quantity: 2 }]);
+
+      const missing = await remove("/api/logistics/requests/1/resources/2");
+      const invalid = await remove("/api/logistics/requests/1/resources/abc");
+
+      expect(missing.status).toBe(404);
+      expect(missing.body.message).toBe(
+        "El recurso no tiene una asignación provisional en la solicitud."
+      );
+      expect(invalid.status).toBe(404);
+    });
+
+    it("denies access to requests of another responsible", async () => {
+      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      await assign(2, [{ resource_id: 3, quantity: 1 }]);
+      context.signInAs(GABRIEL_ID, UserRole.LOGISTICA);
+
+      const response = await remove("/api/logistics/requests/2/resources/3");
+
+      expect(response.status).toBe(403);
+    });
+
+    it("rejects requests in a status that does not allow confirming resources", async () => {
+      const response = await remove("/api/logistics/requests/4/resources/3");
+
+      expect(response.status).toBe(409);
     });
   });
 
@@ -399,6 +503,25 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       expect(response.body.message).toBe(
         "La disponibilidad del recurso cambió. Actualice la información."
       );
+    });
+
+    it("saves nothing when part of the confirmation fails (single transaction)", async () => {
+      await assign(1, [{ resource_id: 2, quantity: 50 }], "Observación de la sesión");
+      context.resourceConfirmationRepository.create = async () => {
+        throw new Error("Confirmation could not be saved");
+      };
+
+      const response = await post("/api/logistics/requests/1/resources/confirm");
+
+      expect(response.status).toBe(500);
+      expect(context.reservationRequestRepository.requests[0].status).toBe("Asignada");
+
+      const listing = await get("/api/logistics/resources/material?request_id=1");
+      expect(listing.body.data.resources[0].assignment.status).toBe("Provisional");
+      expect(listing.body.metadata.request).toMatchObject({
+        observations: null,
+        pending_observations: "Observación de la sesión",
+      });
     });
 
     it("requires at least one resource", async () => {

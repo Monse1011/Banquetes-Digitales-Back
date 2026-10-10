@@ -287,6 +287,25 @@ const resourceConfirmationPaths = {
       },
     },
   },
+  "/api/logistics/requests/{id}/resources/{resourceId}": {
+    delete: {
+      tags: ["Resource confirmation"],
+      summary: "Remove a registered resource by releasing its provisional assignment",
+      security: [{ CookieAuth: [] }],
+      parameters: [
+        requestPathParameter,
+        { name: "resourceId", in: "path", required: true, schema: { type: "integer" } },
+      ],
+      responses: {
+        204: { description: "Provisional assignment released" },
+        ...resourceConfirmationAccessResponses,
+        404: {
+          description:
+            "Request not found, or the resource has no provisional assignment in the request (El recurso no tiene una asignación provisional en la solicitud.)",
+        },
+      },
+    },
+  },
   "/api/logistics/requests/{id}/resources/confirm": {
     post: {
       tags: ["Resource confirmation"],

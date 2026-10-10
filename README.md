@@ -156,10 +156,11 @@ El Personal de Logística responsable de la solicitud y el Administrador General
 
 - **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo; con `request_id` agrega la cantidad disponible para el periodo del evento y lo registrado para la solicitud
 - **POST** `/api/logistics/requests/:id/resources` - Registrar recursos solicitados; los suficientes quedan asignados como provisionales (3.2)
+- **DELETE** `/api/logistics/requests/:id/resources/:resourceId` - Quitar un recurso registrado: libera su asignación provisional sin descartar los demás (3.2)
 - **POST** `/api/logistics/requests/:id/resources/confirm` - Finalizar confirmación (3.2)
 - **POST** `/api/logistics/requests/:id/resources/cancel` - Descartar las asignaciones provisionales (3.2)
 
-Las asignaciones de recursos (Función 3.2) todavía se guardan en memoria: se pierden al reiniciar el servidor.
+Las asignaciones y confirmaciones de recursos (Función 3.2) se acceden con `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Sus tablas aún no tienen migración, así que por ahora esas clases usan un mock en memoria y los datos se pierden al reiniciar el servidor; al crear las tablas solo cambia el contenido de esas clases. Confirmar recursos guarda las asignaciones, el registro de la confirmación y el estado de la solicitud en una sola transacción.
 
 ## Documentación API
 

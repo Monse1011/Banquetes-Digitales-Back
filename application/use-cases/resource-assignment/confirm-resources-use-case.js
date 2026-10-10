@@ -24,6 +24,7 @@ const {
   currentAssignmentsByResource,
   normalizeObservation,
 } = require("../../services/resource-assignment/assignment-review");
+const { findResourcesInOrder } = require("../../services/resource-assignment/resource-lookup");
 
 // Función 3.2 - POST /api/logistics/requests/:id/resources/confirm ("Finalizar confirmación").
 // RF-2.3.2.14: guarda la suficiencia de cada recurso con la cantidad solicitada y disponible,
@@ -34,13 +35,15 @@ class ConfirmResourcesUseCase {
     reservationRequestRepository,
     resourceAssignmentRepository,
     resourceConfirmationRepository,
-    userRepository
+    userRepository,
+    transactionManager
   ) {
     this.resourceRepository = resourceRepository;
     this.reservationRequestRepository = reservationRequestRepository;
     this.resourceAssignmentRepository = resourceAssignmentRepository;
     this.resourceConfirmationRepository = resourceConfirmationRepository;
     this.userRepository = userRepository;
+    this.transactionManager = transactionManager;
   }
 
   async execute(requestId, user, input = {}) {
@@ -73,8 +76,9 @@ class ConfirmResourcesUseCase {
     }
 
     const period = blockingPeriod(request.eventDateTime, request.eventEndTime);
-    const resources = await Promise.all(
-      reviewed.map((assignment) => this.resourceRepository.findById(assignment.resourceId))
+    const resources = await findResourcesInOrder(
+      this.resourceRepository,
+      reviewed.map((assignment) => assignment.resourceId)
     );
     const blocking = await this.resourceAssignmentRepository.findBlocking(
       reviewed.map((assignment) => assignment.resourceId),
@@ -88,15 +92,35 @@ class ConfirmResourcesUseCase {
     const now = new Date();
     reviewed.forEach((assignment, index) => assignment.confirm(available[index], user.id, now));
 
-    if (!(await this.resourceAssignmentRepository.confirm(reviewed, replacedIds, blocking))) {
-      throw new ResourceAvailabilityChangedException();
-    }
+    // Las asignaciones, el registro de la confirmación y el estado de la solicitud se guardan
+    // juntos: si alguno falla, ninguno queda guardado.
+    const confirmation = await this.transactionManager.run(async (transaction) => {
+      if (
+        !(await this.resourceAssignmentRepository.confirm(
+          reviewed,
+          replacedIds,
+          blocking,
+          transaction
+        ))
+      ) {
+        throw new ResourceAvailabilityChangedException();
+      }
 
-    const confirmation = await this.saveConfirmation(request, reviewed, user, now, dto);
+      const savedConfirmation = await this.saveConfirmation(
+        request,
+        reviewed,
+        user,
+        now,
+        dto,
+        transaction
+      );
 
-    // RF-2.3.2.17 / RF-2.3.2.18
-    request.status = confirmation.currentStatus;
-    await this.reservationRequestRepository.update(request);
+      // RF-2.3.2.17 / RF-2.3.2.18
+      request.status = savedConfirmation.currentStatus;
+      await this.reservationRequestRepository.update(request, transaction);
+
+      return savedConfirmation;
+    });
 
     const confirmedBy = await this.userRepository.findById(user.id);
 
@@ -130,13 +154,16 @@ class ConfirmResourcesUseCase {
   }
 
   // RF-2.3.2.15: las observaciones del body tienen prioridad sobre las de la sesión.
-  async saveConfirmation(request, reviewed, user, now, dto) {
+  async saveConfirmation(request, reviewed, user, now, dto, transaction) {
     const insufficient = reviewed.filter((assignment) => !assignment.isSufficient()).length;
     const observations =
       normalizeObservation(dto.observations) ??
       (await this.resourceConfirmationRepository.findPendingObservations(request.requestId));
 
-    await this.resourceConfirmationRepository.deletePendingObservations(request.requestId);
+    await this.resourceConfirmationRepository.deletePendingObservations(
+      request.requestId,
+      transaction
+    );
 
     return this.resourceConfirmationRepository.create(
       new ResourceConfirmation(
@@ -150,7 +177,8 @@ class ConfirmResourcesUseCase {
         reviewed.length - insufficient,
         insufficient,
         observations
-      )
+      ),
+      transaction
     );
   }
 }

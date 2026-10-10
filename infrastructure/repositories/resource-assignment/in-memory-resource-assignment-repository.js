@@ -64,57 +64,101 @@ class InMemoryResourceAssignmentRepository {
     );
   }
 
-  async saveProvisional(assignments, blocking) {
+  async saveProvisional(assignments, blocking, transaction = null) {
     if (!this.isStillBlockedBy(assignments, blocking)) return null;
 
     const resourceIds = assignments.map((assignment) => assignment.resourceId);
     const { requestId } = assignments[0];
-
-    this.assignments = this.assignments.map((existing) =>
-      existing.requestId === requestId &&
-      existing.isProvisional() &&
-      resourceIds.includes(existing.resourceId)
-        ? copyOf(existing, { status: AssignmentStatus.RELEASED })
-        : existing
-    );
-
     const savedAssignments = assignments.map((assignment) =>
       copyOf(assignment, { id: this.nextId++ })
     );
 
-    this.assignments.push(...savedAssignments);
+    this.write(transaction, () => [
+      ...this.assignments.map((existing) =>
+        existing.requestId === requestId &&
+        existing.isProvisional() &&
+        resourceIds.includes(existing.resourceId)
+          ? copyOf(existing, { status: AssignmentStatus.RELEASED })
+          : existing
+      ),
+      ...savedAssignments,
+    ]);
+
     return savedAssignments.map((assignment) => copyOf(assignment));
   }
 
-  async confirm(assignments, releasedIds, blocking) {
+  async confirm(assignments, releasedIds, blocking, transaction = null) {
     if (!this.isStillBlockedBy(assignments, blocking)) return null;
 
-    this.assignments = this.assignments.map((existing) => {
-      const confirmed = assignments.find((assignment) => assignment.id === existing.id);
+    this.write(transaction, () =>
+      this.assignments.map((existing) => {
+        const confirmed = assignments.find((assignment) => assignment.id === existing.id);
 
-      if (confirmed) return copyOf(confirmed);
+        if (confirmed) return copyOf(confirmed);
 
-      return releasedIds.includes(existing.id)
-        ? copyOf(existing, { status: AssignmentStatus.RELEASED })
-        : existing;
-    });
+        return releasedIds.includes(existing.id)
+          ? copyOf(existing, { status: AssignmentStatus.RELEASED })
+          : existing;
+      })
+    );
 
     return assignments.map((assignment) => copyOf(assignment));
   }
 
-  async releaseProvisional(requestId) {
+  async releaseProvisional(requestId, transaction = null) {
+    return this.release(
+      transaction,
+      (existing) => existing.requestId === requestId && existing.isProvisional()
+    );
+  }
+
+  async releaseProvisionalResource(requestId, resourceId, transaction = null) {
+    const [released] = await this.release(
+      transaction,
+      (existing) =>
+        existing.requestId === requestId &&
+        existing.resourceId === resourceId &&
+        existing.isProvisional()
+    );
+
+    return released ?? null;
+  }
+
+  release(transaction, isReleased) {
     const released = [];
 
-    this.assignments = this.assignments.map((existing) => {
-      if (existing.requestId !== requestId || !existing.isProvisional()) return existing;
+    this.write(transaction, () =>
+      this.assignments.map((existing) => {
+        if (!isReleased(existing)) return existing;
 
-      const releasedAssignment = copyOf(existing, { status: AssignmentStatus.RELEASED });
-      released.push(releasedAssignment);
+        const releasedAssignment = copyOf(existing, { status: AssignmentStatus.RELEASED });
+        released.push(releasedAssignment);
 
-      return releasedAssignment;
-    });
+        return releasedAssignment;
+      })
+    );
 
     return released.map((assignment) => copyOf(assignment));
+  }
+
+  // Si la transacción se deshace, las asignaciones que cambió esta escritura vuelven a su versión
+  // anterior y se quitan las que creó, sin tocar lo que otras operaciones guardaron mientras tanto.
+  write(transaction, nextAssignments) {
+    const previous = new Map(this.assignments.map((assignment) => [assignment.id, assignment]));
+
+    this.assignments = nextAssignments();
+
+    const writtenIds = this.assignments
+      .filter((assignment) => previous.get(assignment.id) !== assignment)
+      .map((assignment) => assignment.id);
+
+    transaction?.afterRollback(() => {
+      this.assignments = this.assignments
+        .filter((assignment) => !writtenIds.includes(assignment.id) || previous.has(assignment.id))
+        .map((assignment) =>
+          writtenIds.includes(assignment.id) ? previous.get(assignment.id) : assignment
+        );
+    });
   }
 
   // RF-2.3.2.22: las asignaciones que bloquean esos recursos siguen siendo las leídas.

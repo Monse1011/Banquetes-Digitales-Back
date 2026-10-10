@@ -1,4 +1,5 @@
 const ReservationRequestNotFoundException = require("../../../domain/exceptions/reservation-request/reservation-request-not-found-exception");
+const ProvisionalAssignmentNotFoundException = require("../../../domain/exceptions/resource-assignment/provisional-assignment-not-found-exception");
 
 // Función 3.2 - Confirmación de recursos. Lo usan el responsable de logística de la solicitud y
 // el Administrador General (RF-2.3.2.21).
@@ -33,6 +34,17 @@ class ResourceAssignmentController {
     response.status(204).end();
   }
 
+  // DELETE /api/logistics/requests/:id/resources/:resourceId (respuesta sin cuerpo)
+  async release(request, response) {
+    await this.useCases.releaseResource.execute(
+      this.parseRequestId(request.params.id),
+      this.sessionUser(request),
+      this.parseResourceId(request.params.resourceId)
+    );
+
+    response.status(204).end();
+  }
+
   // POST /api/logistics/requests/:id/resources/confirm
   async confirm(request, response) {
     const result = await this.useCases.confirmResources.execute(
@@ -59,13 +71,29 @@ class ResourceAssignmentController {
   }
 
   parseRequestId(value) {
-    const id = Number(typeof value === "string" ? value : NaN);
+    const id = this.parseId(value);
 
-    if (!Number.isSafeInteger(id) || id < 1) {
+    if (id === null) {
       throw new ReservationRequestNotFoundException();
     }
 
     return id;
+  }
+
+  parseResourceId(value) {
+    const id = this.parseId(value);
+
+    if (id === null) {
+      throw new ProvisionalAssignmentNotFoundException();
+    }
+
+    return id;
+  }
+
+  parseId(value) {
+    const id = Number(typeof value === "string" ? value : NaN);
+
+    return Number.isSafeInteger(id) && id >= 1 ? id : null;
   }
 }
 

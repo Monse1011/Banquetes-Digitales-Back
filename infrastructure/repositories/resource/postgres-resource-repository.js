@@ -64,6 +64,17 @@ class PostgresResourceRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
+  async findByIds(ids) {
+    const result = await this.pool.query(
+      `SELECT ${RESOURCE_COLUMNS}
+       FROM resources
+       WHERE id = ANY($1)`,
+      [ids]
+    );
+
+    return result.rows.map((row) => this.toEntity(row));
+  }
+
   // Solo escribe los datos editables; nunca el estado. Devuelve null si la versión cambió.
   async updateDetails(resource) {
     const result = await this.pool.query(

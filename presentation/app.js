@@ -39,6 +39,7 @@ const RequestAccessDeniedException = require("../domain/exceptions/resource-assi
 const RequestNotConfirmableException = require("../domain/exceptions/resource-assignment/request-not-confirmable-exception");
 const ResourceAvailabilityChangedException = require("../domain/exceptions/resource-assignment/resource-availability-changed-exception");
 const UnassignedSufficientResourcesException = require("../domain/exceptions/resource-assignment/unassigned-sufficient-resources-exception");
+const ProvisionalAssignmentNotFoundException = require("../domain/exceptions/resource-assignment/provisional-assignment-not-found-exception");
 const ErrorMessages = require("./constants/error-messages");
 
 // Funciones 2.8 a 2.10: errores de los recursos.
@@ -115,6 +116,11 @@ function handleResourceAssignmentError(error, response) {
 
   if (error instanceof UnassignedSufficientResourcesException) {
     response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ProvisionalAssignmentNotFoundException) {
+    response.status(404).json({ message: error.message });
     return true;
   }
 

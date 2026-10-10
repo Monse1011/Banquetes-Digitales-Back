@@ -20,6 +20,7 @@ const {
   availableQuantity,
 } = require("../../services/resource-assignment/resource-availability");
 const { normalizeObservation } = require("../../services/resource-assignment/assignment-review");
+const { findResourcesInOrder } = require("../../services/resource-assignment/resource-lookup");
 
 // Un recurso humano representa a una sola persona (RF-1.2.8.1).
 const HUMAN_RESOURCE_QUANTITY = 1;
@@ -32,12 +33,14 @@ class AssignResourcesUseCase {
     resourceRepository,
     reservationRequestRepository,
     resourceAssignmentRepository,
-    resourceConfirmationRepository
+    resourceConfirmationRepository,
+    transactionManager
   ) {
     this.resourceRepository = resourceRepository;
     this.reservationRequestRepository = reservationRequestRepository;
     this.resourceAssignmentRepository = resourceAssignmentRepository;
     this.resourceConfirmationRepository = resourceConfirmationRepository;
+    this.transactionManager = transactionManager;
   }
 
   async execute(requestId, user, input = {}) {
@@ -53,8 +56,9 @@ class AssignResourcesUseCase {
       requestId,
       user
     );
-    const resources = await Promise.all(
-      dto.data.map((item) => this.resourceRepository.findById(item.resource_id))
+    const resources = await findResourcesInOrder(
+      this.resourceRepository,
+      dto.data.map((item) => item.resource_id)
     );
     const items = dto.data.map((item) => ({
       resourceId: item.resource_id,
@@ -98,17 +102,26 @@ class AssignResourcesUseCase {
       );
     });
 
-    // RF-2.3.2.13 / RF-2.3.2.22: otra asignación cambió la disponibilidad tras la consulta.
-    if (!(await this.resourceAssignmentRepository.saveProvisional(assignments, blocking))) {
-      throw new ResourceAvailabilityChangedException();
-    }
+    await this.transactionManager.run(async (transaction) => {
+      // RF-2.3.2.13 / RF-2.3.2.22: otra asignación cambió la disponibilidad tras la consulta.
+      if (
+        !(await this.resourceAssignmentRepository.saveProvisional(
+          assignments,
+          blocking,
+          transaction
+        ))
+      ) {
+        throw new ResourceAvailabilityChangedException();
+      }
 
-    if (input.observations !== undefined) {
-      await this.resourceConfirmationRepository.savePendingObservations(
-        request.requestId,
-        normalizeObservation(input.observations)
-      );
-    }
+      if (input.observations !== undefined) {
+        await this.resourceConfirmationRepository.savePendingObservations(
+          request.requestId,
+          normalizeObservation(input.observations),
+          transaction
+        );
+      }
+    });
   }
 
   ensureAssignable(items, resources, request) {

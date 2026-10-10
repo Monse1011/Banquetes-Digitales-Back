@@ -20,11 +20,14 @@ const {
   PostgresOperativeRoleRepository,
 } = require("../infrastructure/repositories/operative-role/postgres-operative-role-repository");
 const {
-  InMemoryResourceAssignmentRepository,
-} = require("../infrastructure/repositories/resource-assignment/in-memory-resource-assignment-repository");
+  PostgresResourceAssignmentRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-assignment-repository");
 const {
-  InMemoryResourceConfirmationRepository,
-} = require("../infrastructure/repositories/resource-assignment/in-memory-resource-confirmation-repository");
+  PostgresResourceConfirmationRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-confirmation-repository");
+const {
+  PostgresTransactionManager,
+} = require("../infrastructure/services/transaction/postgres-transaction-manager");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -144,8 +147,8 @@ const {
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
 
-// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Las asignaciones aún no
-// tienen tabla: se guardan en memoria y se pierden al reiniciar el servidor.
+// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Los repositorios de
+// asignaciones y confirmaciones aún usan un mock en memoria (sus tablas no tienen migración).
 function createResourceDependencies(pool, reservationRequestRepository, userRepository) {
   const resourceRepository = new PostgresResourceRepository(pool);
   const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
@@ -155,10 +158,11 @@ function createResourceDependencies(pool, reservationRequestRepository, userRepo
     ...createResourceAssignmentUseCases(
       resourceRepository,
       reservationRequestRepository,
-      new InMemoryResourceAssignmentRepository(),
-      new InMemoryResourceConfirmationRepository(),
+      new PostgresResourceAssignmentRepository(pool),
+      new PostgresResourceConfirmationRepository(pool),
       operativeRoleRepository,
-      userRepository
+      userRepository,
+      new PostgresTransactionManager(pool)
     ),
   };
 }

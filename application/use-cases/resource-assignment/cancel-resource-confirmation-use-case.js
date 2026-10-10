@@ -10,18 +10,25 @@ class CancelResourceConfirmationUseCase {
   constructor(
     reservationRequestRepository,
     resourceAssignmentRepository,
-    resourceConfirmationRepository
+    resourceConfirmationRepository,
+    transactionManager
   ) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.resourceAssignmentRepository = resourceAssignmentRepository;
     this.resourceConfirmationRepository = resourceConfirmationRepository;
+    this.transactionManager = transactionManager;
   }
 
   async execute(requestId, user) {
     const request = await findAccessibleRequest(this.reservationRequestRepository, requestId, user);
-    const released = await this.resourceAssignmentRepository.releaseProvisional(request.requestId);
+    const released = await this.transactionManager.run(async (transaction) => {
+      await this.resourceConfirmationRepository.deletePendingObservations(
+        request.requestId,
+        transaction
+      );
 
-    await this.resourceConfirmationRepository.deletePendingObservations(request.requestId);
+      return this.resourceAssignmentRepository.releaseProvisional(request.requestId, transaction);
+    });
 
     return new CancelResourceConfirmationResponseDto(
       request.requestId,
