@@ -5,9 +5,20 @@ function isAdmin(actor) {
   return actor?.role === UserRole.ADMIN;
 }
 
+function getActorId(actor) {
+  return actor?.id ?? actor?.id_user;
+}
+
 function isResponsible(actor, logisticUserId) {
+  const actorId = getActorId(actor);
+
   return (
-    actor?.role === UserRole.LOGISTICA && logisticUserId !== null && actor.id === logisticUserId
+    actor?.role === UserRole.LOGISTICA &&
+    logisticUserId !== null &&
+    logisticUserId !== undefined &&
+    actorId !== null &&
+    actorId !== undefined &&
+    actorId === logisticUserId
   );
 }
 
@@ -37,6 +48,7 @@ function assertCanListEvents(actor) {
 
 module.exports = {
   isAdmin,
+  getActorId,
   canViewEvent,
   assertCanViewEvent,
   assertCanEditEvent,

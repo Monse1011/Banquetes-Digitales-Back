@@ -1,7 +1,11 @@
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
 const { CalendarRules } = require("../../../domain/constants/calendar-rules");
 const CalendarValidationException = require("../../../domain/exceptions/calendar/calendar-validation-exception");
-const { assertCanListEvents, isAdmin } = require("../../services/calendar/calendar-access-policy");
+const {
+  assertCanListEvents,
+  getActorId,
+  isAdmin,
+} = require("../../services/calendar/calendar-access-policy");
 const { toCalendarEventDto } = require("../../dto/calendar/calendar-event-dto");
 
 const DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -49,7 +53,7 @@ class ListCalendarEventsUseCase {
 
     // E.2 / E.7: el filtro por responsable lo impone el backend según el rol del token.
     if (!isAdmin(actor)) {
-      filters.logisticUserId = actor.id;
+      filters.logisticUserId = getActorId(actor);
     }
 
     // F.3: el estado se actualiza al consultar, sin depender solo del proceso periódico.

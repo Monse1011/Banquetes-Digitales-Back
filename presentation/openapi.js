@@ -29,6 +29,61 @@ function jsonBody(schema) {
   return { required: true, content: { "application/json": { schema: dataEnvelope(schema) } } };
 }
 
+const calendarEventSchema = {
+  type: "object",
+  properties: {
+    event_id: { type: "integer" },
+    request_id: { type: "integer" },
+    folio: { type: "string" },
+    title: { type: "string" },
+    logistics_responsible: {
+      type: "object",
+      nullable: true,
+      properties: {
+        user_id: { type: "integer" },
+        full_name: { type: "string" },
+      },
+    },
+    start_datetime: { type: "string", example: "2026-12-24 18:00:00" },
+    end_datetime: { type: "string", example: "2026-12-24 23:00:00" },
+    location: { type: "string" },
+    status: { type: "string" },
+    sync_status: { type: "string" },
+  },
+};
+
+const calendarListResponse = {
+  description: "Eventos del calendario",
+  content: {
+    "application/json": {
+      schema: {
+        type: "object",
+        properties: {
+          data: {
+            type: "object",
+            properties: {
+              events: { type: "array", items: calendarEventSchema },
+            },
+          },
+          metadata: {
+            type: "object",
+            properties: {
+              pagination: {
+                type: "object",
+                properties: {
+                  total_records: { type: "integer" },
+                  page: { type: "integer" },
+                  per_page: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const humanResourceBody = {
   type: "object",
   required: ["name", "operative_role_id"],
@@ -209,80 +264,84 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
-    "/api/calendar": {
+    "/api/logistics/calendar": {
       get: {
-        summary: "Consulta el calendario",
+        summary: "Consulta el calendario del responsable de logística",
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
-        parameters: [
-          { name: "date", in: "query", schema: { type: "string", format: "date" } },
-          { name: "include_cancelled", in: "query", schema: { type: "boolean" } },
-          { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
-          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1 } },
-        ],
-        responses: { 200: { description: "Lista de eventos" } },
-      },
-      post: {
-        summary: "Agenda un evento",
-        tags: ["Calendar"],
-        security: [{ cookieAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { type: "object", properties: { request_id: { type: "integer" } } },
-            },
-          },
-        },
-        responses: { 201: { description: "Evento agendado" } },
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
       },
     },
-    "/api/calendar/{id}": {
-      put: {
-        summary: "Edita un evento",
+    "/api/admin/calendar": {
+      get: {
+        summary: "Consulta el calendario del Administrador General",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
+      },
+    },
+    "/api/logistics/requests/{id}/calendar": {
+      post: {
+        summary: "Agenda un evento desde una solicitud",
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
         parameters: [resourceIdParameter],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  start_at: { type: "string", format: "date-time" },
-                  end_at: { type: "string", format: "date-time" },
-                  location: { type: "string" },
+        responses: {
+          201: {
+            description: "Evento agendado",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      type: "object",
+                      properties: {
+                        event_id: { type: "integer" },
+                        request_id: { type: "integer" },
+                        status: { type: "string" },
+                        sync_status: { type: "string" },
+                        google_event_id: { type: "string", nullable: true },
+                      },
+                    },
+                  },
                 },
               },
             },
           },
         },
-        responses: { 200: { description: "Evento editado" } },
-      },
-      delete: {
-        summary: "Cancela un evento",
-        tags: ["Calendar"],
-        security: [{ cookieAuth: [] }],
-        parameters: [resourceIdParameter],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { type: "object", properties: { confirmed: { type: "boolean" } } },
-            },
-          },
-        },
-        responses: { 200: { description: "Evento cancelado" } },
       },
     },
-    "/api/calendar/{id}/sync": {
-      post: {
-        summary: "Reintenta sincronizar un evento",
+    "/api/logistics/calendar/{id}": {
+      patch: {
+        summary: "Edita un evento confirmado",
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
         parameters: [resourceIdParameter],
-        responses: { 200: { description: "Sincronización reintentada" } },
+        requestBody: jsonBody({
+          type: "object",
+          properties: {
+            location: { type: "string" },
+            start_datetime: { type: "string", example: "2026-12-24 19:00:00" },
+            end_datetime: { type: "string", example: "2026-12-25 00:00:00" },
+            logistic_user_id: { type: "integer", description: "Campo inmutable." },
+            resources: {
+              type: "array",
+              description: "Campo inmutable.",
+              items: { type: "object" },
+            },
+          },
+        }),
+        responses: { 200: { description: "Body vacío" } },
+      },
+      delete: {
+        summary: "Cancela un evento confirmado",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: { 200: { description: "Body vacío" } },
       },
     },
     "/api/auth/login": {

@@ -1,7 +1,6 @@
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
 const CalendarEventNotFoundException = require("../../../domain/exceptions/calendar/calendar-event-not-found-exception");
 const EventNotModifiableException = require("../../../domain/exceptions/calendar/event-not-modifiable-exception");
-const CancellationNotConfirmedException = require("../../../domain/exceptions/calendar/cancellation-not-confirmed-exception");
 const { assertCanViewEvent } = require("../../services/calendar/calendar-access-policy");
 const { syncEventNow } = require("../../services/calendar/sync-event-now");
 
@@ -13,8 +12,7 @@ class CancelEventUseCase {
     this.clock = clock;
   }
 
-  // `confirmed` es la respuesta del usuario al aviso de D.2.
-  async execute(eventId, actor, confirmed) {
+  async execute(eventId, actor) {
     const event = await this.calendarEventRepository.findById(eventId);
 
     if (!event) {
@@ -25,11 +23,6 @@ class CancelEventUseCase {
 
     if (!event.isConfirmed()) {
       throw new EventNotModifiableException(CalendarMessages.CANCEL_NOT_CONFIRMED_STATE);
-    }
-
-    // D.4: sin confirmación no se produce ningún cambio.
-    if (confirmed !== true) {
-      throw new CancellationNotConfirmedException();
     }
 
     const result = await this.calendarEventRepository.cancel({

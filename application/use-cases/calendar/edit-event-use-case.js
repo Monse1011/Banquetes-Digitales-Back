@@ -39,6 +39,14 @@ class EditEventUseCase {
       );
     }
 
+    if (dto.unsupportedFieldsSent.length > 0) {
+      throw new CalendarValidationException(
+        Object.fromEntries(
+          dto.unsupportedFieldsSent.map((field) => [field, CalendarMessages.UNSUPPORTED_FIELD])
+        )
+      );
+    }
+
     if (!dto.hasAnyChange()) {
       throw new CalendarValidationException({ data: CalendarMessages.EDIT_NO_CHANGES });
     }

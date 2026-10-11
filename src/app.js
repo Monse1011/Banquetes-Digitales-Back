@@ -137,18 +137,18 @@ const {
   ListCalendarEventsUseCase,
 } = require("../application/use-cases/calendar/list-calendar-events-use-case");
 const {
-  RetryCalendarSyncUseCase,
-} = require("../application/use-cases/calendar/retry-calendar-sync-use-case");
-const {
   ProcessPendingCalendarSyncUseCase,
 } = require("../application/use-cases/calendar/process-pending-calendar-sync-use-case");
 const {
   FinalizeElapsedEventsUseCase,
 } = require("../application/use-cases/calendar/finalize-elapsed-events-use-case");
-const PostgresCalendarEventRepository = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
-const PostgresCalendarSyncRepository = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
+const {
+  PostgresCalendarEventRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
+const {
+  PostgresCalendarSyncRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
 const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
-const { SyncProcessor } = require("../application/services/calendar/sync-processor");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
   createResourceUseCases,
@@ -246,21 +246,27 @@ async function main() {
   const calendarEventRepository = new PostgresCalendarEventRepository(pool);
   const calendarSyncRepository = new PostgresCalendarSyncRepository(pool);
   const externalCalendarGateway = new GoogleCalendarGateway();
-
-  const syncProcessor = new SyncProcessor(calendarSyncRepository, externalCalendarGateway);
-
-  const scheduleEventUseCase = new ScheduleEventUseCase(calendarEventRepository, syncProcessor);
-  const editEventUseCase = new EditEventUseCase(calendarEventRepository, syncProcessor);
-  const cancelEventUseCase = new CancelEventUseCase(calendarEventRepository, syncProcessor);
-  const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
-  const retryCalendarSyncUseCase = new RetryCalendarSyncUseCase(
-    calendarSyncRepository,
-    syncProcessor
-  );
   const processPendingCalendarSyncUseCase = new ProcessPendingCalendarSyncUseCase(
+    calendarEventRepository,
     calendarSyncRepository,
-    syncProcessor
+    externalCalendarGateway
   );
+
+  const scheduleEventUseCase = new ScheduleEventUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const editEventUseCase = new EditEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const cancelEventUseCase = new CancelEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
   const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
 
   const app = createApp({
@@ -284,7 +290,6 @@ async function main() {
     editEventUseCase,
     cancelEventUseCase,
     listCalendarEventsUseCase,
-    retryCalendarSyncUseCase,
     // Resources
     ...createPostgresResourceUseCases(pool),
   });

@@ -1,9 +1,6 @@
-const {
-  formatDate,
-  formatTime,
-} = require("../../services/reservation-request/date-time-formatter");
+const { formatDateTime } = require("../../services/reservation-request/date-time-formatter");
 
-// Un conflicto de disponibilidad con la forma de la API (snake_case, fecha y horas locales).
+// Un conflicto de disponibilidad con los nombres de fecha y hora definidos por el DAD.
 function toConflictDto(conflict) {
   const dto = { type: conflict.type, reason: conflict.reason };
 
@@ -12,9 +9,8 @@ function toConflictDto(conflict) {
   }
 
   if (conflict.startAt && conflict.endAt) {
-    dto.event_date = formatDate(conflict.startAt);
-    dto.start_time = formatTime(conflict.startAt);
-    dto.end_time = formatTime(conflict.endAt);
+    dto.start_datetime = formatDateTime(conflict.startAt);
+    dto.end_datetime = formatDateTime(conflict.endAt);
   }
 
   if (conflict.resourceId !== undefined) {
@@ -29,22 +25,18 @@ function toConflictDto(conflict) {
 // E.5: campos mínimos de un evento en el calendario.
 function toCalendarEventDto(event) {
   return {
-    id: event.id,
+    event_id: event.id,
     request_id: event.requestId,
     folio: event.folio,
     title: event.title,
-    event_date: formatDate(event.startAt),
-    start_time: formatTime(event.startAt),
-    end_time: formatTime(event.endAt),
-    start_at: event.startAt.toISOString(),
-    end_at: event.endAt.toISOString(),
+    start_datetime: formatDateTime(event.startAt),
+    end_datetime: formatDateTime(event.endAt),
     location: event.location,
-    logistic_user: event.logisticUserId
-      ? { id: event.logisticUserId, full_name: event.logisticUserName }
+    logistics_responsible: event.logisticUserId
+      ? { user_id: event.logisticUserId, full_name: event.logisticUserName }
       : null,
     status: event.status,
     sync_status: event.syncStatus,
-    request_detail_path: `/api/calendar/events/${event.id}/request`,
   };
 }
 

@@ -13,7 +13,10 @@ const {
 const { UserController } = require("./controller/user/user-controller");
 const { ServiceController } = require("./controller/service/service-controller");
 const CalendarController = require("./controller/calendar/calendar-controller");
-const { createCalendarRoutes } = require("./routes/calendar-routes");
+const {
+  createLogisticsCalendarRoutes,
+  createAdminCalendarRoutes,
+} = require("./routes/calendar-routes");
 const { ResourceController } = require("./controller/resource/resource-controller");
 const { HumanResourceController } = require("./controller/resource/human-resource-controller");
 const {
@@ -33,6 +36,12 @@ const ResourceValidationException = require("../domain/exceptions/resource/resou
 const ResourceNotFoundException = require("../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
 const ResourceConcurrencyException = require("../domain/exceptions/resource/resource-concurrency-exception");
+const CalendarValidationException = require("../domain/exceptions/calendar/calendar-validation-exception");
+const CalendarEventNotFoundException = require("../domain/exceptions/calendar/calendar-event-not-found-exception");
+const CalendarAccessDeniedException = require("../domain/exceptions/calendar/calendar-access-denied-exception");
+const EventAvailabilityConflictException = require("../domain/exceptions/calendar/event-availability-conflict-exception");
+const EventNotModifiableException = require("../domain/exceptions/calendar/event-not-modifiable-exception");
+const RequestNotSchedulableException = require("../domain/exceptions/calendar/request-not-schedulable-exception");
 const ErrorMessages = require("./constants/error-messages");
 
 // Funciones 2.8 a 2.10: errores de los recursos.
@@ -80,6 +89,55 @@ function handleAssignmentError(error, response) {
     response.status(409).json({
       message: error.message,
       ...(error.conflict ? { conflict: error.conflict } : {}),
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function handleCalendarError(error, response) {
+  if (error instanceof CalendarValidationException) {
+    response.status(422).json({
+      status: "error",
+      message: "Error de validación",
+      errors: error.errors,
+    });
+    return true;
+  }
+
+  if (error instanceof CalendarEventNotFoundException) {
+    response.status(404).json({
+      status: "error",
+      message: error.message || "Evento no encontrado",
+    });
+    return true;
+  }
+
+  if (error instanceof EventAvailabilityConflictException) {
+    response.status(409).json({
+      status: "error",
+      message: error.message,
+      conflicts: error.conflicts,
+    });
+    return true;
+  }
+
+  if (error instanceof CalendarAccessDeniedException) {
+    response.status(403).json({
+      status: "error",
+      message: error.message || "No tiene permisos para realizar esta acción",
+    });
+    return true;
+  }
+
+  if (
+    error instanceof EventNotModifiableException ||
+    error instanceof RequestNotSchedulableException
+  ) {
+    response.status(400).json({
+      status: "error",
+      message: error.message,
     });
     return true;
   }
@@ -135,15 +193,17 @@ function createApp(dependencies) {
 
   app.use("/api/client", createClientRoutes(reservationRequestController, serviceController));
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
+  app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
+  app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
-  app.use("/api/calendar", createCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsRoutes(resourceControllers, authMiddleware));
 
   // Error handler
   app.use((error, _request, response, _next) => {
+    if (handleCalendarError(error, response)) return;
     if (handleResourceError(error, response)) return;
 
     if (error instanceof ReservationRequestValidationException) {
