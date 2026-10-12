@@ -54,6 +54,10 @@ function matchesClientName(request, filters) {
   return true;
 }
 
+function getClientField(request, key, alias) {
+  return request[key] || request[alias] || null;
+}
+
 class InMemoryReservationRequestRepository {
   constructor() {
     this.requests = [];
@@ -62,6 +66,9 @@ class InMemoryReservationRequestRepository {
 
   async create(request) {
     const id = request.requestId || request.id || this.nextId++;
+    const clientName = getClientField(request, "clientName", "client_name");
+    const clientEmail = getClientField(request, "clientEmail", "client_email");
+    const clientPhone = getClientField(request, "clientPhone", "client_phone");
 
     const createdRequest = new ReservationRequest(
       id,
@@ -78,9 +85,9 @@ class InMemoryReservationRequestRepository {
       request.logisticUserId,
       request.assignedByUserId,
       request.assignedAt,
-      request.clientName || request.client_name || null,
-      request.clientEmail || request.client_email || null,
-      request.clientPhone || request.client_phone || null
+      clientName,
+      clientEmail,
+      clientPhone
     );
 
     createdRequest.services = request.services || [];

@@ -17,6 +17,14 @@ function extractTimestamp(request) {
   return NaN;
 }
 
+function getEventDate(request) {
+  return request.event_date || request.eventDate || "";
+}
+
+function getFolio(request) {
+  return request.folio || "";
+}
+
 class GetAssignedRequestsHistoryUseCase {
   constructor({ reservationRequestRepository } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
@@ -48,12 +56,12 @@ class GetAssignedRequestsHistoryUseCase {
     if (!Number.isNaN(timeA) && !Number.isNaN(timeB) && timeA !== timeB) {
       return timeB - timeA;
     }
-    const dateA = requestA.event_date || requestA.eventDate || "";
-    const dateB = requestB.event_date || requestB.eventDate || "";
+    const dateA = getEventDate(requestA);
+    const dateB = getEventDate(requestB);
     if (dateA !== dateB) {
       return dateB.localeCompare(dateA);
     }
-    return (requestB.folio || "").localeCompare(requestA.folio || "");
+    return getFolio(requestB).localeCompare(getFolio(requestA));
   }
 
   sortRequests(requests) {

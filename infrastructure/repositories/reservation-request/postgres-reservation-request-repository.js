@@ -17,9 +17,40 @@ const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
             request_date, logistic_user_id, assigned_by_user_id, assigned_at,
             ARRAY[]::integer[] AS services_ids`;
 
+function addStatusCondition(filters, parameters, conditions) {
+  const statusList = filters.statuses || (filters.status ? [filters.status].flat() : null);
+  if (!statusList) return;
+  parameters.push(statusList);
+  conditions.push(`rr.status = ANY($${parameters.length})`);
+}
+
 class PostgresReservationRequestRepository {
   constructor(pool) {
     this.pool = pool;
+  }
+
+  buildConditions(filters, parameters) {
+    const conditions = [];
+
+    addStatusCondition(filters, parameters, conditions);
+
+    const logisticUserId = filters.logisticUserId ?? filters.logistic_user_id;
+    if (logisticUserId !== undefined && logisticUserId !== null) {
+      parameters.push(logisticUserId);
+      conditions.push(`rr.logistic_user_id = $${parameters.length}`);
+    }
+
+    if (filters.eventDate) {
+      parameters.push(this.datePart(filters.eventDate));
+      conditions.push(`CAST(rr.event_date_time AS DATE) = $${parameters.length}`);
+    }
+
+    if (filters.clientName) {
+      parameters.push(`%${filters.clientName}%`);
+      conditions.push(`c.full_name ILIKE $${parameters.length}`);
+    }
+
+    return conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   }
 
   async create(request) {
@@ -242,38 +273,8 @@ class PostgresReservationRequestRepository {
 
   async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
     const parameters = [];
-    const conditions = [];
+    const where = this.buildConditions(filters, parameters);
 
-    if (filters.status) {
-      if (Array.isArray(filters.status)) {
-        parameters.push(filters.status);
-        conditions.push(`rr.status = ANY($${parameters.length})`);
-      } else {
-        parameters.push(filters.status);
-        conditions.push(`rr.status = $${parameters.length}`);
-      }
-    } else if (filters.statuses && Array.isArray(filters.statuses)) {
-      parameters.push(filters.statuses);
-      conditions.push(`rr.status = ANY($${parameters.length})`);
-    }
-
-    const logisticUserId = filters.logisticUserId ?? filters.logistic_user_id;
-    if (logisticUserId !== undefined && logisticUserId !== null) {
-      parameters.push(logisticUserId);
-      conditions.push(`rr.logistic_user_id = $${parameters.length}`);
-    }
-
-    if (filters.eventDate) {
-      parameters.push(this.datePart(filters.eventDate));
-      conditions.push(`CAST(rr.event_date_time AS DATE) = $${parameters.length}`);
-    }
-
-    if (filters.clientName) {
-      parameters.push(`%${filters.clientName}%`);
-      conditions.push(`c.full_name ILIKE $${parameters.length}`);
-    }
-
-    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const countResult = await this.pool.query(
       `SELECT COUNT(DISTINCT rr.id_reservation_request)::int AS total_records
        FROM reservations_request rr
