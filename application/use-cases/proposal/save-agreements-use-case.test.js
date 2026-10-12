@@ -57,7 +57,7 @@ describe("SaveAgreementsUseCase", () => {
   });
 
   async function createRequest(status = ReservationRequestStatus.COORDINATION_READY) {
-    return reservationRequestRepository.create(
+    const created = await reservationRequestRepository.create(
       new ReservationRequest(
         null,
         "EVT-2026-0101",
@@ -75,6 +75,25 @@ describe("SaveAgreementsUseCase", () => {
         new Date()
       )
     );
+
+    assignedResourceRepository.addAssignment({
+      requestId: created.requestId,
+      resourceId: 1,
+      quantity: 4,
+      usageStart: created.eventDateTime,
+      usageEnd: created.eventEndTime,
+      status: AssignedResourceStatus.CONFIRMED,
+    });
+    assignedResourceRepository.addAssignment({
+      requestId: created.requestId,
+      resourceId: 2,
+      quantity: 50,
+      usageStart: created.eventDateTime,
+      usageEnd: created.eventEndTime,
+      status: AssignedResourceStatus.CONFIRMED,
+    });
+
+    return created;
   }
 
   function dto(overrides = {}) {
@@ -110,14 +129,6 @@ describe("SaveAgreementsUseCase", () => {
 
   it("updates assignments releasing the replaced quantities (RF-2.3.4.9)", async () => {
     const request = await createRequest();
-    assignedResourceRepository.addAssignment({
-      requestId: request.requestId,
-      resourceId: 1,
-      quantity: 4,
-      usageStart: request.eventDateTime,
-      usageEnd: request.eventEndTime,
-      status: AssignedResourceStatus.CONFIRMED,
-    });
 
     await useCase.execute(request.requestId, LOGISTIC_USER_ID, dto());
 
@@ -253,5 +264,45 @@ describe("SaveAgreementsUseCase", () => {
         })
       )
     ).rejects.toBeInstanceOf(ScheduleConflictException);
+  });
+
+  it("rejects resource ids that are not assigned to the request (RF-2.3.4.2)", async () => {
+    const request = await createRequest();
+
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          adjusted_resources: [
+            { resource_id: 1, quantity: 2 },
+            { resource_id: 2, quantity: 50 },
+            { resource_id: 99, quantity: 1 },
+          ],
+        })
+      )
+    ).rejects.toMatchObject({
+      errors: {
+        adjusted_resources: "El recurso con identificador 99 no está asignado a la solicitud.",
+      },
+    });
+  });
+
+  it("rejects missing adjusted quantities of assigned resources (RF-2.3.4.2)", async () => {
+    const request = await createRequest();
+
+    const promise = useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({ adjusted_resources: [{ resource_id: 1, quantity: 2 }] })
+    );
+
+    await expect(promise).rejects.toBeInstanceOf(AgreementsValidationException);
+    await expect(promise).rejects.toMatchObject({
+      errors: {
+        adjusted_resources:
+          "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
+      },
+    });
   });
 });

@@ -15,6 +15,11 @@ function exceededAvailabilityMessage(resourceName, available) {
   return `La cantidad ajustada de ${resourceName} excede la disponibilidad (${available}) para el horario indicado.`;
 }
 
+// RF-2.3.4.2: los recursos ajustados deben estar asignados a la solicitud.
+function resourceNotAssignedMessage(resourceId) {
+  return `El recurso con identificador ${resourceId} no está asignado a la solicitud.`;
+}
+
 const ProposalMessages = Object.freeze({
   AGREEMENTS_NOT_ALLOWED_STATE:
     "La solicitud no se encuentra en un estado que permita registrar acuerdos.",
@@ -32,7 +37,10 @@ const ProposalMessages = Object.freeze({
   DATE_IN_PAST: "La fecha no puede ser anterior a la actual.",
   LOCATION_TOO_LONG: "La ubicación no puede exceder 255 caracteres.",
   ADJUSTED_QUANTITY_INVALID: "La cantidad ajustada debe ser un número entero mayor o igual a 0.",
+  ADJUSTED_QUANTITY_MISSING:
+    "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
   RESOURCE_ID_INVALID: "El identificador del recurso no es válido.",
+  RESOURCE_NOT_ASSIGNED: "El recurso no está asignado a la solicitud.",
   SCHEDULE_CONFLICT: "El horario confirmado entra en conflicto con la agenda del responsable.",
 });
 
@@ -41,4 +49,5 @@ module.exports = {
   ProposalFieldNames,
   requiredFieldMessage,
   exceededAvailabilityMessage,
+  resourceNotAssignedMessage,
 };

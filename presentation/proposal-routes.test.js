@@ -55,6 +55,7 @@ function futureDate(days, hour) {
 describe("Rutas de la Función 3.4", () => {
   let app;
   let reservationRequestRepository;
+  let assignedResourceRepository;
   let derivedInformationRepository;
   let proposalRepository;
   let auditLogRepository;
@@ -67,7 +68,7 @@ describe("Rutas de la Función 3.4", () => {
 
     const clientRepository = new InMemoryClientRepository();
     reservationRequestRepository = new InMemoryReservationRequestRepository();
-    const assignedResourceRepository = new InMemoryAssignedResourceRepository([
+    assignedResourceRepository = new InMemoryAssignedResourceRepository([
       { id: 1, name: "Mesero", type: "HUMAN", unitCost: 300, totalQuantity: 5 },
     ]);
     derivedInformationRepository = new InMemoryDerivedInformationRepository();
@@ -160,6 +161,14 @@ describe("Rutas de la Función 3.4", () => {
         new Date()
       )
     );
+
+    assignedResourceRepository.addAssignment({
+      requestId: created.requestId,
+      resourceId: 1,
+      quantity: 4,
+      usageStart: created.eventDateTime,
+      usageEnd: created.eventEndTime,
+    });
 
     return created.requestId;
   }
@@ -257,6 +266,23 @@ describe("Rutas de la Función 3.4", () => {
       .expect(400);
 
     expect(response.body.errors.location).toBe("El campo ubicación es obligatorio.");
+  });
+
+  it("rejects invalid request ids with a validation error (Estándares 2.4)", async () => {
+    const endpoints = [
+      ["get", "/api/logistics/requests/abc"],
+      ["post", "/api/logistics/requests/abc/derived-information"],
+      ["post", "/api/logistics/requests/0/proposals"],
+      ["get", "/api/logistics/requests/-1/proposals"],
+      ["get", "/api/logistics/requests/x/proposals/download"],
+      ["post", "/api/logistics/requests/x/proposals/send"],
+    ];
+
+    for (const [method, url] of endpoints) {
+      const response = await request(app)[method](url).set("Cookie", AUTH_COOKIE).expect(400);
+
+      expect(response.body.message).toBe("El identificador proporcionado no es válido.");
+    }
   });
 
   it("rejects agreements and proposals in invalid states (RF-2.3.4.1 / RF-2.3.4.12)", async () => {

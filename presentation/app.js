@@ -152,6 +152,41 @@ function handleProposalError(error, response) {
   );
 }
 
+// Estándares de Código 2.4: los ids inválidos de la URL responden 400.
+function handleCommonError(error, response) {
+  if (error instanceof InvalidIdException) {
+    response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  return false;
+}
+
+// Funciones 2.1 a 2.3: errores de autenticación y recuperación de contraseña.
+function handleAuthError(error, response) {
+  if (error instanceof AccountBlockedException) {
+    response.status(423).json({ message: ErrorMessages.ACCOUNT_BLOCKED });
+    return true;
+  }
+
+  if (error instanceof InvalidCredentialsException) {
+    response.status(401).json({ message: ErrorMessages.INVALID_CREDENTIALS });
+    return true;
+  }
+
+  if (error instanceof InvalidPasswordException || error instanceof InvalidResetTokenException) {
+    response.status(400).json({
+      message:
+        error instanceof InvalidResetTokenException
+          ? ErrorMessages.INVALID_RESET_TOKEN
+          : ErrorMessages.INVALID_PASSWORD,
+    });
+    return true;
+  }
+
+  return false;
+}
+
 function createApp(dependencies) {
   const app = express();
 
@@ -214,11 +249,7 @@ function createApp(dependencies) {
 
   // Error handler
   app.use((error, _request, response, _next) => {
-    // Estándares de Código 2.4: ids inválidos de la URL responden 400.
-    if (error instanceof InvalidIdException) {
-      response.status(400).json({ message: error.message });
-      return;
-    }
+    if (handleCommonError(error, response)) return;
 
     if (handleResourceError(error, response)) return;
 
@@ -237,23 +268,8 @@ function createApp(dependencies) {
     if (handleProposalError(error, response)) {
       return;
     }
-    if (error instanceof AccountBlockedException) {
-      response.status(423).json({ message: ErrorMessages.ACCOUNT_BLOCKED });
-      return;
-    }
 
-    if (error instanceof InvalidCredentialsException) {
-      response.status(401).json({ message: ErrorMessages.INVALID_CREDENTIALS });
-      return;
-    }
-
-    if (error instanceof InvalidPasswordException || error instanceof InvalidResetTokenException) {
-      response.status(400).json({
-        message:
-          error instanceof InvalidResetTokenException
-            ? ErrorMessages.INVALID_RESET_TOKEN
-            : ErrorMessages.INVALID_PASSWORD,
-      });
+    if (handleAuthError(error, response)) {
       return;
     }
 

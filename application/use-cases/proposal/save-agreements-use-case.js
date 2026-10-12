@@ -6,7 +6,11 @@ const AgreementsValidationException = require("../../../domain/exceptions/propos
 const RequestNotInAgreementsStateException = require("../../../domain/exceptions/proposal/request-not-in-agreements-state-exception");
 const ResourceAvailabilityExceededException = require("../../../domain/exceptions/proposal/resource-availability-exceeded-exception");
 const ScheduleConflictException = require("../../../domain/exceptions/proposal/schedule-conflict-exception");
-const { exceededAvailabilityMessage, resourceNotAssignedMessage, ProposalMessages } = require("../../../domain/constants/proposal-messages");
+const {
+  exceededAvailabilityMessage,
+  resourceNotAssignedMessage,
+  ProposalMessages,
+} = require("../../../domain/constants/proposal-messages");
 const { SaveAgreementsResponseDto } = require("../../dto/proposal/save-agreements-response-dto");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
 const {
@@ -116,9 +120,7 @@ class SaveAgreementsUseCase {
     const assignedIds = new Set(assignedResources.map((assignment) => assignment.resourceId));
     const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
 
-    const unassigned = adjustments.filter(
-      (adjustment) => !assignedIds.has(adjustment.resourceId)
-    );
+    const unassigned = adjustments.filter((adjustment) => !assignedIds.has(adjustment.resourceId));
     const missing = assignedResources.filter(
       (assignment) => !adjustedIds.has(assignment.resourceId)
     );
