@@ -6,7 +6,7 @@ const AgreementsValidationException = require("../../../domain/exceptions/propos
 const RequestNotInAgreementsStateException = require("../../../domain/exceptions/proposal/request-not-in-agreements-state-exception");
 const ResourceAvailabilityExceededException = require("../../../domain/exceptions/proposal/resource-availability-exceeded-exception");
 const ScheduleConflictException = require("../../../domain/exceptions/proposal/schedule-conflict-exception");
-const { exceededAvailabilityMessage } = require("../../../domain/constants/proposal-messages");
+const { exceededAvailabilityMessage, resourceNotAssignedMessage, ProposalMessages } = require("../../../domain/constants/proposal-messages");
 const { SaveAgreementsResponseDto } = require("../../dto/proposal/save-agreements-response-dto");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
 const {
@@ -45,6 +45,10 @@ class SaveAgreementsUseCase {
     const startDatetime = dto.parseDate(dto.startDatetime);
     const endDatetime = dto.parseDate(dto.endDatetime);
     const adjustments = dto.toAdjustments();
+
+    // RF-2.3.4.2 / RF-2.3.4.8: los recursos ajustados deben corresponder a los
+    // recursos asignados a la solicitud y debe capturarse la cantidad de cada uno.
+    await this.validateAdjustedResourcesCoverage(requestId, adjustments);
 
     await this.validateResponsibleSchedule(request, startDatetime, endDatetime);
     await this.validateAdjustedAvailability(requestId, adjustments, startDatetime, endDatetime);
@@ -102,6 +106,38 @@ class SaveAgreementsUseCase {
         }))
       );
     }
+  }
+
+  // RF-2.3.4.2 / RF-2.3.4.8: valida que cada resource_id ajustado exista y esté
+  // asignado a la solicitud, y que se capture la cantidad de todos los asignados.
+  async validateAdjustedResourcesCoverage(requestId, adjustments) {
+    const assignedResources =
+      await this.assignedResourceRepository.findActiveByRequestId(requestId);
+    const assignedIds = new Set(assignedResources.map((assignment) => assignment.resourceId));
+    const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
+
+    const unassigned = adjustments.filter(
+      (adjustment) => !assignedIds.has(adjustment.resourceId)
+    );
+    const missing = assignedResources.filter(
+      (assignment) => !adjustedIds.has(assignment.resourceId)
+    );
+
+    if (unassigned.length === 0 && missing.length === 0) {
+      return;
+    }
+
+    const messages = [
+      ...unassigned.map((adjustment) => resourceNotAssignedMessage(adjustment.resourceId)),
+    ];
+
+    if (missing.length > 0) {
+      messages.push(ProposalMessages.ADJUSTED_QUANTITY_MISSING);
+    }
+
+    throw new AgreementsValidationException({
+      adjusted_resources: messages.join(" "),
+    });
   }
 
   // RF-2.3.4.8: cada cantidad ajustada se valida contra la disponibilidad del

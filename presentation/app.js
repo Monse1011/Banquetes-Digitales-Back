@@ -41,6 +41,7 @@ const ResourceAvailabilityExceededException = require("../domain/exceptions/prop
 const ScheduleConflictException = require("../domain/exceptions/proposal/schedule-conflict-exception");
 const ProposalGenerationFailedException = require("../domain/exceptions/proposal/proposal-generation-failed-exception");
 const ProposalSendFailedException = require("../domain/exceptions/proposal/proposal-send-failed-exception");
+const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
 const { AgreementsController } = require("./controller/proposal/agreements-controller");
 const { ProposalController } = require("./controller/proposal/proposal-controller");
 const ErrorMessages = require("./constants/error-messages");
@@ -213,6 +214,12 @@ function createApp(dependencies) {
 
   // Error handler
   app.use((error, _request, response, _next) => {
+    // Estándares de Código 2.4: ids inválidos de la URL responden 400.
+    if (error instanceof InvalidIdException) {
+      response.status(400).json({ message: error.message });
+      return;
+    }
+
     if (handleResourceError(error, response)) return;
 
     if (error instanceof ReservationRequestValidationException) {
