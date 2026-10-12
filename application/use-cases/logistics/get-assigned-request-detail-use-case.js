@@ -1,5 +1,9 @@
 const CONFIRMED_STATUSES = ["Confirmado", "CONFIRMED", "Finalizado", "COMPLETED"];
 
+function valueOrFallback(value, fallback = "Sin registrar") {
+  return value || fallback;
+}
+
 class GetAssignedRequestDetailUseCase {
   constructor({ reservationRequestRepository } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
@@ -7,32 +11,33 @@ class GetAssignedRequestDetailUseCase {
 
   determineScheduleType(status) {
     const isConfirmed = CONFIRMED_STATUSES.some(
-      (s) => s.toUpperCase() === (status || "").toUpperCase()
+      (confirmedStatus) => confirmedStatus.toUpperCase() === (status || "").toUpperCase()
     );
     return isConfirmed ? "confirmado" : "propuesto";
   }
 
-  mapResource(res) {
+  mapResource(resource) {
     return {
-      type: res.type || "material",
+      type: resource.type || "material",
       resource_or_operative_role:
-        res.resource_or_operative_role ||
-        res.resourceOrOperativeRole ||
-        res.name ||
+        resource.resource_or_operative_role ||
+        resource.resourceOrOperativeRole ||
+        resource.name ||
         "Sin registrar",
-      quantity: res.quantity || 1,
+      quantity: resource.quantity || 1,
     };
   }
 
   mapServices(services) {
     if (!Array.isArray(services)) return [];
-    return services.map((s) => {
-      const resources = s.required_resources || s.requiredResources || [];
+    return services.map((service) => {
+      const requiredResources = service.required_resources || service.requiredResources || [];
       return {
-        service_id: s.service_id || s.serviceId || s.id,
-        service_name: s.service_name || s.serviceName || s.name || "Sin registrar",
-        required_resources: Array.isArray(resources)
-          ? resources.map((r) => this.mapResource(r))
+        service_id: service.service_id || service.serviceId || service.id,
+        service_name:
+          service.service_name || service.serviceName || service.name || "Sin registrar",
+        required_resources: Array.isArray(requiredResources)
+          ? requiredResources.map((resource) => this.mapResource(resource))
           : [],
       };
     });
@@ -41,44 +46,48 @@ class GetAssignedRequestDetailUseCase {
   verifyAccess(request, userId) {
     const assignedId = request.logistic_user_id ?? request.logisticUserId;
     if (Number(assignedId) !== Number(userId)) {
-      const err = new Error("No tiene permisos para acceder a esta solicitud.");
-      err.status = 403;
-      throw err;
+      const error = new Error("No tiene permisos para acceder a esta solicitud.");
+      error.status = 403;
+      throw error;
     }
   }
 
   buildClientDto(request) {
     return {
-      client_name: request.client_name || request.clientName,
-      client_email: request.client_email || request.clientEmail,
-      client_phone: request.client_phone || request.clientPhone || "Sin registrar",
+      client_name: valueOrFallback(request.client_name || request.clientName),
+      client_email: valueOrFallback(request.client_email || request.clientEmail),
+      client_phone: valueOrFallback(request.client_phone || request.clientPhone),
+    };
+  }
+
+  buildDetailDto(request) {
+    return {
+      request_id: request.id || request.requestId,
+      folio: request.folio,
+      client: this.buildClientDto(request),
+      event_date: valueOrFallback(request.event_date || request.eventDate, ""),
+      start_time: valueOrFallback(request.start_time || request.startTime, ""),
+      end_time: valueOrFallback(request.end_time || request.endTime, ""),
+      schedule_type: this.determineScheduleType(request.status),
+      event_address: valueOrFallback(request.event_address || request.eventAddress),
+      guest_count: request.guest_count || request.guestCount,
+      selected_services: this.mapServices(request.services || request.selected_services),
+      status: request.status,
     };
   }
 
   async execute({ requestId, userId }) {
     const request = await this.reservationRequestRepository.findById(requestId);
     if (!request) {
-      const err = new Error("Solicitud de reservación no encontrada.");
-      err.status = 404;
-      throw err;
+      const error = new Error("Solicitud de reservación no encontrada.");
+      error.status = 404;
+      throw error;
     }
 
     this.verifyAccess(request, userId);
 
     return {
-      data: {
-        request_id: request.id || request.requestId,
-        folio: request.folio,
-        client: this.buildClientDto(request),
-        event_date: request.event_date || request.eventDate,
-        start_time: request.start_time || request.startTime,
-        end_time: request.end_time || request.endTime,
-        schedule_type: this.determineScheduleType(request.status),
-        event_address: request.event_address || request.eventAddress || "Sin registrar",
-        guest_count: request.guest_count || request.guestCount,
-        selected_services: this.mapServices(request.services || request.selected_services),
-        status: request.status,
-      },
+      data: this.buildDetailDto(request),
     };
   }
 }

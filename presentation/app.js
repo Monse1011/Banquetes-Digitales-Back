@@ -136,7 +136,10 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
-  app.use("/api/logistics", createLogisticsRoutes(resourceControllers, authMiddleware));
+  app.use(
+    "/api/logistics",
+    createLogisticsRoutes(resourceControllers, authMiddleware, reservationRequestController)
+  );
 
   // Error handler
   app.use((error, _request, response, _next) => {

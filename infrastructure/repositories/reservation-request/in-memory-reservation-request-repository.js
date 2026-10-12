@@ -10,6 +10,50 @@ const {
   ReservationRequestSortField,
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 
+function matchesStatus(request, filters) {
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      return filters.status.some(
+        (candidate) => candidate.toUpperCase() === (request.status || "").toUpperCase()
+      );
+    }
+    return request.status?.toUpperCase() === filters.status.toUpperCase();
+  }
+  if (filters.statuses && Array.isArray(filters.statuses)) {
+    return filters.statuses.some(
+      (candidate) => candidate.toUpperCase() === (request.status || "").toUpperCase()
+    );
+  }
+  return true;
+}
+
+function matchesLogisticUser(request, filters) {
+  const logisticUserId = filters.logisticUserId ?? filters.logistic_user_id;
+  if (logisticUserId !== undefined && logisticUserId !== null) {
+    const requestLogisticId = request.logisticUserId ?? request.logistic_user_id;
+    return Number(requestLogisticId) === Number(logisticUserId);
+  }
+  return true;
+}
+
+function matchesEventDate(request, filters) {
+  if (filters.eventDate) {
+    return (
+      request.eventDateTime.toISOString().slice(0, 10) ===
+      filters.eventDate.toISOString().slice(0, 10)
+    );
+  }
+  return true;
+}
+
+function matchesClientName(request, filters) {
+  if (filters.clientName) {
+    const name = request.clientName || request.client_name || "";
+    return name.toLowerCase().includes(filters.clientName.toLowerCase());
+  }
+  return true;
+}
+
 class InMemoryReservationRequestRepository {
   constructor() {
     this.requests = [];
@@ -17,8 +61,10 @@ class InMemoryReservationRequestRepository {
   }
 
   async create(request) {
+    const id = request.requestId || request.id || this.nextId++;
+
     const createdRequest = new ReservationRequest(
-      this.nextId++,
+      id,
       request.folio,
       request.clientId,
       request.userId,
@@ -31,8 +77,14 @@ class InMemoryReservationRequestRepository {
       request.servicesIds,
       request.logisticUserId,
       request.assignedByUserId,
-      request.assignedAt
+      request.assignedAt,
+      request.clientName || request.client_name || null,
+      request.clientEmail || request.client_email || null,
+      request.clientPhone || request.client_phone || null
     );
+
+    createdRequest.services = request.services || [];
+    createdRequest.selected_services = request.selected_services || [];
 
     this.requests.push(createdRequest);
     return createdRequest;
@@ -101,29 +153,31 @@ class InMemoryReservationRequestRepository {
     return { status: "assigned", request };
   }
 
-  async findAll(filters, sort, page, perPage) {
-    const filteredRequests = this.requests.filter((request) => {
-      if (filters.status && request.status !== filters.status) {
-        return false;
+  async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
+    const filteredRequests = this.requests.filter(
+      (request) =>
+        matchesStatus(request, filters) &&
+        matchesLogisticUser(request, filters) &&
+        matchesEventDate(request, filters) &&
+        matchesClientName(request, filters)
+    );
+
+    const sortField = sort?.field ?? ReservationRequestSortField.EVENT_DATE;
+    const sortDirection = sort?.direction ?? "asc";
+
+    const sortedRequests = [...filteredRequests].sort((requestA, requestB) => {
+      const valueA = this.getSortValue(requestA, sortField);
+      const valueB = this.getSortValue(requestB, sortField);
+      let comparison = 0;
+      if (valueA < valueB) comparison = -1;
+      else if (valueA > valueB) comparison = 1;
+      else {
+        const folioA = requestA.folio || "";
+        const folioB = requestB.folio || "";
+        comparison = folioA.localeCompare(folioB);
       }
 
-      if (
-        filters.eventDate &&
-        request.eventDateTime.toISOString().slice(0, 10) !==
-          filters.eventDate.toISOString().slice(0, 10)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const sortedRequests = [...filteredRequests].sort((left, right) => {
-      const leftValue = this.getSortValue(left, sort.field);
-      const rightValue = this.getSortValue(right, sort.field);
-      const comparison = leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
-
-      return sort.direction === "asc" ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     const start = (page - 1) * perPage;
@@ -135,14 +189,15 @@ class InMemoryReservationRequestRepository {
   }
 
   getSortValue(request, field) {
-    switch (field) {
-      case ReservationRequestSortField.EVENT_DATE:
-        return request.eventDateTime.getTime();
-      case ReservationRequestSortField.STATUS:
-        return request.status;
-      case ReservationRequestSortField.CLIENT_NAME:
-        return request.clientId;
+    if (field === ReservationRequestSortField.STATUS) {
+      return request.status || "";
     }
+    if (field === ReservationRequestSortField.CLIENT_NAME) {
+      return request.clientName || request.client_name || request.clientId || "";
+    }
+    return request.eventDateTime instanceof Date
+      ? request.eventDateTime.getTime()
+      : new Date(request.eventDateTime || 0).getTime();
   }
 }
 

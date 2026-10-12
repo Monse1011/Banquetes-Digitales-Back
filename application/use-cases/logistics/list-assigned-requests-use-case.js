@@ -14,6 +14,10 @@ const ACTIVE_STATUSES = Object.freeze([
   "CONFIRMED",
 ]);
 
+function valueOrFallback(value, fallback = "Sin registrar") {
+  return value || fallback;
+}
+
 class ListAssignedRequestsUseCase {
   constructor({ reservationRequestRepository } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
@@ -21,69 +25,119 @@ class ListAssignedRequestsUseCase {
 
   normalizeStatus(status) {
     if (!status) return null;
-    const s = status.trim().toUpperCase();
-    for (const valid of ACTIVE_STATUSES) {
-      if (valid.toUpperCase() === s) return valid;
+    const normalized = status.trim().toUpperCase();
+    for (const validStatus of ACTIVE_STATUSES) {
+      if (validStatus.toUpperCase() === normalized) return validStatus;
     }
-    const err = new Error("El estado indicado no es válido para solicitudes activas.");
-    err.status = 400;
-    throw err;
+    const error = new Error("El estado indicado no es válido para solicitudes activas.");
+    error.status = 400;
+    throw error;
   }
 
   matchesStatus(reqStatus, filterStatus) {
     if (filterStatus) {
       return reqStatus.toUpperCase() === filterStatus.toUpperCase();
     }
-    return ACTIVE_STATUSES.some((active) => active.toUpperCase() === reqStatus.toUpperCase());
+    return ACTIVE_STATUSES.some(
+      (activeStatus) => activeStatus.toUpperCase() === reqStatus.toUpperCase()
+    );
   }
 
-  buildSortKey(r) {
-    const dateVal = r.event_date || r.eventDate || "";
-    const timeVal = r.start_time || r.startTime || "";
-    const folioVal = r.folio || "";
-    return dateVal + " " + timeVal + " " + folioVal;
+  buildSortKey(request) {
+    const dateValue = request.event_date || request.eventDate || "";
+    const timeValue = request.start_time || request.startTime || "";
+    const folioValue = request.folio || "";
+    return `${dateValue} ${timeValue} ${folioValue}`;
   }
 
   sortRequests(requests) {
-    return requests.sort((a, b) => this.buildSortKey(a).localeCompare(this.buildSortKey(b)));
+    return [...requests].sort((requestA, requestB) => {
+      const timeA = requestA.eventDateTime instanceof Date ? requestA.eventDateTime.getTime() : NaN;
+      const timeB = requestB.eventDateTime instanceof Date ? requestB.eventDateTime.getTime() : NaN;
+      if (!Number.isNaN(timeA) && !Number.isNaN(timeB) && timeA !== timeB) {
+        return timeA - timeB;
+      }
+      return this.buildSortKey(requestA).localeCompare(this.buildSortKey(requestB));
+    });
   }
 
-  mapRequestDto(r) {
-    const address = r.event_address || r.eventAddress;
+  mapRequestDto(request) {
     return {
-      request_id: r.id || r.requestId,
-      folio: r.folio,
-      client_name: r.client_name || r.clientName,
-      client_email: r.client_email || r.clientEmail,
-      event_date: r.event_date || r.eventDate,
-      start_time: r.start_time || r.startTime,
-      end_time: r.end_time || r.endTime,
-      event_address: address || "Sin registrar",
-      guest_count: r.guest_count || r.guestCount,
-      status: r.status,
+      request_id: request.id || request.requestId,
+      folio: request.folio,
+      client_name: valueOrFallback(request.client_name || request.clientName),
+      client_email: valueOrFallback(request.client_email || request.clientEmail),
+      event_date: valueOrFallback(request.event_date || request.eventDate, ""),
+      start_time: valueOrFallback(request.start_time || request.startTime, ""),
+      end_time: valueOrFallback(request.end_time || request.endTime, ""),
+      event_address: valueOrFallback(request.event_address || request.eventAddress),
+      guest_count: request.guest_count || request.guestCount,
+      status: request.status,
     };
   }
 
   async execute({ userId, status, page = 1, perPage = 10 }) {
     const filterStatus = this.normalizeStatus(status);
-    const all = await this.reservationRequestRepository.findAll({}, null, 1, 10000);
-    const items = all.requests || all.items || (Array.isArray(all) ? all : []);
 
-    const userAssigned = items.filter((r) => {
-      const assignedId = r.logistic_user_id ?? r.logisticUserId;
-      return (
-        Number(assignedId) === Number(userId) && this.matchesStatus(r.status || "", filterStatus)
-      );
-    });
+    const queryFilters = {
+      logisticUserId: userId,
+      status: filterStatus ? [filterStatus, filterStatus.toUpperCase()] : ACTIVE_STATUSES,
+    };
+    const sort = { field: "EVENT_DATE", direction: "asc" };
 
-    const sorted = this.sortRequests(userAssigned);
-    const totalRecords = sorted.length;
-    const offset = (page - 1) * perPage;
-    const paged = sorted.slice(offset, offset + perPage);
+    const repositoryResult = await this.reservationRequestRepository.findAll(
+      queryFilters,
+      sort,
+      page,
+      perPage
+    );
+
+    let items =
+      repositoryResult.requests ||
+      repositoryResult.items ||
+      (Array.isArray(repositoryResult) ? repositoryResult : []);
+
+    let totalRecords = repositoryResult.totalRecords ?? repositoryResult.total_records;
+
+    // Fallback if the repository did not filter in-database
+    if (totalRecords === undefined) {
+      const userAssigned = items.filter((request) => {
+        const assignedId = request.logistic_user_id ?? request.logisticUserId;
+        return (
+          Number(assignedId) === Number(userId) &&
+          this.matchesStatus(request.status || "", filterStatus)
+        );
+      });
+      totalRecords = userAssigned.length;
+      const sorted = this.sortRequests(userAssigned);
+      const offset = (page - 1) * perPage;
+      items = sorted.slice(offset, offset + perPage);
+    } else {
+      items = this.sortRequests(items);
+    }
+
+    // RF-2.3.1.2: Si el Personal de Logística no tiene solicitudes de eventos asignadas,
+    // el sistema debe mostrar el mensaje: “No tiene solicitudes de eventos asignadas.”
+    if (totalRecords === 0) {
+      return {
+        message: "No tiene solicitudes de eventos asignadas.",
+        data: {
+          requests: [],
+          message: "No tiene solicitudes de eventos asignadas.",
+        },
+        metadata: {
+          pagination: {
+            total_records: 0,
+            page,
+            per_page: perPage,
+          },
+        },
+      };
+    }
 
     return {
       data: {
-        requests: paged.map((r) => this.mapRequestDto(r)),
+        requests: items.map((request) => this.mapRequestDto(request)),
       },
       metadata: {
         pagination: {

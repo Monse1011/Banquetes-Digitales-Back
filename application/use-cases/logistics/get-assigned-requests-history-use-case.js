@@ -6,6 +6,17 @@ const HISTORY_STATUSES = Object.freeze([
   "REJECTED",
 ]);
 
+function valueOrFallback(value, fallback = "Sin registrar") {
+  return value || fallback;
+}
+
+function extractTimestamp(request) {
+  if (request.eventDateTime instanceof Date) {
+    return request.eventDateTime.getTime();
+  }
+  return NaN;
+}
+
 class GetAssignedRequestsHistoryUseCase {
   constructor({ reservationRequestRepository } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
@@ -13,71 +24,100 @@ class GetAssignedRequestsHistoryUseCase {
 
   normalizeStatus(status) {
     if (!status) return null;
-    const s = status.trim().toUpperCase();
-    for (const valid of HISTORY_STATUSES) {
-      if (valid.toUpperCase() === s) return valid;
+    const normalized = status.trim().toUpperCase();
+    for (const validStatus of HISTORY_STATUSES) {
+      if (validStatus.toUpperCase() === normalized) return validStatus;
     }
-    const err = new Error("El estado indicado no es válido para el historial.");
-    err.status = 400;
-    throw err;
+    const error = new Error("El estado indicado no es válido para el historial.");
+    error.status = 400;
+    throw error;
   }
 
   matchesStatus(reqStatus, filterStatus) {
     if (filterStatus) {
       return reqStatus.toUpperCase() === filterStatus.toUpperCase();
     }
-    return HISTORY_STATUSES.some((h) => h.toUpperCase() === reqStatus.toUpperCase());
+    return HISTORY_STATUSES.some(
+      (historyStatus) => historyStatus.toUpperCase() === reqStatus.toUpperCase()
+    );
   }
 
-  compareHistory(a, b) {
-    const dateA = a.event_date || a.eventDate || "";
-    const dateB = b.event_date || b.eventDate || "";
+  compareHistory(requestA, requestB) {
+    const timeA = extractTimestamp(requestA);
+    const timeB = extractTimestamp(requestB);
+    if (!Number.isNaN(timeA) && !Number.isNaN(timeB) && timeA !== timeB) {
+      return timeB - timeA;
+    }
+    const dateA = requestA.event_date || requestA.eventDate || "";
+    const dateB = requestB.event_date || requestB.eventDate || "";
     if (dateA !== dateB) {
       return dateB.localeCompare(dateA);
     }
-    return (b.folio || "").localeCompare(a.folio || "");
+    return (requestB.folio || "").localeCompare(requestA.folio || "");
   }
 
   sortRequests(requests) {
-    return requests.sort((a, b) => this.compareHistory(a, b));
+    return [...requests].sort((requestA, requestB) => this.compareHistory(requestA, requestB));
   }
 
-  mapRequestDto(r) {
-    const address = r.event_address || r.eventAddress;
+  mapRequestDto(request) {
     return {
-      request_id: r.id || r.requestId,
-      folio: r.folio,
-      client_name: r.client_name || r.clientName,
-      client_email: r.client_email || r.clientEmail,
-      event_date: r.event_date || r.eventDate,
-      start_time: r.start_time || r.startTime,
-      end_time: r.end_time || r.endTime,
-      event_address: address || "Sin registrar",
-      guest_count: r.guest_count || r.guestCount,
-      status: r.status,
+      request_id: request.id || request.requestId,
+      folio: request.folio,
+      client_name: valueOrFallback(request.client_name || request.clientName),
+      client_email: valueOrFallback(request.client_email || request.clientEmail),
+      event_date: valueOrFallback(request.event_date || request.eventDate, ""),
+      start_time: valueOrFallback(request.start_time || request.startTime, ""),
+      end_time: valueOrFallback(request.end_time || request.endTime, ""),
+      event_address: valueOrFallback(request.event_address || request.eventAddress),
+      guest_count: request.guest_count || request.guestCount,
+      status: request.status,
     };
   }
 
   async execute({ userId, status, page = 1, perPage = 10 }) {
     const filterStatus = this.normalizeStatus(status);
-    const all = await this.reservationRequestRepository.findAll({}, null, 1, 10000);
-    const items = all.requests || all.items || (Array.isArray(all) ? all : []);
 
-    const userHistory = items.filter((r) => {
-      const assignedId = r.logistic_user_id ?? r.logisticUserId;
-      return (
-        Number(assignedId) === Number(userId) && this.matchesStatus(r.status || "", filterStatus)
-      );
-    });
+    const queryFilters = {
+      logisticUserId: userId,
+      status: filterStatus ? [filterStatus, filterStatus.toUpperCase()] : HISTORY_STATUSES,
+    };
+    const sort = { field: "EVENT_DATE", direction: "desc" };
 
-    const sorted = this.sortRequests(userHistory);
-    const totalRecords = sorted.length;
-    const offset = (page - 1) * perPage;
-    const paged = sorted.slice(offset, offset + perPage);
+    const repositoryResult = await this.reservationRequestRepository.findAll(
+      queryFilters,
+      sort,
+      page,
+      perPage
+    );
+
+    let items =
+      repositoryResult.requests ||
+      repositoryResult.items ||
+      (Array.isArray(repositoryResult) ? repositoryResult : []);
+
+    let totalRecords = repositoryResult.totalRecords ?? repositoryResult.total_records;
+
+    // Fallback if repository did not filter in-database
+    if (totalRecords === undefined) {
+      const userHistory = items.filter((request) => {
+        const assignedId = request.logistic_user_id ?? request.logisticUserId;
+        return (
+          Number(assignedId) === Number(userId) &&
+          this.matchesStatus(request.status || "", filterStatus)
+        );
+      });
+      totalRecords = userHistory.length;
+      const sorted = this.sortRequests(userHistory);
+      const offset = (page - 1) * perPage;
+      items = sorted.slice(offset, offset + perPage);
+    } else {
+      items = this.sortRequests(items);
+    }
 
     return {
       data: {
-        requests: paged.map((r) => this.mapRequestDto(r)),
+        requests: items.map((request) => this.mapRequestDto(request)),
       },
       metadata: {
         pagination: {

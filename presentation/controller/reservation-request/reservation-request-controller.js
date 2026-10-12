@@ -118,14 +118,22 @@ class ReservationRequestController {
     const useCase =
       this.listAssignedRequestsUseCase || this.dependencies.listAssignedRequestsUseCase;
 
-    const result = await useCase.execute({
-      userId,
-      status,
-      page,
-      perPage,
-    });
+    try {
+      const result = await useCase.execute({
+        userId,
+        status,
+        page,
+        perPage,
+      });
 
-    response.json(result);
+      response.json(result);
+    } catch (error) {
+      if (error.status === 400 || error.status === 403 || error.status === 404) {
+        response.status(error.status).json({ message: error.message });
+        return;
+      }
+      throw error;
+    }
   }
 
   // Función 3.1: GET /api/logistics/requests/history
@@ -138,19 +146,34 @@ class ReservationRequestController {
     const useCase =
       this.getAssignedRequestsHistoryUseCase || this.dependencies.getAssignedRequestsHistoryUseCase;
 
-    const result = await useCase.execute({
-      userId,
-      status,
-      page,
-      perPage,
-    });
+    try {
+      const result = await useCase.execute({
+        userId,
+        status,
+        page,
+        perPage,
+      });
 
-    response.json(result);
+      response.json(result);
+    } catch (error) {
+      if (error.status === 400 || error.status === 403 || error.status === 404) {
+        response.status(error.status).json({ message: error.message });
+        return;
+      }
+      throw error;
+    }
   }
 
   // Función 3.1: GET /api/logistics/requests/:id
   async getByIdForLogistics(request, response) {
-    const requestId = this.parseId(request.params.id);
+    let requestId;
+    try {
+      requestId = this.parseId(request.params.id);
+    } catch (err) {
+      response.status(400).json({ message: err.message });
+      return;
+    }
+
     const userId = request.user?.id_user ?? request.user?.id;
 
     const useCase =
