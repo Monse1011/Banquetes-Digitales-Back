@@ -14,7 +14,8 @@ class GetUserByIdUseCase {
     }
 
     let assignedRequests;
-    if (user.role === UserRole.LOGISTICS) {
+    const roleUpper = String(user.role || "").toUpperCase();
+    if (roleUpper === UserRole.LOGISTICS || roleUpper === "LOGISTIC" || roleUpper === "LOGISTICA") {
       assignedRequests = await this.userRepository.findAssignedRequestsByUserId(id);
     }
 

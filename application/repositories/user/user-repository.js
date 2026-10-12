@@ -23,6 +23,10 @@ class UserRepository {
     throw new Error("Method updateStatus() must be implemented");
   }
 
+  async delete(_id) {
+    throw new Error("Method delete() must be implemented");
+  }
+
   async countActiveAdmins() {
     throw new Error("Method countActiveAdmins() must be implemented");
   }

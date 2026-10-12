@@ -80,9 +80,18 @@ class InMemoryUserRepository extends UserRepository {
     return this.update(id, { status });
   }
 
+  async delete(id) {
+    const initialLen = this.users.length;
+    this.users = this.users.filter((u) => String(u.id) !== String(id));
+    return this.users.length < initialLen;
+  }
+
   async countActiveAdmins() {
-    return this.users.filter((u) => u.role === UserRole.ADMIN && u.status === UserStatus.ACTIVE)
-      .length;
+    return this.users.filter(
+      (u) =>
+        String(u.role).toUpperCase() === UserRole.ADMIN &&
+        String(u.status).toUpperCase() === UserStatus.ACTIVE
+    ).length;
   }
 
   async hasActiveRequests(userId) {
@@ -94,9 +103,12 @@ class InMemoryUserRepository extends UserRepository {
   }
 
   async findAvailableLogisticsUsers() {
-    return this.users.filter(
-      (u) => u.role === UserRole.LOGISTICS && u.status === UserStatus.ACTIVE
-    );
+    return this.users.filter((u) => {
+      const role = String(u.role).toUpperCase();
+      const status = String(u.status).toUpperCase();
+      const isLogistics = ["LOGISTICS", "LOGISTIC", "LOGISTICA"].includes(role);
+      return isLogistics && status === UserStatus.ACTIVE;
+    });
   }
 
   async findAssignedRequestsByUserId(userId) {

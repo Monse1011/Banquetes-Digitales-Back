@@ -40,13 +40,17 @@ class UpdateUserUseCase {
   }
 
   async validateRole(role, user, id) {
-    const normalizedRole = role.toUpperCase();
-    if (![UserRole.ADMIN, UserRole.LOGISTICS].includes(normalizedRole)) {
-      const err = new Error("Rol no válido. Debe ser ADMIN o LOGISTICS.");
+    let normalizedRole = (role || "").toUpperCase();
+    if (normalizedRole === "LOGISTIC" || normalizedRole === "LOGISTICA") {
+      normalizedRole = UserRole.LOGISTICS;
+    }
+    if (![UserRole.ADMIN, UserRole.LOGISTICS, UserRole.LOGISTIC].includes(normalizedRole)) {
+      const err = new Error("Rol de usuario no válido. Debe ser ADMIN o LOGISTICS.");
       err.status = 400;
       throw err;
     }
-    if (normalizedRole !== user.role) {
+    const currentRoleUpper = String(user.role || "").toUpperCase();
+    if (normalizedRole !== currentRoleUpper) {
       const hasActive = await this.userRepository.hasActiveRequests(id);
       if (hasActive) {
         const msg = "El usuario tiene solicitudes asignadas activas y su rol no puede modificarse.";

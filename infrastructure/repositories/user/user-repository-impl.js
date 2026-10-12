@@ -2,6 +2,9 @@ const UserRepository = require("../../../application/repositories/user/user-repo
 const User = require("../../../domain/entities/user/user");
 const UserRole = require("../../../domain/enums/auth/user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
+const {
+  ActiveReservationRequestStatuses,
+} = require("../../../domain/enums/reservation-request/request-status");
 
 class UserRepositoryImpl extends UserRepository {
   constructor({ pool } = {}) {
@@ -166,6 +169,12 @@ class UserRepositoryImpl extends UserRepository {
     return result.rows[0];
   }
 
+  async delete(id) {
+    const query = "DELETE FROM users WHERE id = $1";
+    await this.pool.query(query, [id]);
+    return true;
+  }
+
   async countActiveAdmins() {
     const query = `
       SELECT COUNT(*) AS total
@@ -177,31 +186,13 @@ class UserRepositoryImpl extends UserRepository {
   }
 
   async hasActiveRequests(userId) {
-    const activeStatuses = [
-      "ASSIGNED",
-      "Asignada",
-      "ASIGNADA",
-      "COORDINATION_READY",
-      "Coordinación Lista",
-      "Coordinacion Lista",
-      "COORDINATION_INCOMPLETE",
-      "Coordinación Incompleta",
-      "Coordinacion Incompleta",
-      "PROPOSAL_GENERATED",
-      "Propuesta generada",
-      "PROPUESTA_GENERADA",
-      "CONFIRMED",
-      "Confirmado",
-      "CONFIRMADO",
-    ];
-
     const query = `
       SELECT COUNT(*) AS total
       FROM reservation_requests
       WHERE logistic_user_id = $1 AND status = ANY($2::text[])
     `;
     try {
-      const result = await this.pool.query(query, [userId, activeStatuses]);
+      const result = await this.pool.query(query, [userId, ActiveReservationRequestStatuses]);
       return parseInt(result.rows[0].total, 10) > 0;
     } catch (_err) {
       return false;

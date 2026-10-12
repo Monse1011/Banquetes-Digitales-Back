@@ -27,7 +27,7 @@ class ToggleUserStatusUseCase {
       err.status = 409;
       throw err;
     }
-    if (user.role === UserRole.ADMIN) {
+    if (String(user.role).toUpperCase() === UserRole.ADMIN) {
       const activeAdminsCount = await this.userRepository.countActiveAdmins();
       if (activeAdminsCount <= 1) {
         const err = new Error("No se permite desactivar al único Administrador General activo.");

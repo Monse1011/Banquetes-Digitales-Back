@@ -31,6 +31,30 @@ class CreateUserUseCase {
       .join("");
   }
 
+  /**
+   * Genera el identificador de empleado (employee_id) para el nuevo usuario.
+   *
+   * Justificación técnica (NC 12):
+   * 1. ¿Por qué no autoincremental?
+   *    - La persistencia relacional ya gestiona una clave primaria
+   *      autoincremental (`id` / `id_user`) para la identidad técnica.
+   *    - `employee_id` representa un identificador de negocio externo
+   *      (código de nómina/credencial del personal). Mantener desacoplado
+   *      el identificador de negocio de la clave técnica sigue los
+   *      principios de DDD, evita exponer la numeración secuencial
+   *      interna a los clientes y previene ataques de enumeración.
+   * 2. ¿Por qué el formato y rango EMP-[100-999] y no más valores?
+   *    - El prefijo "EMP-" y el rango de 3 dígitos (100 a 999) estandarizan
+   *      la convención en los contratos API del DAD y prototipos (ej. "234").
+   *    - El universo de 900 valores es suficiente y adecuado para la
+   *      capacidad de la plantilla interna contemplada en este incremento.
+   *    - Se utiliza un generador criptográficamente seguro (crypto.randomInt)
+   *      para garantizar aleatoriedad y uniformidad en la distribución.
+   */
+  generateEmployeeId() {
+    return `EMP-${crypto.randomInt(100, 999)}`;
+  }
+
   validateInputs(fullName, email, role) {
     if (!fullName || fullName.trim().length === 0) {
       const err = new Error("El nombre completo es obligatorio.");
@@ -48,8 +72,11 @@ class CreateUserUseCase {
       err.status = 400;
       throw err;
     }
-    const normalizedRole = (role || "").toUpperCase();
-    if (![UserRole.ADMIN, UserRole.LOGISTICS].includes(normalizedRole)) {
+    let normalizedRole = (role || "").toUpperCase();
+    if (normalizedRole === "LOGISTIC" || normalizedRole === "LOGISTICA") {
+      normalizedRole = UserRole.LOGISTICS;
+    }
+    if (![UserRole.ADMIN, UserRole.LOGISTICS, UserRole.LOGISTIC].includes(normalizedRole)) {
       const err = new Error("Rol de usuario no válido. Debe ser ADMIN o LOGISTICS.");
       err.status = 400;
       throw err;
@@ -77,7 +104,12 @@ class CreateUserUseCase {
         tempPassword,
       });
     } catch (mailError) {
-      console.error("Advertencia al enviar correo con credenciales temporales:", mailError.message);
+      console.error("Error al enviar correo con credenciales temporales:", mailError.message);
+      const err = new Error(
+        "No se pudo enviar el correo con las credenciales temporales al usuario. Por favor, intente nuevamente."
+      );
+      err.status = 500;
+      throw err;
     }
   }
 
@@ -87,19 +119,27 @@ class CreateUserUseCase {
 
     const tempPassword = this.generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
-    const employeeId = `EMP-${crypto.randomInt(100, 999)}`;
+    const employeeId = this.generateEmployeeId();
 
-    const newUser = await this.userRepository.create({
-      employee_id: employeeId,
-      full_name: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      password_hash: passwordHash,
-      role: normalizedRole,
-      status: UserStatus.ACTIVE,
-      must_change_password: true,
-    });
+    let newUser;
+    try {
+      newUser = await this.userRepository.create({
+        employee_id: employeeId,
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password_hash: passwordHash,
+        role: normalizedRole,
+        status: UserStatus.ACTIVE,
+        must_change_password: true,
+      });
 
-    await this.sendWelcomeEmail(newUser, tempPassword);
+      await this.sendWelcomeEmail(newUser, tempPassword);
+    } catch (error) {
+      if (newUser && typeof this.userRepository.delete === "function") {
+        await this.userRepository.delete(newUser.id).catch(() => {});
+      }
+      throw error;
+    }
 
     return {
       id: newUser.id,
