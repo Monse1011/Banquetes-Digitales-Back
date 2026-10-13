@@ -173,6 +173,17 @@ class UserRepositoryImpl extends UserRepository {
     return result.rows[0];
   }
 
+  async updateCredentials(id, { password_hash: passwordHash, must_change_password: mustChange }) {
+    const query = `
+      UPDATE users
+      SET password_hash = $2, must_change_password = $3, updated_at = NOW()
+      WHERE id = $1
+      RETURNING id
+    `;
+    const result = await this.pool.query(query, [id, passwordHash, mustChange]);
+    return result.rows[0] || null;
+  }
+
   async existsByEmployeeId(employeeId) {
     const result = await this.pool.query("SELECT 1 FROM users WHERE employee_id = $1 LIMIT 1", [
       employeeId,

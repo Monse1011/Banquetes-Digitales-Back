@@ -77,6 +77,10 @@ class InMemoryUserRepository extends UserRepository {
     return new User(updated);
   }
 
+  async updateCredentials(id, { password_hash: passwordHash, must_change_password: mustChange }) {
+    return this.update(id, { password_hash: passwordHash, must_change_password: mustChange });
+  }
+
   async existsByEmployeeId(employeeId) {
     return this.users.some((u) => u.employee_id === employeeId);
   }

@@ -420,6 +420,21 @@ const openApiDocument = {
         },
       },
     },
+    "/api/admin/users/{id}/credentials": {
+      post: {
+        tags: ["User management"],
+        summary:
+          "Resend credentials: new temporary password, previous one invalidated (RF-1.2.12.3)",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          204: { description: "Credentials resent" },
+          404: { description: "User not found" },
+          409: { description: "User inactive or already defined their password" },
+          502: { description: "The email with the temporary password could not be sent" },
+        },
+      },
+    },
     "/api/admin/users/usersavailable": {
       get: {
         tags: ["Event assignment"],

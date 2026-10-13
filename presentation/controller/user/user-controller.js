@@ -79,6 +79,14 @@ class UserController {
     });
   }
 
+  // POST /api/admin/users/:id/credentials (RF-1.2.12.3: Reenviar credenciales)
+  async resendCredentials(request, response) {
+    const { id } = request.params;
+    await this.dependencies.resendUserCredentialsUseCase.execute(id);
+
+    return response.status(204).send();
+  }
+
   // PUT /api/admin/users/:id
   async toggleStatus(request, response) {
     const { id } = request.params;

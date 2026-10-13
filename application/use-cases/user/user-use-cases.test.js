@@ -4,6 +4,7 @@ const UpdateUserUseCase = require("./update-user-use-case");
 const ToggleUserStatusUseCase = require("./toggle-user-status-use-case");
 const GetUserByIdUseCase = require("./get-user-by-id-use-case");
 const ListUsersUseCase = require("./list-users-use-case");
+const ResendUserCredentialsUseCase = require("./resend-user-credentials-use-case");
 const CredentialsDeliveryException = require("../../../domain/exceptions/user/credentials-delivery-exception");
 const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 const { generateUniqueEmployeeId } = require("../../services/user/employee-id-generator");
@@ -135,6 +136,54 @@ describe("User Management Use Cases (Función 2.12)", () => {
     });
   });
 
+  describe("NC 10 - Reenviar credenciales (RF-1.2.12.3)", () => {
+    let resend;
+    let pendingUser;
+
+    beforeEach(async () => {
+      const create = new CreateUserUseCase({ userRepository, emailService });
+      pendingUser = await create.execute({
+        full_name: "Pendiente",
+        email: "pendiente@test.com",
+        role: "LOGISTICS",
+      });
+      emailService.sendCredentials.mockClear();
+      resend = new ResendUserCredentialsUseCase({ userRepository, emailService });
+    });
+
+    it("genera una nueva contraseña, invalida la anterior y la envía por correo", async () => {
+      const before = (await userRepository.findById(pendingUser.id)).password_hash;
+      await resend.execute(pendingUser.id);
+      const after = await userRepository.findById(pendingUser.id);
+      expect(after.password_hash).not.toBe(before);
+      expect(after.must_change_password).toBe(true);
+      expect(emailService.sendCredentials).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "pendiente@test.com" })
+      );
+    });
+
+    it("responde 404 si el usuario no existe", async () => {
+      await expect(resend.execute(999)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("responde 409 si el usuario está inactivo o ya definió su contraseña", async () => {
+      await userRepository.updateStatus(pendingUser.id, UserStatus.INACTIVE);
+      await expect(resend.execute(pendingUser.id)).rejects.toMatchObject({ status: 409 });
+
+      await userRepository.updateStatus(pendingUser.id, UserStatus.ACTIVE);
+      await userRepository.update(pendingUser.id, { must_change_password: false });
+      await expect(resend.execute(pendingUser.id)).rejects.toMatchObject({ status: 409 });
+      expect(emailService.sendCredentials).not.toHaveBeenCalled();
+    });
+
+    it("informa si el reenvío vuelve a fallar", async () => {
+      emailService.sendCredentials.mockRejectedValue(new Error("SMTP down"));
+      await expect(resend.execute(pendingUser.id)).rejects.toBeInstanceOf(
+        CredentialsDeliveryException
+      );
+    });
+  });
+
   describe("NC 11 - Active reservation request status checking with Enum", () => {
     it("UserResponsibilityReservationRequestStatuses includes required active statuses from RF-1.2.12.10", () => {
       expect(UserResponsibilityReservationRequestStatuses).toContain(
@@ -204,10 +253,10 @@ describe("User Management Use Cases (Función 2.12)", () => {
   });
 
   describe("NC 12 - Employee ID format and technical justification", () => {
-    it("generates employee_id matching EMP-[100-999]", async () => {
+    it("generates employee_id matching the DAD format (3-digit string 100-999)", async () => {
       const empId = await generateUniqueEmployeeId(userRepository);
-      expect(empId).toMatch(/^EMP-\d{3}$/);
-      const num = parseInt(empId.replace("EMP-", ""), 10);
+      expect(empId).toMatch(/^\d{3}$/);
+      const num = parseInt(empId, 10);
       expect(num).toBeGreaterThanOrEqual(100);
       expect(num).toBeLessThanOrEqual(999);
     });
@@ -216,7 +265,7 @@ describe("User Management Use Cases (Función 2.12)", () => {
       const repository = { existsByEmployeeId: vi.fn() };
       repository.existsByEmployeeId.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
       const randomInt = vi.fn().mockReturnValueOnce(111).mockReturnValueOnce(999);
-      await expect(generateUniqueEmployeeId(repository, randomInt)).resolves.toBe("EMP-999");
+      await expect(generateUniqueEmployeeId(repository, randomInt)).resolves.toBe("999");
       expect(randomInt).toHaveBeenLastCalledWith(100, 1000);
     });
 

@@ -2,6 +2,7 @@
 const request = require("supertest");
 const { createApp } = require("../app");
 const InMemoryUserRepository = require("../../infrastructure/repositories/user/in-memory-user-repository");
+const ResendUserCredentialsUseCase = require("../../application/use-cases/user/resend-user-credentials-use-case");
 const CreateUserUseCase = require("../../application/use-cases/user/create-user-use-case");
 const UpdateUserUseCase = require("../../application/use-cases/user/update-user-use-case");
 const ToggleUserStatusUseCase = require("../../application/use-cases/user/toggle-user-status-use-case");
@@ -34,6 +35,10 @@ describe("Admin User Routes (Función 2.12 - DAD API Contracts)", () => {
     const toggleUserStatusUseCase = new ToggleUserStatusUseCase({ userRepository });
     const getUserByIdUseCase = new GetUserByIdUseCase({ userRepository });
     const listUsersUseCase = new ListUsersUseCase({ userRepository });
+    const resendUserCredentialsUseCase = new ResendUserCredentialsUseCase({
+      userRepository,
+      emailService,
+    });
     const getAvailableLogisticsUsersUseCase = new GetAvailableLogisticsUsersUseCase(userRepository);
 
     app = createApp({
@@ -41,6 +46,7 @@ describe("Admin User Routes (Función 2.12 - DAD API Contracts)", () => {
         verifyToken: () => ({ id_user: currentUserId, role: currentUserRole }),
       },
       createUserUseCase,
+      resendUserCredentialsUseCase,
       updateUserUseCase,
       toggleUserStatusUseCase,
       getUserByIdUseCase,
@@ -125,6 +131,30 @@ describe("Admin User Routes (Función 2.12 - DAD API Contracts)", () => {
 
     expect(response.status).toBe(502);
     expect(response.body.message).toContain("no se pudo enviar el correo");
+  });
+
+  it("POST /api/admin/users/:id/credentials resends credentials with 204 (RF-1.2.12.3)", async () => {
+    const created = await request(app)
+      .post("/api/admin/users")
+      .set("Cookie", ["auth_token=valid"])
+      .send({ data: { full_name: "Reenvio", email: "reenvio@test.com", role: "LOGISTICS" } });
+    expect(created.status).toBe(201);
+    const id = Number(created.headers.location.split("/").pop());
+    emailService.sendCredentials.mockClear();
+
+    const response = await request(app)
+      .post(`/api/admin/users/${id}/credentials`)
+      .set("Cookie", ["auth_token=valid"]);
+
+    expect(response.status).toBe(204);
+    expect(emailService.sendCredentials).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /api/admin/users/:id/credentials returns 404 for an unknown user", async () => {
+    const response = await request(app)
+      .post("/api/admin/users/9999/credentials")
+      .set("Cookie", ["auth_token=valid"]);
+    expect(response.status).toBe(404);
   });
 
   it("GET /api/admin/users returns paginated users", async () => {

@@ -23,6 +23,10 @@ class UserRepository {
     throw new Error("Method updateStatus() must be implemented");
   }
 
+  async updateCredentials(_id, _credentials) {
+    throw new Error("Method updateCredentials() must be implemented");
+  }
+
   async existsByEmployeeId(_employeeId) {
     throw new Error("Method existsByEmployeeId() must be implemented");
   }

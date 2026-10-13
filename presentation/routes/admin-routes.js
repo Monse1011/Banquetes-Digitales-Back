@@ -43,6 +43,10 @@ function createAdminRoutes(reservationRequestController, userController, authMid
     userController.update(request, response).catch(next);
   });
 
+  router.post("/users/:id/credentials", (request, response, next) => {
+    userController.resendCredentials(request, response).catch(next);
+  });
+
   router.put("/users/:id", (request, response, next) => {
     userController.toggleStatus(request, response).catch(next);
   });
