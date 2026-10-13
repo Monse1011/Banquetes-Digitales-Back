@@ -4,7 +4,7 @@ const requireRole = require("../middleware/auth/role-middleware");
 
 function createLogisticsRoutes(resourceControllers, authMiddleware) {
   const router = express.Router();
-  router.use(authMiddleware, requireRole(UserRole.LOGISTICA));
+  router.use(authMiddleware, requireRole(UserRole.LOGISTICS));
 
   ["human", "material", "logistic"].forEach((type) => {
     router.get(`/resources/${type}`, (request, response, next) => {

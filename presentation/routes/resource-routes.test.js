@@ -227,7 +227,7 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
     let app;
 
     beforeEach(() => {
-      app = buildApp(UserRole.LOGISTICA);
+      app = buildApp(UserRole.LOGISTICS);
     });
 
     it("cannot manage the resource catalogs", async () => {

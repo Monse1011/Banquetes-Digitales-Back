@@ -1,6 +1,10 @@
 const User = require("../../../domain/entities/auth/user");
 const UserStatus = require("../../../domain/enums/auth/user-status");
 const UserRole = require("../../../domain/enums/auth/user-role");
+const {
+  normalizeUserRole,
+  roleQueryValues,
+} = require("../../../domain/enums/auth/normalize-user-role");
 
 class PostgresUserRepository {
   constructor(pool) {
@@ -47,9 +51,9 @@ class PostgresUserRepository {
             SELECT id_user, id_employee, full_name, email, password_hash,
                     role, status, creation_date, last_access
             FROM users
-            WHERE role = $1 AND status = $2
+            WHERE UPPER(role) = ANY($1::text[]) AND status = $2
             ORDER BY full_name`,
-      [role, UserStatus.ACTIVE]
+      [roleQueryValues(role), UserStatus.ACTIVE]
     );
     return result.rows.map((row) => this.toEntity(row));
   }
@@ -86,8 +90,8 @@ class PostgresUserRepository {
     const rawStatus = row.status ? String(row.status).toLowerCase() : "";
     const status = rawStatus === UserStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE;
 
-    const rawRole = row.role ? String(row.role).toUpperCase() : "";
-    const role = rawRole === "ADMIN" ? UserRole.ADMIN : UserRole.LOGISTICS;
+    const role =
+      normalizeUserRole(row.role) === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICS;
 
     return new User(
       Number(row.id_user),

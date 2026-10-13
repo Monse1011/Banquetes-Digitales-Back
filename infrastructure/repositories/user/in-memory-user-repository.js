@@ -1,6 +1,7 @@
 const UserRepository = require("../../../application/repositories/user/user-repository");
 const User = require("../../../domain/entities/user/user");
 const UserRole = require("../../../domain/enums/auth/user-role");
+const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
 
 class InMemoryUserRepository extends UserRepository {
@@ -26,7 +27,7 @@ class InMemoryUserRepository extends UserRepository {
     }
 
     if (role) {
-      filtered = filtered.filter((u) => u.role === role);
+      filtered = filtered.filter((u) => normalizeUserRole(u.role) === normalizeUserRole(role));
     }
 
     if (status) {
@@ -76,20 +77,18 @@ class InMemoryUserRepository extends UserRepository {
     return new User(updated);
   }
 
-  async updateStatus(id, status) {
-    return this.update(id, { status });
+  async existsByEmployeeId(employeeId) {
+    return this.users.some((u) => u.employee_id === employeeId);
   }
 
-  async delete(id) {
-    const initialLen = this.users.length;
-    this.users = this.users.filter((u) => String(u.id) !== String(id));
-    return this.users.length < initialLen;
+  async updateStatus(id, status) {
+    return this.update(id, { status });
   }
 
   async countActiveAdmins() {
     return this.users.filter(
       (u) =>
-        String(u.role).toUpperCase() === UserRole.ADMIN &&
+        normalizeUserRole(u.role) === UserRole.ADMIN &&
         String(u.status).toUpperCase() === UserStatus.ACTIVE
     ).length;
   }
@@ -103,12 +102,11 @@ class InMemoryUserRepository extends UserRepository {
   }
 
   async findAvailableLogisticsUsers() {
-    return this.users.filter((u) => {
-      const role = String(u.role).toUpperCase();
-      const status = String(u.status).toUpperCase();
-      const isLogistics = ["LOGISTICS", "LOGISTIC", "LOGISTICA"].includes(role);
-      return isLogistics && status === UserStatus.ACTIVE;
-    });
+    return this.users.filter(
+      (u) =>
+        normalizeUserRole(u.role) === UserRole.LOGISTICS &&
+        String(u.status).toUpperCase() === UserStatus.ACTIVE
+    );
   }
 
   async findAssignedRequestsByUserId(userId) {

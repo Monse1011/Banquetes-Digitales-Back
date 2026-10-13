@@ -1,4 +1,5 @@
 const UserRole = require("../../../domain/enums/auth/user-role");
+const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 
 class GetUserByIdUseCase {
   constructor({ userRepository } = {}) {
@@ -14,8 +15,7 @@ class GetUserByIdUseCase {
     }
 
     let assignedRequests;
-    const roleUpper = String(user.role || "").toUpperCase();
-    if (roleUpper === UserRole.LOGISTICS || roleUpper === "LOGISTIC" || roleUpper === "LOGISTICA") {
+    if (normalizeUserRole(user.role) === UserRole.LOGISTICS) {
       assignedRequests = await this.userRepository.findAssignedRequestsByUserId(id);
     }
 

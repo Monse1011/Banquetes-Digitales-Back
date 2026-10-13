@@ -10,6 +10,7 @@ const {
   ReservationRequestSortField,
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
 const UserRole = require("../../../domain/enums/auth/user-role");
+const { roleQueryValues } = require("../../../domain/enums/auth/normalize-user-role");
 const UserStatus = require("../../../domain/enums/auth/user-status");
 
 const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
@@ -200,9 +201,9 @@ class PostgresReservationRequestRepository {
     const userResult = await connection.query(
       `SELECT id_user
        FROM users
-       WHERE id_user = $1 AND role = $2 AND status = $3
+       WHERE id_user = $1 AND UPPER(role) = ANY($2::text[]) AND status = $3
        FOR UPDATE`,
-      [logisticUserId, UserRole.LOGISTICA, UserStatus.ACTIVE]
+      [logisticUserId, roleQueryValues(UserRole.LOGISTICS), UserStatus.ACTIVE]
     );
 
     if (!userResult.rows[0]) {

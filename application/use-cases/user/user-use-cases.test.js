@@ -4,13 +4,16 @@ const UpdateUserUseCase = require("./update-user-use-case");
 const ToggleUserStatusUseCase = require("./toggle-user-status-use-case");
 const GetUserByIdUseCase = require("./get-user-by-id-use-case");
 const ListUsersUseCase = require("./list-users-use-case");
-const ResendCredentialsUseCase = require("./resend-credentials-use-case");
+const CredentialsDeliveryException = require("../../../domain/exceptions/user/credentials-delivery-exception");
+const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
+const { generateUniqueEmployeeId } = require("../../services/user/employee-id-generator");
+const UserRepositoryImpl = require("../../../infrastructure/repositories/user/user-repository-impl");
 const InMemoryUserRepository = require("../../../infrastructure/repositories/user/in-memory-user-repository");
 const UserRole = require("../../../domain/enums/auth/user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
 const {
   ReservationRequestStatus,
-  ActiveReservationRequestStatuses,
+  UserResponsibilityReservationRequestStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
 
 describe("User Management Use Cases (Función 2.12)", () => {
@@ -43,7 +46,7 @@ describe("User Management Use Cases (Función 2.12)", () => {
       expect(logistics.role).toBe(UserRole.LOGISTICS);
     });
 
-    it("normalizes lowercase role and alias LOGISTIC / LOGISTICA to LOGISTICS", async () => {
+    it("normalizes lowercase roles to the DAD enum values", async () => {
       const useCase = new CreateUserUseCase({ userRepository, emailService });
 
       const user1 = await useCase.execute({
@@ -53,19 +56,25 @@ describe("User Management Use Cases (Función 2.12)", () => {
       });
       expect(user1.role).toBe(UserRole.LOGISTICS);
 
-      const user2 = await useCase.execute({
-        full_name: "User 2",
-        email: "u2@test.com",
-        role: "LOGISTIC",
-      });
-      expect(user2.role).toBe(UserRole.LOGISTICS);
-
       const user3 = await useCase.execute({
         full_name: "User 3",
         email: "u3@test.com",
         role: "admin",
       });
       expect(user3.role).toBe(UserRole.ADMIN);
+    });
+
+    it("rejects LOGISTIC (not a UserRole value in the DAD) and keeps a single enum key", async () => {
+      const useCase = new CreateUserUseCase({ userRepository, emailService });
+      await expect(
+        useCase.execute({ full_name: "User", email: "x@test.com", role: "LOGISTIC" })
+      ).rejects.toMatchObject({ status: 400 });
+      expect(Object.keys(UserRole)).toEqual(["ADMIN", "LOGISTICS"]);
+    });
+
+    it("maps the legacy stored value logistica to LOGISTICS", () => {
+      expect(normalizeUserRole("logistica")).toBe(UserRole.LOGISTICS);
+      expect(normalizeUserRole(null)).toBeNull();
     });
 
     it("rejects invalid role with 400 error", async () => {
@@ -102,62 +111,63 @@ describe("User Management Use Cases (Función 2.12)", () => {
     });
   });
 
-  describe("NC 10 - Email failure handling and credential rollback/resend", () => {
-    it("fails with 500 and descriptive message when email sending fails, rolling back user creation", async () => {
+  describe("NC 10 - Email failure handling", () => {
+    it("reports a 502 to the administrator and keeps the created user when email sending fails", async () => {
       emailService.sendCredentials = vi.fn().mockRejectedValue(new Error("SMTP server down"));
       const useCase = new CreateUserUseCase({ userRepository, emailService });
 
-      await expect(
-        useCase.execute({
-          full_name: "Failing Email",
-          email: "fail@test.com",
-          role: "LOGISTICS",
-        })
-      ).rejects.toThrow("No se pudo enviar el correo con las credenciales temporales");
-
-      // Verify rollback occurred: user was removed so they don't block subsequent retry
-      const inRepo = await userRepository.findByEmail("fail@test.com");
-      expect(inRepo).toBeNull();
-
-      // Should be able to register again once email succeeds
-      emailService.sendCredentials = vi.fn().mockResolvedValue(true);
-      const retryUser = await useCase.execute({
+      const promise = useCase.execute({
         full_name: "Failing Email",
         email: "fail@test.com",
         role: "LOGISTICS",
       });
-      expect(retryUser.id).toBeDefined();
+      await expect(promise).rejects.toBeInstanceOf(CredentialsDeliveryException);
+      await expect(promise).rejects.toMatchObject({ status: 502 });
+
+      expect(await userRepository.findByEmail("fail@test.com")).not.toBeNull();
     });
 
-    it("ResendCredentialsUseCase regenerates temporary password and sends new credentials", async () => {
-      const createUseCase = new CreateUserUseCase({ userRepository, emailService });
-      const user = await createUseCase.execute({
-        full_name: "Resend Target",
-        email: "resend@test.com",
-        role: "LOGISTICS",
-      });
-
-      const resendUseCase = new ResendCredentialsUseCase({ userRepository, emailService });
-      const result = await resendUseCase.execute(user.id);
-
-      expect(result.message).toContain("Credenciales temporales regeneradas");
-      expect(emailService.sendCredentials).toHaveBeenCalledTimes(2);
+    it("fails explicitly when no email service is configured", async () => {
+      const useCase = new CreateUserUseCase({ userRepository });
+      await expect(
+        useCase.execute({ full_name: "No Mail", email: "nomail@test.com", role: "ADMIN" })
+      ).rejects.toBeInstanceOf(CredentialsDeliveryException);
     });
   });
 
   describe("NC 11 - Active reservation request status checking with Enum", () => {
-    it("ActiveReservationRequestStatuses includes required active statuses from RF-1.2.12.10", () => {
-      expect(ActiveReservationRequestStatuses).toContain(ReservationRequestStatus.ASSIGNED);
-      expect(ActiveReservationRequestStatuses).toContain(
+    it("UserResponsibilityReservationRequestStatuses includes required active statuses from RF-1.2.12.10", () => {
+      expect(UserResponsibilityReservationRequestStatuses).toContain(
+        ReservationRequestStatus.ASSIGNED
+      );
+      expect(UserResponsibilityReservationRequestStatuses).toContain(
         ReservationRequestStatus.COORDINATION_READY
       );
-      expect(ActiveReservationRequestStatuses).toContain(
+      expect(UserResponsibilityReservationRequestStatuses).toContain(
         ReservationRequestStatus.COORDINATION_INCOMPLETE
       );
-      expect(ActiveReservationRequestStatuses).toContain(
+      expect(UserResponsibilityReservationRequestStatuses).toContain(
         ReservationRequestStatus.PROPOSAL_GENERATED
       );
-      expect(ActiveReservationRequestStatuses).toContain(ReservationRequestStatus.CONFIRMED);
+      expect(UserResponsibilityReservationRequestStatuses).toContain(
+        ReservationRequestStatus.CONFIRMED
+      );
+    });
+
+    it("hasActiveRequests queries with the enum statuses", async () => {
+      const pool = { query: vi.fn().mockResolvedValue({ rows: [{ total: "1" }] }) };
+      const repository = new UserRepositoryImpl({ pool });
+      await expect(repository.hasActiveRequests(3)).resolves.toBe(true);
+      expect(pool.query.mock.calls[0][1][1]).toEqual([
+        ...UserResponsibilityReservationRequestStatuses,
+      ]);
+    });
+
+    it("only holds values taken from the ReservationRequestStatus enum", () => {
+      const enumValues = Object.values(ReservationRequestStatus);
+      UserResponsibilityReservationRequestStatuses.forEach((status) => {
+        expect(enumValues).toContain(status);
+      });
     });
 
     it("blocks modifying user role when user has active requests", async () => {
@@ -195,13 +205,25 @@ describe("User Management Use Cases (Función 2.12)", () => {
 
   describe("NC 12 - Employee ID format and technical justification", () => {
     it("generates employee_id matching EMP-[100-999]", async () => {
-      const useCase = new CreateUserUseCase({ userRepository, emailService });
-      const empId = useCase.generateEmployeeId();
-
+      const empId = await generateUniqueEmployeeId(userRepository);
       expect(empId).toMatch(/^EMP-\d{3}$/);
       const num = parseInt(empId.replace("EMP-", ""), 10);
       expect(num).toBeGreaterThanOrEqual(100);
-      expect(num).toBeLessThan(1000);
+      expect(num).toBeLessThanOrEqual(999);
+    });
+
+    it("includes the upper bound 999 and retries when the id already exists", async () => {
+      const repository = { existsByEmployeeId: vi.fn() };
+      repository.existsByEmployeeId.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const randomInt = vi.fn().mockReturnValueOnce(111).mockReturnValueOnce(999);
+      await expect(generateUniqueEmployeeId(repository, randomInt)).resolves.toBe("EMP-999");
+      expect(randomInt).toHaveBeenLastCalledWith(100, 1000);
+    });
+
+    it("fails after exhausting the attempts", async () => {
+      const repository = { existsByEmployeeId: vi.fn().mockResolvedValue(true) };
+      await expect(generateUniqueEmployeeId(repository, () => 123)).rejects.toThrow();
+      expect(repository.existsByEmployeeId).toHaveBeenCalledTimes(10);
     });
   });
 

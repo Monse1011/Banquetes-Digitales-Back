@@ -1,4 +1,5 @@
 const UserRole = require("../../../domain/enums/auth/user-role");
+const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
 
 class ToggleUserStatusUseCase {
@@ -27,7 +28,7 @@ class ToggleUserStatusUseCase {
       err.status = 409;
       throw err;
     }
-    if (String(user.role).toUpperCase() === UserRole.ADMIN) {
+    if (normalizeUserRole(user.role) === UserRole.ADMIN) {
       const activeAdminsCount = await this.userRepository.countActiveAdmins();
       if (activeAdminsCount <= 1) {
         const err = new Error("No se permite desactivar al único Administrador General activo.");

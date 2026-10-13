@@ -1,8 +1,7 @@
+// Valores públicos del contrato (DAD, "Respetar valores de los enums": UserRole).
 const UserRole = Object.freeze({
   ADMIN: "ADMIN",
-  LOGISTIC: "LOGISTICS",
   LOGISTICS: "LOGISTICS",
-  LOGISTICA: "LOGISTICS",
 });
 
 module.exports = UserRole;

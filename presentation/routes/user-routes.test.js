@@ -109,7 +109,7 @@ describe("Admin User Routes (Función 2.12 - DAD API Contracts)", () => {
     expect(duplicateResponse.body.message).toContain("Ya existe un usuario registrado");
   });
 
-  it("POST /api/admin/users returns 500 when email service fails (NC 10)", async () => {
+  it("POST /api/admin/users returns 502 when email service fails (NC 10)", async () => {
     emailService.sendCredentials.mockRejectedValueOnce(new Error("SMTP down"));
 
     const response = await request(app)
@@ -123,8 +123,8 @@ describe("Admin User Routes (Función 2.12 - DAD API Contracts)", () => {
         },
       });
 
-    expect(response.status).toBe(500);
-    expect(response.body.message).toContain("No se pudo enviar el correo");
+    expect(response.status).toBe(502);
+    expect(response.body.message).toContain("no se pudo enviar el correo");
   });
 
   it("GET /api/admin/users returns paginated users", async () => {
