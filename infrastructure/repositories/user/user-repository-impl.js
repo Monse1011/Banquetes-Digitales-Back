@@ -3,10 +3,6 @@ const User = require("../../../domain/entities/user/user");
 const UserRole = require("../../../domain/enums/auth/user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
 const {
-  normalizeUserRole,
-  roleQueryValues,
-} = require("../../../domain/enums/auth/normalize-user-role");
-const {
   UserResponsibilityReservationRequestStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
 
@@ -24,7 +20,7 @@ class UserRepositoryImpl extends UserRepository {
       full_name: row.full_name,
       email: row.email,
       password_hash: row.password_hash,
-      role: normalizeUserRole(row.role) || row.role,
+      role: row.role,
       status: row.status,
       must_change_password: row.must_change_password,
       last_access: row.last_access ? row.last_access.toISOString() : null,
@@ -48,8 +44,8 @@ class UserRepositoryImpl extends UserRepository {
     }
 
     if (role) {
-      conditions.push(`UPPER(role) = ANY($${paramIndex}::text[])`);
-      params.push(roleQueryValues(role));
+      conditions.push(`role = $${paramIndex}`);
+      params.push(role);
       paramIndex++;
     }
 
@@ -195,12 +191,9 @@ class UserRepositoryImpl extends UserRepository {
     const query = `
       SELECT COUNT(*) AS total
       FROM users
-      WHERE UPPER(role) = ANY($1::text[]) AND status = $2
+      WHERE role = $1 AND status = $2
     `;
-    const result = await this.pool.query(query, [
-      roleQueryValues(UserRole.ADMIN),
-      UserStatus.ACTIVE,
-    ]);
+    const result = await this.pool.query(query, [UserRole.ADMIN, UserStatus.ACTIVE]);
     return parseInt(result.rows[0].total, 10);
   }
 
@@ -225,13 +218,10 @@ class UserRepositoryImpl extends UserRepository {
     const query = `
       SELECT id, employee_id, full_name
       FROM users
-      WHERE UPPER(role) = ANY($1::text[]) AND status = $2
+      WHERE role = $1 AND status = $2
       ORDER BY full_name ASC
     `;
-    const result = await this.pool.query(query, [
-      roleQueryValues(UserRole.LOGISTICS),
-      UserStatus.ACTIVE,
-    ]);
+    const result = await this.pool.query(query, [UserRole.LOGISTICS, UserStatus.ACTIVE]);
     return result.rows;
   }
 

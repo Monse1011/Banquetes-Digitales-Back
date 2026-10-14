@@ -6,7 +6,6 @@ const GetUserByIdUseCase = require("./get-user-by-id-use-case");
 const ListUsersUseCase = require("./list-users-use-case");
 const ResendUserCredentialsUseCase = require("./resend-user-credentials-use-case");
 const CredentialsDeliveryException = require("../../../domain/exceptions/user/credentials-delivery-exception");
-const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 const { generateUniqueEmployeeId } = require("../../services/user/employee-id-generator");
 const UserRepositoryImpl = require("../../../infrastructure/repositories/user/user-repository-impl");
 const InMemoryUserRepository = require("../../../infrastructure/repositories/user/in-memory-user-repository");
@@ -47,35 +46,20 @@ describe("User Management Use Cases (Función 2.12)", () => {
       expect(logistics.role).toBe(UserRole.LOGISTICS);
     });
 
-    it("normalizes lowercase roles to the DAD enum values", async () => {
+    it("accepts only the exact UserRole values of the DAD (single enum, no aliases)", async () => {
+      expect(Object.entries(UserRole)).toEqual([
+        ["ADMIN", "ADMIN"],
+        ["LOGISTICS", "LOGISTICS"],
+      ]);
+
       const useCase = new CreateUserUseCase({ userRepository, emailService });
-
-      const user1 = await useCase.execute({
-        full_name: "User 1",
-        email: "u1@test.com",
-        role: "logistics",
-      });
-      expect(user1.role).toBe(UserRole.LOGISTICS);
-
-      const user3 = await useCase.execute({
-        full_name: "User 3",
-        email: "u3@test.com",
-        role: "admin",
-      });
-      expect(user3.role).toBe(UserRole.ADMIN);
-    });
-
-    it("rejects LOGISTIC (not a UserRole value in the DAD) and keeps a single enum key", async () => {
-      const useCase = new CreateUserUseCase({ userRepository, emailService });
-      await expect(
-        useCase.execute({ full_name: "User", email: "x@test.com", role: "LOGISTIC" })
-      ).rejects.toMatchObject({ status: 400 });
-      expect(Object.keys(UserRole)).toEqual(["ADMIN", "LOGISTICS"]);
-    });
-
-    it("maps the legacy stored value logistica to LOGISTICS", () => {
-      expect(normalizeUserRole("logistica")).toBe(UserRole.LOGISTICS);
-      expect(normalizeUserRole(null)).toBeNull();
+      const invalidRoles = ["logistics", "admin", "LOGISTIC", "LOGISTICA", " ADMIN"];
+      for (const [index, role] of invalidRoles.entries()) {
+        // eslint-disable-next-line no-await-in-loop
+        await expect(
+          useCase.execute({ full_name: "User", email: `x${index}@test.com`, role })
+        ).rejects.toMatchObject({ status: 400 });
+      }
     });
 
     it("rejects invalid role with 400 error", async () => {
@@ -100,7 +84,7 @@ describe("User Management Use Cases (Función 2.12)", () => {
 
       const updateUseCase = new UpdateUserUseCase({ userRepository });
       const updated = await updateUseCase.execute(created.id, {
-        role: "admin",
+        role: "ADMIN",
       });
       expect(updated.role).toBe(UserRole.ADMIN);
 

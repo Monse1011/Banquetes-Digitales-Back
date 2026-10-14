@@ -1,4 +1,4 @@
-const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
+const UserRole = require("../../../domain/enums/auth/user-role");
 
 class UpdateUserUseCase {
   constructor({ userRepository } = {}) {
@@ -40,13 +40,12 @@ class UpdateUserUseCase {
   }
 
   async validateRole(role, user, id) {
-    const normalizedRole = normalizeUserRole(role);
-    if (!normalizedRole) {
+    if (!Object.values(UserRole).includes(role)) {
       const err = new Error("Rol de usuario no válido. Debe ser ADMIN o LOGISTICS.");
       err.status = 400;
       throw err;
     }
-    if (normalizedRole !== normalizeUserRole(user.role)) {
+    if (role !== user.role) {
       const hasActive = await this.userRepository.hasActiveRequests(id);
       if (hasActive) {
         const msg = "El usuario tiene solicitudes asignadas activas y su rol no puede modificarse.";
@@ -55,7 +54,7 @@ class UpdateUserUseCase {
         throw err;
       }
     }
-    return normalizedRole;
+    return role;
   }
 
   async execute(id, { full_name: fullName, email, role }) {

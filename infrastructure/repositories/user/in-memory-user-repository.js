@@ -1,7 +1,6 @@
 const UserRepository = require("../../../application/repositories/user/user-repository");
 const User = require("../../../domain/entities/user/user");
 const UserRole = require("../../../domain/enums/auth/user-role");
-const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
 const UserStatus = require("../../../domain/enums/user/user-status");
 
 class InMemoryUserRepository extends UserRepository {
@@ -27,7 +26,7 @@ class InMemoryUserRepository extends UserRepository {
     }
 
     if (role) {
-      filtered = filtered.filter((u) => normalizeUserRole(u.role) === normalizeUserRole(role));
+      filtered = filtered.filter((u) => u.role === role);
     }
 
     if (status) {
@@ -91,9 +90,7 @@ class InMemoryUserRepository extends UserRepository {
 
   async countActiveAdmins() {
     return this.users.filter(
-      (u) =>
-        normalizeUserRole(u.role) === UserRole.ADMIN &&
-        String(u.status).toUpperCase() === UserStatus.ACTIVE
+      (u) => u.role === UserRole.ADMIN && String(u.status).toUpperCase() === UserStatus.ACTIVE
     ).length;
   }
 
@@ -107,9 +104,7 @@ class InMemoryUserRepository extends UserRepository {
 
   async findAvailableLogisticsUsers() {
     return this.users.filter(
-      (u) =>
-        normalizeUserRole(u.role) === UserRole.LOGISTICS &&
-        String(u.status).toUpperCase() === UserStatus.ACTIVE
+      (u) => u.role === UserRole.LOGISTICS && String(u.status).toUpperCase() === UserStatus.ACTIVE
     );
   }
 

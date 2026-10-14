@@ -1,5 +1,5 @@
 const bcrypt = require("bcrypt");
-const { normalizeUserRole } = require("../../../domain/enums/auth/normalize-user-role");
+const UserRole = require("../../../domain/enums/auth/user-role");
 const { generateTemporaryPassword } = require("../../services/user/temporary-password-generator");
 const { generateUniqueEmployeeId } = require("../../services/user/employee-id-generator");
 const { deliverCredentials } = require("../../services/user/credentials-delivery");
@@ -28,13 +28,11 @@ class CreateUserUseCase {
       err.status = 400;
       throw err;
     }
-    const normalizedRole = normalizeUserRole(role);
-    if (!normalizedRole) {
+    if (!Object.values(UserRole).includes(role)) {
       const err = new Error("Rol de usuario no válido. Debe ser ADMIN o LOGISTICS.");
       err.status = 400;
       throw err;
     }
-    return normalizedRole;
   }
 
   async checkEmailUniqueness(email) {
@@ -47,7 +45,7 @@ class CreateUserUseCase {
   }
 
   async execute({ full_name: fullName, email, role }) {
-    const normalizedRole = this.validateInputs(fullName, email, role);
+    this.validateInputs(fullName, email, role);
     await this.checkEmailUniqueness(email);
 
     const tempPassword = generateTemporaryPassword();
@@ -59,7 +57,7 @@ class CreateUserUseCase {
       full_name: fullName.trim(),
       email: email.trim().toLowerCase(),
       password_hash: passwordHash,
-      role: normalizedRole,
+      role,
       status: UserStatus.ACTIVE,
       must_change_password: true,
     });

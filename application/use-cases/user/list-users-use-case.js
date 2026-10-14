@@ -9,7 +9,7 @@ class ListUsersUseCase {
 
     const { users, total_records: totalRecords } = await this.userRepository.findAll({
       search: search ? search.trim() : null,
-      role: role ? role.toUpperCase() : null,
+      role: role || null,
       status: status ? status.toUpperCase() : null,
       page: pageNum,
       per_page: perPageNum,
