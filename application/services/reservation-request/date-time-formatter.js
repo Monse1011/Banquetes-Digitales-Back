@@ -11,4 +11,8 @@ function formatTime(date) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-module.exports = { formatDate, formatTime };
+function formatDateTime(date) {
+  return `${formatDate(date)} ${formatTime(date)}:${pad(date.getSeconds())}`;
+}
+
+module.exports = { formatDate, formatTime, formatDateTime };
