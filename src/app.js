@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, max-len */
 require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
@@ -142,6 +143,28 @@ const {
   GetAvailableLogisticsUsersUseCase,
 } = require("../application/use-cases/reservation-request/get-available-logistics-users-use-case");
 
+// Calendar Use Cases (Función 3.3)
+const {
+  ScheduleEventUseCase,
+} = require("../application/use-cases/calendar/schedule-event-use-case");
+const { EditEventUseCase } = require("../application/use-cases/calendar/edit-event-use-case");
+const { CancelEventUseCase } = require("../application/use-cases/calendar/cancel-event-use-case");
+const {
+  ListCalendarEventsUseCase,
+} = require("../application/use-cases/calendar/list-calendar-events-use-case");
+const {
+  ProcessPendingCalendarSyncUseCase,
+} = require("../application/use-cases/calendar/process-pending-calendar-sync-use-case");
+const {
+  FinalizeElapsedEventsUseCase,
+} = require("../application/use-cases/calendar/finalize-elapsed-events-use-case");
+const {
+  PostgresCalendarEventRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
+const {
+  PostgresCalendarSyncRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
+const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
   createResourceUseCases,
@@ -295,6 +318,33 @@ async function main() {
     auditLogRepository
   );
 
+  // Calendar
+  const calendarEventRepository = new PostgresCalendarEventRepository(pool);
+  const calendarSyncRepository = new PostgresCalendarSyncRepository(pool);
+  const externalCalendarGateway = new GoogleCalendarGateway();
+  const processPendingCalendarSyncUseCase = new ProcessPendingCalendarSyncUseCase(
+    calendarEventRepository,
+    calendarSyncRepository,
+    externalCalendarGateway
+  );
+
+  const scheduleEventUseCase = new ScheduleEventUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const editEventUseCase = new EditEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const cancelEventUseCase = new CancelEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
+  const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
+
   const app = createApp({
     // Authentication
     authController,
@@ -311,6 +361,11 @@ async function main() {
     getReservationRequestsUseCase,
     assignReservationRequestUseCase,
     getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
+    // Calendar
+    scheduleEventUseCase,
+    editEventUseCase,
+    cancelEventUseCase,
+    listCalendarEventsUseCase,
     // Resources
     ...createPostgresResourceUseCases(pool),
     // Proposals (Función 3.4)
@@ -321,6 +376,15 @@ async function main() {
     downloadProposalUseCase,
     sendProposalUseCase,
   });
+
+  // Start background jobs for calendar sync and finalization
+  setInterval(() => {
+    processPendingCalendarSyncUseCase.execute().catch((err) => console.error("Sync error:", err));
+  }, 15000); // every 15 seconds
+
+  setInterval(() => {
+    finalizeElapsedEventsUseCase.execute().catch((err) => console.error("Finalize error:", err));
+  }, 60000); // every minute
 
   app.listen(config.port, () => {
     console.log(`Server running on port ${config.port}`);
