@@ -33,5 +33,27 @@ class NodemailerEmailService {
             `,
     });
   }
+  // RF-2.3.4.6: la propuesta se remite como adjunto al correo del cliente.
+  async sendProposalEmail(email, clientName, proposalCode, fileName, pdfBuffer) {
+    await this.transporter.sendMail({
+      from: `"Banquetes Elegancia" <${this.user}>`,
+      to: email,
+      subject: `Propuesta de evento ${proposalCode} - Banquetes Elegancia`,
+      html: `
+                <h2>Propuesta de evento</h2>
+                <p>Hola ${clientName},</p>
+                <p>Adjuntamos la propuesta <strong>${proposalCode}</strong> para tu evento.</p>
+                <p>Quedamos atentos a tu confirmación.</p>
+                <p>Saludos,<br>Banquetes Elegancia</p>
+            `,
+      attachments: [
+        {
+          filename: fileName,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  }
 }
 module.exports = NodemailerEmailService;

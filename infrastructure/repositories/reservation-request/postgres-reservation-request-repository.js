@@ -240,6 +240,27 @@ class PostgresReservationRequestRepository {
     return undefined;
   }
 
+  // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
+  // horario confirmado de una solicitud.
+  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
+    const result = await this.pool.query(
+      `SELECT folio, event_date_time, event_end_time
+       FROM reservations_request
+       WHERE logistic_user_id = $1
+         AND id_reservation_request <> $2
+         AND status = ANY($3)
+         AND event_date_time < $4
+         AND event_end_time > $5`,
+      [logisticUserId, excludeRequestId, ActiveReservationRequestStatuses, end, start]
+    );
+
+    return result.rows.map((row) => ({
+      folio: row.folio,
+      startDateTime: new Date(row.event_date_time),
+      endDateTime: new Date(row.event_end_time),
+    }));
+  }
+
   async findAll(filters, sort, page, perPage) {
     const parameters = [];
     const conditions = [];
