@@ -101,6 +101,25 @@ class InMemoryReservationRequestRepository {
     return { status: "assigned", request };
   }
 
+  // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
+  // horario confirmado de una solicitud.
+  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
+    return this.requests
+      .filter(
+        (request) =>
+          request.requestId !== excludeRequestId &&
+          request.logisticUserId === logisticUserId &&
+          ActiveReservationRequestStatuses.includes(request.status) &&
+          request.eventDateTime < end &&
+          request.eventEndTime > start
+      )
+      .map((request) => ({
+        folio: request.folio,
+        startDateTime: request.eventDateTime,
+        endDateTime: request.eventEndTime,
+      }));
+  }
+
   async findAll(filters, sort, page, perPage) {
     const filteredRequests = this.requests.filter((request) => {
       if (filters.status && request.status !== filters.status) {
