@@ -1,8 +1,16 @@
 const express = require("express");
 const UserRole = require("../../domain/enums/auth/user-role");
 const requireRole = require("../middleware/auth/role-middleware");
+const {
+  ReservationRequestController,
+} = require("../controller/reservation-request/reservation-request-controller");
 
-function createLogisticsRoutes(resourceControllers, authMiddleware, proposalControllers = {}) {
+function createLogisticsRoutes(
+  resourceControllers,
+  authMiddleware,
+  proposalControllers,
+  reservationRequestController
+) {
   const router = express.Router();
   const assignmentController = resourceControllers.assignment;
   // RF-2.3.2.21: la confirmación de recursos también la puede realizar el Administrador General.
@@ -52,10 +60,28 @@ function createLogisticsRoutes(resourceControllers, authMiddleware, proposalCont
     }
   );
 
-  const { agreementsController, proposalController } = proposalControllers;
+  // Función 3.1 - Visualización de reservaciones asignadas.
+  const reqController = reservationRequestController || new ReservationRequestController({});
+
+  router.get("/requests/history", requireLogistics, (request, response, next) => {
+    reqController.listHistoryForLogistics(request, response).catch(next);
+  });
+
+  router.get("/requests", requireLogistics, (request, response, next) => {
+    reqController.listForLogistics(request, response).catch(next);
+  });
+
+  // DAD, Función 3.1: GET /api/logistics/requests/:id es el detalle de la reservación asignada.
+  router.get("/requests/:id", requireLogistics, (request, response, next) => {
+    reqController.getByIdForLogistics(request, response).catch(next);
+  });
+
+  const { agreementsController, proposalController } = proposalControllers || {};
 
   // Función 3.4 - Contacto con el cliente.
-  router.get("/requests/:id", requireLogistics, (request, response, next) => {
+  // Precarga del formulario de acuerdos (RF-2.3.4.1 / RF-2.3.4.2). Antes usaba
+  // GET /requests/:id, ruta que el DAD reserva para el detalle de la Función 3.1.
+  router.get("/requests/:id/derived-information", requireLogistics, (request, response, next) => {
     agreementsController.getRequestAgreements(request, response).catch(next);
   });
 

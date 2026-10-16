@@ -189,11 +189,11 @@ describe("Rutas de la Función 3.4", () => {
   it("rejects unauthenticated and non-logistics users", async () => {
     const requestId = await createRequest();
 
-    await request(app).get(`/api/logistics/requests/${requestId}`).expect(401);
+    await request(app).get(`/api/logistics/requests/${requestId}/derived-information`).expect(401);
 
     currentRole = UserRole.ADMIN;
     await request(app)
-      .get(`/api/logistics/requests/${requestId}`)
+      .get(`/api/logistics/requests/${requestId}/derived-information`)
       .set("Cookie", AUTH_COOKIE)
       .expect(403);
   });
@@ -202,7 +202,7 @@ describe("Rutas de la Función 3.4", () => {
     const requestId = await createRequest();
 
     const response = await request(app)
-      .get(`/api/logistics/requests/${requestId}`)
+      .get(`/api/logistics/requests/${requestId}/derived-information`)
       .set("Cookie", AUTH_COOKIE)
       .expect(200);
 
@@ -270,7 +270,7 @@ describe("Rutas de la Función 3.4", () => {
 
   it("rejects invalid request ids with a validation error (Estándares 2.4)", async () => {
     const endpoints = [
-      ["get", "/api/logistics/requests/abc"],
+      ["get", "/api/logistics/requests/abc/derived-information"],
       ["post", "/api/logistics/requests/abc/derived-information"],
       ["post", "/api/logistics/requests/0/proposals"],
       ["get", "/api/logistics/requests/-1/proposals"],
@@ -337,7 +337,7 @@ describe("Rutas de la Función 3.4", () => {
     );
 
     await request(app)
-      .get(`/api/logistics/requests/${created.requestId}`)
+      .get(`/api/logistics/requests/${created.requestId}/derived-information`)
       .set("Cookie", AUTH_COOKIE)
       .expect(404);
   });

@@ -1,13 +1,29 @@
 const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
+const ListAssignedRequestsUseCase = require("../../../application/use-cases/logistics/list-assigned-requests-use-case");
+const GetAssignedRequestsHistoryUseCase = require("../../../application/use-cases/logistics/get-assigned-requests-history-use-case");
+const GetAssignedRequestDetailUseCase = require("../../../application/use-cases/logistics/get-assigned-request-detail-use-case");
 
 // ?status= recibe las claves del enum RequestStatus del DAD (PENDING, APPROVED, ...).
 const STATUS_BY_QUERY_VALUE = ReservationRequestStatus;
 
 class ReservationRequestController {
-  constructor(dependencies) {
+  constructor(dependencies = {}) {
     this.dependencies = dependencies;
+    const repo = dependencies.reservationRequestRepository;
+
+    this.listAssignedRequestsUseCase =
+      dependencies.listAssignedRequestsUseCase ||
+      (repo ? new ListAssignedRequestsUseCase({ reservationRequestRepository: repo }) : null);
+
+    this.getAssignedRequestsHistoryUseCase =
+      dependencies.getAssignedRequestsHistoryUseCase ||
+      (repo ? new GetAssignedRequestsHistoryUseCase({ reservationRequestRepository: repo }) : null);
+
+    this.getAssignedRequestDetailUseCase =
+      dependencies.getAssignedRequestDetailUseCase ||
+      (repo ? new GetAssignedRequestDetailUseCase({ reservationRequestRepository: repo }) : null);
   }
 
   async create(request, response) {
@@ -57,9 +73,6 @@ class ReservationRequestController {
     response.json(result);
   }
 
-  // Función 2.4: PATCH /api/admin/requests/:id/assignment (respuesta solo código HTTP).
-  // data.request_id es opcional: responsable actual esperado para rechazar
-  // reasignaciones basadas en información vencida (RF-1.2.4.7).
   async assign(request, response) {
     const id = this.parseId(request.params.id);
     const data = request.body?.data ?? {};
@@ -90,6 +103,89 @@ class ReservationRequestController {
     );
 
     response.sendStatus(200);
+  }
+
+  // Función 3.1: GET /api/logistics/requests
+  async listForLogistics(request, response) {
+    const userId = request.user?.id_user ?? request.user?.id;
+    const page = this.parsePositiveInteger(request.query.page, 1);
+    const perPage = this.parsePositiveInteger(request.query.per_page, 10);
+    const status = request.query.status ? request.query.status.trim() : null;
+
+    const useCase =
+      this.listAssignedRequestsUseCase || this.dependencies.listAssignedRequestsUseCase;
+
+    try {
+      const result = await useCase.execute({
+        userId,
+        status,
+        page,
+        perPage,
+      });
+
+      response.json(result);
+    } catch (error) {
+      if (error.status === 400 || error.status === 403 || error.status === 404) {
+        response.status(error.status).json({ message: error.message });
+        return;
+      }
+      throw error;
+    }
+  }
+
+  // Función 3.1: GET /api/logistics/requests/history
+  async listHistoryForLogistics(request, response) {
+    const userId = request.user?.id_user ?? request.user?.id;
+    const page = this.parsePositiveInteger(request.query.page, 1);
+    const perPage = this.parsePositiveInteger(request.query.per_page, 10);
+    const status = request.query.status ? request.query.status.trim() : null;
+
+    const useCase =
+      this.getAssignedRequestsHistoryUseCase || this.dependencies.getAssignedRequestsHistoryUseCase;
+
+    try {
+      const result = await useCase.execute({
+        userId,
+        status,
+        page,
+        perPage,
+      });
+
+      response.json(result);
+    } catch (error) {
+      if (error.status === 400 || error.status === 403 || error.status === 404) {
+        response.status(error.status).json({ message: error.message });
+        return;
+      }
+      throw error;
+    }
+  }
+
+  // Función 3.1: GET /api/logistics/requests/:id
+  async getByIdForLogistics(request, response) {
+    let requestId;
+    try {
+      requestId = this.parseId(request.params.id);
+    } catch (err) {
+      response.status(400).json({ message: err.message });
+      return;
+    }
+
+    const userId = request.user?.id_user ?? request.user?.id;
+
+    const useCase =
+      this.getAssignedRequestDetailUseCase || this.dependencies.getAssignedRequestDetailUseCase;
+
+    try {
+      const result = await useCase.execute({ requestId, userId });
+      response.json(result);
+    } catch (error) {
+      if (error.status === 403 || error.status === 404 || error.status === 400) {
+        response.status(error.status).json({ message: error.message });
+        return;
+      }
+      throw error;
+    }
   }
 
   parseStatus(value) {

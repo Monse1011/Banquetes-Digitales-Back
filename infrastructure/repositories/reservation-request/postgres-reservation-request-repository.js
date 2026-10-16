@@ -17,9 +17,40 @@ const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
             request_date, logistic_user_id, assigned_by_user_id, assigned_at,
             ARRAY[]::integer[] AS services_ids`;
 
+function addStatusCondition(filters, parameters, conditions) {
+  const statusList = filters.statuses || (filters.status ? [filters.status].flat() : null);
+  if (!statusList) return;
+  parameters.push(statusList);
+  conditions.push(`rr.status = ANY($${parameters.length})`);
+}
+
 class PostgresReservationRequestRepository {
   constructor(pool) {
     this.pool = pool;
+  }
+
+  buildConditions(filters, parameters) {
+    const conditions = [];
+
+    addStatusCondition(filters, parameters, conditions);
+
+    const logisticUserId = filters.logisticUserId ?? filters.logistic_user_id;
+    if (logisticUserId !== undefined && logisticUserId !== null) {
+      parameters.push(logisticUserId);
+      conditions.push(`rr.logistic_user_id = $${parameters.length}`);
+    }
+
+    if (filters.eventDate) {
+      parameters.push(this.datePart(filters.eventDate));
+      conditions.push(`CAST(rr.event_date_time AS DATE) = $${parameters.length}`);
+    }
+
+    if (filters.clientName) {
+      parameters.push(`%${filters.clientName}%`);
+      conditions.push(`c.full_name ILIKE $${parameters.length}`);
+    }
+
+    return conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   }
 
   async create(request) {
@@ -74,7 +105,7 @@ class PostgresReservationRequestRepository {
     const result = await this.pool.query(
       this.baseSelect() +
         ` WHERE rr.id_reservation_request = $1
-          GROUP BY rr.id_reservation_request`,
+          GROUP BY rr.id_reservation_request, c.id_client, c.full_name, c.email, c.phone`,
       [id]
     );
 
@@ -272,42 +303,31 @@ class PostgresReservationRequestRepository {
     }));
   }
 
-  async findAll(filters, sort, page, perPage) {
+  async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
     const parameters = [];
-    const conditions = [];
+    const where = this.buildConditions(filters, parameters);
 
-    if (filters.status) {
-      parameters.push(filters.status);
-      conditions.push(`rr.status = $${parameters.length}`);
-    }
-
-    if (filters.eventDate) {
-      parameters.push(this.datePart(filters.eventDate));
-      conditions.push(`CAST(rr.event_date_time AS DATE) = $${parameters.length}`);
-    }
-
-    if (filters.clientName) {
-      parameters.push(`%${filters.clientName}%`);
-      conditions.push(`c.full_name ILIKE $${parameters.length}`);
-    }
-
-    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const countResult = await this.pool.query(
-      `SELECT COUNT(*)::int AS total_records
+      `SELECT COUNT(DISTINCT rr.id_reservation_request)::int AS total_records
        FROM reservations_request rr
        JOIN clients c ON c.id_client = rr.id_client${where}`,
       parameters
     );
 
     const offset = (page - 1) * perPage;
-    const sortColumn = this.sortColumn(sort.field);
-    const direction = sort.direction === "desc" ? "DESC" : "ASC";
+    let orderClause = "ORDER BY rr.event_date_time ASC, rr.folio ASC";
+    if (sort && sort.field) {
+      const sortColumn = this.sortColumn(sort.field);
+      const direction = sort.direction === "desc" ? "DESC" : "ASC";
+      orderClause = `ORDER BY ${sortColumn} ${direction}, rr.folio ${direction}`;
+    }
+
     const dataParameters = [...parameters, perPage, offset];
     const result = await this.pool.query(
       this.baseSelect() +
         `${where}
-         GROUP BY rr.id_reservation_request
-         ORDER BY ${sortColumn} ${direction}
+         GROUP BY rr.id_reservation_request, c.id_client, c.full_name, c.email, c.phone
+         ${orderClause}
          LIMIT $${dataParameters.length - 1} OFFSET $${dataParameters.length}`,
       dataParameters
     );
@@ -323,6 +343,7 @@ class PostgresReservationRequestRepository {
       rr.event_date_time, rr.event_end_time, rr.guest_count, rr.event_address,
       rr.status, rr.request_date, rr.logistic_user_id, rr.assigned_by_user_id,
       rr.assigned_at,
+      c.full_name AS client_name, c.email AS client_email, c.phone AS client_phone,
       COALESCE(
         ARRAY_AGG(rs.id_service) FILTER (WHERE rs.id_service IS NOT NULL),
         ARRAY[]::integer[]
@@ -361,7 +382,9 @@ class PostgresReservationRequestRepository {
   }
 
   toEntity(row) {
-    const serviceIds = row.services_ids.map((serviceId) => Number(serviceId));
+    const serviceIds = row.services_ids
+      ? row.services_ids.map((serviceId) => Number(serviceId))
+      : [];
 
     return new ReservationRequest(
       Number(row.id_reservation_request),
@@ -377,7 +400,10 @@ class PostgresReservationRequestRepository {
       serviceIds,
       row.logistic_user_id === null ? null : Number(row.logistic_user_id),
       row.assigned_by_user_id === null ? null : Number(row.assigned_by_user_id),
-      row.assigned_at === null ? null : new Date(row.assigned_at)
+      row.assigned_at === null ? null : new Date(row.assigned_at),
+      row.client_name ?? null,
+      row.client_email ?? null,
+      row.client_phone ?? null
     );
   }
 
@@ -392,6 +418,7 @@ class PostgresReservationRequestRepository {
       case ReservationRequestSortField.STATUS:
         return "rr.status";
       case ReservationRequestSortField.EVENT_DATE:
+      default:
         return "rr.event_date_time";
     }
   }

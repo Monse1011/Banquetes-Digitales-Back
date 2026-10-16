@@ -352,7 +352,12 @@ function createApp(dependencies) {
   );
   app.use(
     "/api/logistics",
-    createLogisticsRoutes(resourceControllers, authMiddleware, proposalControllers)
+    createLogisticsRoutes(
+      resourceControllers,
+      authMiddleware,
+      proposalControllers,
+      reservationRequestController
+    )
   );
 
   // Error handler
