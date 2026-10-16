@@ -81,51 +81,62 @@ class PostgresReservationRequestRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
-  async update(request) {
+  // Con transaction, la actualización forma parte de esa transacción (Función 3.2).
+  async update(request, transaction = null) {
+    if (transaction) {
+      return this.updateWith(transaction.connection, request);
+    }
+
     const connection = await this.pool.connect();
 
     try {
       await connection.query("BEGIN");
-      const result = await connection.query(
-        `UPDATE reservations_request
-         SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
-             event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
-             request_date = $9
-         WHERE id_reservation_request = $10
-         RETURNING ${REQUEST_COLUMNS}`,
-        [...this.requestValues(request), request.requestId]
-      );
-
-      if (!result.rows[0]) {
-        throw new Error("Reservation request not found");
-      }
-
-      await this.replaceServices(connection, request.requestId, request.servicesIds);
+      const updatedRequest = await this.updateWith(connection, request);
       await connection.query("COMMIT");
-      const updatedRequest = this.toEntity(result.rows[0]);
 
-      return new ReservationRequest(
-        updatedRequest.requestId,
-        updatedRequest.folio,
-        updatedRequest.clientId,
-        updatedRequest.userId,
-        updatedRequest.eventDateTime,
-        updatedRequest.eventEndTime,
-        updatedRequest.guestCount,
-        updatedRequest.eventAddress,
-        updatedRequest.status,
-        updatedRequest.requestDate,
-        request.servicesIds,
-        updatedRequest.logisticUserId,
-        updatedRequest.assignedByUserId,
-        updatedRequest.assignedAt
-      );
+      return updatedRequest;
     } catch (error) {
       await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
     }
+  }
+
+  async updateWith(connection, request) {
+    const result = await connection.query(
+      `UPDATE reservations_request
+       SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
+           event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
+           request_date = $9
+       WHERE id_reservation_request = $10
+       RETURNING ${REQUEST_COLUMNS}`,
+      [...this.requestValues(request), request.requestId]
+    );
+
+    if (!result.rows[0]) {
+      throw new Error("Reservation request not found");
+    }
+
+    await this.replaceServices(connection, request.requestId, request.servicesIds);
+    const updatedRequest = this.toEntity(result.rows[0]);
+
+    return new ReservationRequest(
+      updatedRequest.requestId,
+      updatedRequest.folio,
+      updatedRequest.clientId,
+      updatedRequest.userId,
+      updatedRequest.eventDateTime,
+      updatedRequest.eventEndTime,
+      updatedRequest.guestCount,
+      updatedRequest.eventAddress,
+      updatedRequest.status,
+      updatedRequest.requestDate,
+      request.servicesIds,
+      updatedRequest.logisticUserId,
+      updatedRequest.assignedByUserId,
+      updatedRequest.assignedAt
+    );
   }
 
   // RF-1.2.4.7: la (re)asignación se registra de forma atómica. El bloqueo de la fila

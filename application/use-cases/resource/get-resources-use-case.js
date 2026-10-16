@@ -67,4 +67,4 @@ class GetResourcesUseCase {
   }
 }
 
-module.exports = { GetResourcesUseCase };
+module.exports = { GetResourcesUseCase, toSummaryDto };

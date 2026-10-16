@@ -42,6 +42,12 @@ class InMemoryResourceRepository {
     return resource ? copyOf(resource) : null;
   }
 
+  async findByIds(ids) {
+    return this.resources
+      .filter((resource) => ids.includes(resource.id))
+      .map((resource) => copyOf(resource));
+  }
+
   async updateDetails(resource) {
     return this.updateIfSameVersion(resource, {
       name: resource.name,

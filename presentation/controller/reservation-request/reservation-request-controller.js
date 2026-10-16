@@ -2,11 +2,8 @@ const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
 
-const STATUS_BY_QUERY_VALUE = Object.freeze({
-  PENDING: ReservationRequestStatus.PENDING,
-  APPROVED: ReservationRequestStatus.APPROVED,
-  ASSIGNED: ReservationRequestStatus.ASSIGNED,
-});
+// ?status= recibe las claves del enum RequestStatus del DAD (PENDING, APPROVED, ...).
+const STATUS_BY_QUERY_VALUE = ReservationRequestStatus;
 
 class ReservationRequestController {
   constructor(dependencies) {

@@ -22,6 +22,9 @@ const { HumanResourceController } = require("./controller/resource/human-resourc
 const {
   InventoryResourceController,
 } = require("./controller/resource/inventory-resource-controller");
+const {
+  ResourceAssignmentController,
+} = require("./controller/resource-assignment/resource-assignment-controller");
 const { ResourceType } = require("../domain/enums/resource/resource-type");
 const ReservationRequestValidationException = require("../domain/exceptions/reservation-request/reservation-request-validation-exception");
 const ReservationRequestNotFoundException = require("../domain/exceptions/reservation-request/reservation-request-not-found-exception");
@@ -36,6 +39,12 @@ const ResourceValidationException = require("../domain/exceptions/resource/resou
 const ResourceNotFoundException = require("../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
 const ResourceConcurrencyException = require("../domain/exceptions/resource/resource-concurrency-exception");
+const ResourceAssignmentValidationException = require("../domain/exceptions/resource-assignment/resource-assignment-validation-exception");
+const RequestAccessDeniedException = require("../domain/exceptions/resource-assignment/request-access-denied-exception");
+const RequestNotConfirmableException = require("../domain/exceptions/resource-assignment/request-not-confirmable-exception");
+const ResourceAvailabilityChangedException = require("../domain/exceptions/resource-assignment/resource-availability-changed-exception");
+const UnassignedSufficientResourcesException = require("../domain/exceptions/resource-assignment/unassigned-sufficient-resources-exception");
+const ProvisionalAssignmentNotFoundException = require("../domain/exceptions/resource-assignment/provisional-assignment-not-found-exception");
 const CalendarValidationException = require("../domain/exceptions/calendar/calendar-validation-exception");
 const CalendarEventNotFoundException = require("../domain/exceptions/calendar/calendar-event-not-found-exception");
 const CalendarAccessDeniedException = require("../domain/exceptions/calendar/calendar-access-denied-exception");
@@ -103,6 +112,39 @@ function handleAssignmentError(error, response) {
       message: error.message,
       ...(error.conflict ? { conflict: error.conflict } : {}),
     });
+    return true;
+  }
+
+  return false;
+}
+
+// Función 3.2: errores de la confirmación de recursos.
+function handleResourceAssignmentError(error, response) {
+  if (error instanceof ResourceAssignmentValidationException) {
+    response.status(422).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  if (error instanceof RequestAccessDeniedException) {
+    response.status(403).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof RequestNotConfirmableException ||
+    error instanceof ResourceAvailabilityChangedException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof UnassignedSufficientResourcesException) {
+    response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ProvisionalAssignmentNotFoundException) {
+    response.status(404).json({ message: error.message });
     return true;
   }
 
@@ -268,6 +310,8 @@ function createApp(dependencies) {
       dependencies.logisticResourceUseCases,
       ResourceType.LOGISTIC
     ),
+    // Función 3.2: confirmación de recursos de una solicitud.
+    assignment: new ResourceAssignmentController(dependencies.resourceAssignmentUseCases),
   };
   const proposalControllers = {
     agreementsController: new AgreementsController(dependencies),
@@ -314,10 +358,9 @@ function createApp(dependencies) {
   // Error handler
   app.use((error, _request, response, _next) => {
     if (handleCommonError(error, response)) return;
-
     if (handleCalendarError(error, response)) return;
-
     if (handleResourceError(error, response)) return;
+    if (handleResourceAssignmentError(error, response)) return;
 
     if (error instanceof ReservationRequestValidationException) {
       response.status(422).json({
@@ -327,17 +370,9 @@ function createApp(dependencies) {
       return;
     }
 
-    if (handleAssignmentError(error, response)) {
-      return;
-    }
-
-    if (handleProposalError(error, response)) {
-      return;
-    }
-
-    if (handleAuthError(error, response)) {
-      return;
-    }
+    if (handleAssignmentError(error, response)) return;
+    if (handleProposalError(error, response)) return;
+    if (handleAuthError(error, response)) return;
 
     if (error.status) {
       response.status(error.status).json({ message: error.message });
