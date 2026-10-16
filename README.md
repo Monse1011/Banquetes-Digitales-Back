@@ -40,7 +40,11 @@ PGPASSWORD=password
 PGDATABASE=banquetes_db
 JWT_SECRET=your-secret-key
 DATABASE_URL=postgresql://user:password@localhost:5432/banquetes_db
+PROPOSAL_STORAGE_DIR=storage/proposals
 ```
+
+`PROPOSAL_STORAGE_DIR` es opcional e indica el directorio donde se guardan los PDF
+de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
 
 4. Crear y ejecutar migraciones de base de datos:
 
@@ -52,6 +56,22 @@ psql -U postgres -d banquetes_db -f database.sql
 
 ```bash
 psql -U postgres -d banquetes_db -f database/increment-2/assignment.sql
+```
+
+6. Aplicar los cambios de esquema del Incremento 2 (Función 3.4 - Contacto con el
+   cliente), en el siguiente orden (`derived_information` antes de `proposals`):
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-2/derived-information.sql
+psql -U postgres -d banquetes_db -f database/increment-2/proposals.sql
+psql -U postgres -d banquetes_db -f database/increment-2/assigned-resources.sql
+psql -U postgres -d banquetes_db -f database/increment-2/audit-logs.sql
+```
+
+Opcional: cargar datos de prueba de la Función 3.4:
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-2/mock-data-3.4.sql
 ```
 
 ## Desarrollo

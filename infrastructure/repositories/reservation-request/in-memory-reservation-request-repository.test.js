@@ -172,10 +172,11 @@ describe("InMemoryReservationRequestRepository", () => {
     });
 
     // RF-1.2.12.10: las solicitudes en coordinación o con propuesta siguen siendo activas.
+    // Función 3.3: "Finalizado" sigue ocupando el horario; "Cancelado" lo libera.
     it.each([
       [ReservationRequestStatus.COORDINATION_INCOMPLETE, "overlap"],
       [ReservationRequestStatus.PROPOSAL_GENERATED, "overlap"],
-      [ReservationRequestStatus.COMPLETED, "assigned"],
+      [ReservationRequestStatus.FINISHED, "overlap"],
       [ReservationRequestStatus.CANCELLED, "assigned"],
     ])("should treat an overlapping %s request as %s", async (status, expected) => {
       const first = await repository.create(

@@ -31,6 +31,61 @@ function jsonBody(schema) {
   return { required: true, content: { "application/json": { schema: dataEnvelope(schema) } } };
 }
 
+const calendarEventSchema = {
+  type: "object",
+  properties: {
+    event_id: { type: "integer" },
+    request_id: { type: "integer" },
+    folio: { type: "string" },
+    title: { type: "string" },
+    logistics_responsible: {
+      type: "object",
+      nullable: true,
+      properties: {
+        user_id: { type: "integer" },
+        full_name: { type: "string" },
+      },
+    },
+    start_datetime: { type: "string", example: "2026-12-24 18:00:00" },
+    end_datetime: { type: "string", example: "2026-12-24 23:00:00" },
+    location: { type: "string" },
+    status: { type: "string" },
+    sync_status: { type: "string" },
+  },
+};
+
+const calendarListResponse = {
+  description: "Eventos del calendario",
+  content: {
+    "application/json": {
+      schema: {
+        type: "object",
+        properties: {
+          data: {
+            type: "object",
+            properties: {
+              events: { type: "array", items: calendarEventSchema },
+            },
+          },
+          metadata: {
+            type: "object",
+            properties: {
+              pagination: {
+                type: "object",
+                properties: {
+                  total_records: { type: "integer" },
+                  page: { type: "integer" },
+                  per_page: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const humanResourceBody = {
   type: "object",
   required: ["name", "operative_role_id"],
@@ -352,6 +407,86 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
+    "/api/logistics/calendar": {
+      get: {
+        summary: "Consulta el calendario del responsable de logística",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
+      },
+    },
+    "/api/admin/calendar": {
+      get: {
+        summary: "Consulta el calendario del Administrador General",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
+      },
+    },
+    "/api/logistics/requests/{id}/calendar": {
+      post: {
+        summary: "Agenda un evento desde una solicitud",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          201: {
+            description: "Evento agendado",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      type: "object",
+                      properties: {
+                        event_id: { type: "integer" },
+                        request_id: { type: "integer" },
+                        status: { type: "string" },
+                        sync_status: { type: "string" },
+                        google_event_id: { type: "string", nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/logistics/calendar/{id}": {
+      patch: {
+        summary: "Edita un evento confirmado",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          properties: {
+            location: { type: "string" },
+            start_datetime: { type: "string", example: "2026-12-24 19:00:00" },
+            end_datetime: { type: "string", example: "2026-12-25 00:00:00" },
+            logistic_user_id: { type: "integer", description: "Campo inmutable." },
+            resources: {
+              type: "array",
+              description: "Campo inmutable.",
+              items: { type: "object" },
+            },
+          },
+        }),
+        responses: { 200: { description: "Body vacío" } },
+      },
+      delete: {
+        summary: "Cancela un evento confirmado",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: { 200: { description: "Body vacío" } },
+      },
+    },
     "/api/auth/login": {
       post: {
         tags: ["Authentication"],
@@ -521,6 +656,111 @@ const openApiDocument = {
     },
     ...resourcePaths,
     ...resourceConfirmationPaths,
+    "/api/logistics/requests/{id}": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Request detail with client contact data and assigned resources (RF-2.3.4.1)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Agreements form preloaded" },
+          404: { description: "Request not found or not owned by the user" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/derived-information": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Save client agreements without changing the request status (RF-2.3.4.11)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["location", "start_datetime", "end_datetime", "adjusted_resources"],
+          properties: {
+            location: { type: "string", maxLength: 255 },
+            start_datetime: { type: "string", format: "date-time" },
+            end_datetime: { type: "string", format: "date-time" },
+            observations: { type: "string" },
+            adjusted_resources: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["resource_id", "quantity"],
+                properties: {
+                  resource_id: { type: "integer" },
+                  quantity: { type: "integer", minimum: 0 },
+                },
+              },
+            },
+          },
+        }),
+        responses: {
+          201: { description: "Agreements saved" },
+          400: { description: "Required fields missing" },
+          404: { description: "Request not found or not owned by the user" },
+          409: { description: "Invalid state or availability exceeded" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Generate the formal proposal PDF (RF-2.3.4.4)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["derived_information_id"],
+          properties: {
+            derived_information_id: { type: "integer" },
+            client_observations: { type: "string" },
+          },
+        }),
+        responses: {
+          201: { description: "Proposal generated and request moved to Propuesta generada" },
+          400: { description: "Required fields missing" },
+          404: { description: "Agreements not found for the request" },
+          409: { description: "Invalid state or proposal already generated" },
+          500: { description: "PDF generation failed; status unchanged" },
+        },
+      },
+      get: {
+        tags: ["Proposals"],
+        summary: "Get the generated proposal of the request (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal data with pdf_url" },
+          404: { description: "Proposal not found or not visible in current status" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/download": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Download the immutable proposal PDF (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "PDF file", content: { "application/pdf": {} } },
+          404: { description: "Proposal not found" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/send": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Send the proposal PDF to the client email (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal sent" },
+          404: { description: "Proposal not found" },
+          500: { description: "Email sending failed" },
+        },
+      },
+    },
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],
@@ -561,6 +801,21 @@ const openApiDocument = {
             description:
               "Status not reassignable (Confirmado), the current responsible changed (La solicitud ya fue asignada.) or logistic user not available (includes conflict when caused by overlap)",
           },
+        },
+      },
+    },
+    "/api/admin/users/{id}/credentials": {
+      post: {
+        tags: ["User management"],
+        summary:
+          "Resend credentials: new temporary password, previous one invalidated (RF-1.2.12.3)",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          204: { description: "Credentials resent" },
+          404: { description: "User not found" },
+          409: { description: "User inactive or already defined their password" },
+          502: { description: "The email with the temporary password could not be sent" },
         },
       },
     },

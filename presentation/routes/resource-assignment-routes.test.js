@@ -77,7 +77,7 @@ function reservation(id, logisticUserId, status, startHour, endHour, day = 24) {
 }
 
 function buildApp() {
-  const session = { id_user: GABRIEL_ID, role: UserRole.LOGISTICA };
+  const session = { id_user: GABRIEL_ID, role: UserRole.LOGISTICS };
   const resourceRepository = new InMemoryResourceRepository([
     resource(1, "Ana Mesera", ResourceType.HUMAN, 1, 1),
     resource(2, "Vajilla completa", ResourceType.MATERIAL, 100),
@@ -97,8 +97,8 @@ function buildApp() {
   ];
   const userRepository = new InMemoryUserRepository([
     user(ADMIN_ID, "Administrador General", UserRole.ADMIN),
-    user(GABRIEL_ID, "Gabriel Sánchez", UserRole.LOGISTICA),
-    user(LAURA_ID, "Laura Ruiz", UserRole.LOGISTICA),
+    user(GABRIEL_ID, "Gabriel Sánchez", UserRole.LOGISTICS),
+    user(LAURA_ID, "Laura Ruiz", UserRole.LOGISTICS),
   ]);
   const resourceConfirmationRepository = new InMemoryResourceConfirmationRepository();
 
@@ -238,9 +238,9 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       });
 
       // Laura (solicitud 2) inicia 2 h después del fin; la solicitud 3 inicia justo 3 h después.
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       expect(await availableOf(2, "logistic", 3)).toBe(0);
-      context.signInAs(GABRIEL_ID, UserRole.LOGISTICA);
+      context.signInAs(GABRIEL_ID, UserRole.LOGISTICS);
       expect(await availableOf(3, "logistic", 3)).toBe(2);
     });
 
@@ -262,7 +262,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       await assign(1, [{ resource_id: 2, quantity: 60 }]);
 
       expect(await availableOf(3, "material", 2)).toBe(100);
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       expect(await availableOf(2, "material", 2)).toBe(40);
     });
 
@@ -343,7 +343,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       expect(logistic.body.data.resources[0].assignment).toBeNull();
       const material = await get("/api/logistics/resources/material?request_id=1");
       expect(material.body.data.resources[0].assignment.status).toBe("Provisional");
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       expect(await availableOf(2, "logistic", 3)).toBe(2);
     });
 
@@ -386,9 +386,9 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("denies access to requests of another responsible", async () => {
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       await assign(2, [{ resource_id: 3, quantity: 1 }]);
-      context.signInAs(GABRIEL_ID, UserRole.LOGISTICA);
+      context.signInAs(GABRIEL_ID, UserRole.LOGISTICS);
 
       const response = await remove("/api/logistics/requests/2/resources/3");
 
@@ -474,14 +474,14 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("rejects finishing with a sufficient resource left unassigned (RF-2.3.2.20)", async () => {
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       await assign(2, [{ resource_id: 3, quantity: 2 }]);
-      context.signInAs(GABRIEL_ID, UserRole.LOGISTICA);
+      context.signInAs(GABRIEL_ID, UserRole.LOGISTICS);
       await assign(1, [{ resource_id: 3, quantity: 1 }]);
 
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       await post("/api/logistics/requests/2/resources/cancel");
-      context.signInAs(GABRIEL_ID, UserRole.LOGISTICA);
+      context.signInAs(GABRIEL_ID, UserRole.LOGISTICS);
 
       const response = await post("/api/logistics/requests/1/resources/confirm");
 
@@ -562,7 +562,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       const listing = await get("/api/logistics/resources/logistic?request_id=1");
       expect(listing.body.data.resources[0].assignment).toBeNull();
       expect(listing.body.metadata.request.pending_observations).toBeNull();
-      context.signInAs(LAURA_ID, UserRole.LOGISTICA);
+      context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       expect(await availableOf(2, "logistic", 3)).toBe(2);
     });
 

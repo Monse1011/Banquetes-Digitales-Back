@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, max-len */
 require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
@@ -28,6 +29,19 @@ const {
 const {
   PostgresTransactionManager,
 } = require("../infrastructure/services/transaction/postgres-transaction-manager");
+const {
+  PostgresAssignedResourceRepository,
+} = require("../infrastructure/repositories/proposal/postgres-assigned-resource-repository");
+const {
+  PostgresDerivedInformationRepository,
+} = require("../infrastructure/repositories/proposal/postgres-derived-information-repository");
+const {
+  PostgresProposalRepository,
+} = require("../infrastructure/repositories/proposal/postgres-proposal-repository");
+const {
+  PostgresAuditLogRepository,
+} = require("../infrastructure/repositories/proposal/postgres-audit-log-repository");
+const { PdfkitPdfGenerator } = require("../infrastructure/services/proposal/pdfkit-pdf-generator");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -96,6 +110,9 @@ function loadConfig() {
       resetPasswordUrl: process.env.RESET_PASSWORD_URL,
     },
     authCookie: { secure: process.env.NODE_ENV === "production" },
+    proposalStorage: {
+      storageDir: process.env.PROPOSAL_STORAGE_DIR || "storage/proposals",
+    },
   };
 }
 
@@ -108,6 +125,7 @@ const JwtTokenService = require("../infrastructure/security/jwt-token-service");
 const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
 
 // Authentication use cases
+const createUserManagementUseCases = require("./create-user-management-use-cases");
 const AuthenticateUser = require("../application/use-cases/auth/authenticate-user");
 const BlockService = require("../application/use-cases/auth/block-service");
 const ChangePassword = require("../application/use-cases/auth/change-password");
@@ -135,6 +153,28 @@ const {
   GetAvailableLogisticsUsersUseCase,
 } = require("../application/use-cases/reservation-request/get-available-logistics-users-use-case");
 
+// Calendar Use Cases (Función 3.3)
+const {
+  ScheduleEventUseCase,
+} = require("../application/use-cases/calendar/schedule-event-use-case");
+const { EditEventUseCase } = require("../application/use-cases/calendar/edit-event-use-case");
+const { CancelEventUseCase } = require("../application/use-cases/calendar/cancel-event-use-case");
+const {
+  ListCalendarEventsUseCase,
+} = require("../application/use-cases/calendar/list-calendar-events-use-case");
+const {
+  ProcessPendingCalendarSyncUseCase,
+} = require("../application/use-cases/calendar/process-pending-calendar-sync-use-case");
+const {
+  FinalizeElapsedEventsUseCase,
+} = require("../application/use-cases/calendar/finalize-elapsed-events-use-case");
+const {
+  PostgresCalendarEventRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
+const {
+  PostgresCalendarSyncRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
+const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
   createResourceUseCases,
@@ -142,6 +182,22 @@ const {
 const {
   createResourceAssignmentUseCases,
 } = require("../application/use-cases/resource-assignment/create-resource-assignment-use-cases");
+
+// Proposal use cases (Función 3.4)
+const {
+  GetRequestAgreementsUseCase,
+} = require("../application/use-cases/proposal/get-request-agreements-use-case");
+const {
+  SaveAgreementsUseCase,
+} = require("../application/use-cases/proposal/save-agreements-use-case");
+const {
+  GenerateProposalUseCase,
+} = require("../application/use-cases/proposal/generate-proposal-use-case");
+const { GetProposalUseCase } = require("../application/use-cases/proposal/get-proposal-use-case");
+const {
+  DownloadProposalUseCase,
+} = require("../application/use-cases/proposal/download-proposal-use-case");
+const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -243,6 +299,77 @@ async function main() {
     userRepository
   );
 
+  // Función 3.4 - Contacto con el cliente.
+  const assignedResourceRepository = new PostgresAssignedResourceRepository(pool);
+  const derivedInformationRepository = new PostgresDerivedInformationRepository(pool);
+  const proposalRepository = new PostgresProposalRepository(pool);
+  const auditLogRepository = new PostgresAuditLogRepository(pool);
+  const pdfGenerator = new PdfkitPdfGenerator(config.proposalStorage);
+
+  const getRequestAgreementsUseCase = new GetRequestAgreementsUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    assignedResourceRepository,
+    derivedInformationRepository
+  );
+  const saveAgreementsUseCase = new SaveAgreementsUseCase(
+    reservationRequestRepository,
+    assignedResourceRepository,
+    derivedInformationRepository
+  );
+  const generateProposalUseCase = new GenerateProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    assignedResourceRepository,
+    pdfGenerator
+  );
+  const getProposalUseCase = new GetProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository
+  );
+  const downloadProposalUseCase = new DownloadProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    pdfGenerator
+  );
+  const sendProposalUseCase = new SendProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    proposalRepository,
+    pdfGenerator,
+    emailService,
+    auditLogRepository
+  );
+
+  // Calendar
+  const calendarEventRepository = new PostgresCalendarEventRepository(pool);
+  const calendarSyncRepository = new PostgresCalendarSyncRepository(pool);
+  const externalCalendarGateway = new GoogleCalendarGateway();
+  const processPendingCalendarSyncUseCase = new ProcessPendingCalendarSyncUseCase(
+    calendarEventRepository,
+    calendarSyncRepository,
+    externalCalendarGateway
+  );
+
+  const scheduleEventUseCase = new ScheduleEventUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const editEventUseCase = new EditEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const cancelEventUseCase = new CancelEventUseCase(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+  const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
+  const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
+
   const app = createApp({
     // Authentication
     authController,
@@ -259,9 +386,32 @@ async function main() {
     getReservationRequestsUseCase,
     assignReservationRequestUseCase,
     getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
+    // Calendar
+    scheduleEventUseCase,
+    editEventUseCase,
+    cancelEventUseCase,
+    listCalendarEventsUseCase,
+    // User management (Función 2.12)
+    ...createUserManagementUseCases({ pool, emailService }),
     // Resources
     ...createResourceDependencies(pool, reservationRequestRepository, userRepository),
+    // Proposals (Función 3.4)
+    getRequestAgreementsUseCase,
+    saveAgreementsUseCase,
+    generateProposalUseCase,
+    getProposalUseCase,
+    downloadProposalUseCase,
+    sendProposalUseCase,
   });
+
+  // Start background jobs for calendar sync and finalization
+  setInterval(() => {
+    processPendingCalendarSyncUseCase.execute().catch((err) => console.error("Sync error:", err));
+  }, 15000); // every 15 seconds
+
+  setInterval(() => {
+    finalizeElapsedEventsUseCase.execute().catch((err) => console.error("Finalize error:", err));
+  }, 60000); // every minute
 
   app.listen(config.port, () => {
     console.log(`Server running on port ${config.port}`);
