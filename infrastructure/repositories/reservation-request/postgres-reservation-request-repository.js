@@ -202,7 +202,7 @@ class PostgresReservationRequestRepository {
        FROM users
        WHERE id_user = $1 AND role = $2 AND status = $3
        FOR UPDATE`,
-      [logisticUserId, UserRole.LOGISTICA, UserStatus.ACTIVE]
+      [logisticUserId, UserRole.LOGISTICS, UserStatus.ACTIVE]
     );
 
     if (!userResult.rows[0]) {

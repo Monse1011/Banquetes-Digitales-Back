@@ -64,7 +64,7 @@ describe("Rutas de la Función 3.4", () => {
   let currentRole;
 
   beforeEach(() => {
-    currentRole = UserRole.LOGISTICA;
+    currentRole = UserRole.LOGISTICS;
 
     const clientRepository = new InMemoryClientRepository();
     reservationRequestRepository = new InMemoryReservationRequestRepository();

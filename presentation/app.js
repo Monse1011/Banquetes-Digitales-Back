@@ -339,6 +339,11 @@ function createApp(dependencies) {
       return;
     }
 
+    if (error.status) {
+      response.status(error.status).json({ message: error.message });
+      return;
+    }
+
     console.error("Unhandled request error:", error);
     response.status(500).json({ message: ErrorMessages.INTERNAL_SERVER_ERROR });
   });

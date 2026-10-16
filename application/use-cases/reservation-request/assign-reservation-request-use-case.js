@@ -37,7 +37,7 @@ class AssignReservationRequestUseCase {
     // El responsable debe ser un usuario Activo con rol Personal de Logística.
     const logisticUser = await this.userRepository.findById(logisticUserId);
 
-    if (!logisticUser || !logisticUser.isActive() || logisticUser.role !== UserRole.LOGISTICA) {
+    if (!logisticUser || !logisticUser.isActive() || logisticUser.role !== UserRole.LOGISTICS) {
       throw new LogisticsUserNotAvailableException();
     }
 

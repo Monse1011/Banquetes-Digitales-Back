@@ -13,7 +13,7 @@ describe("EditEventUseCase DAD request fields", () => {
     await expect(
       useCase.execute(
         4,
-        { id_user: 12, role: UserRole.LOGISTICA },
+        { id_user: 12, role: UserRole.LOGISTICS },
         {
           start_at: "2026-12-24T19:00:00Z",
         }
@@ -55,7 +55,7 @@ describe("EditEventUseCase DAD request fields", () => {
 
     await useCase.execute(
       4,
-      { id_user: 12, role: UserRole.LOGISTICA },
+      { id_user: 12, role: UserRole.LOGISTICS },
       {
         start_datetime: "2026-12-24 19:00:00",
         end_datetime: "2026-12-24 23:00:00",

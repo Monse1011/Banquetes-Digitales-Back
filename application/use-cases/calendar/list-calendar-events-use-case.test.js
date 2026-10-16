@@ -14,7 +14,7 @@ describe("ListCalendarEventsUseCase", () => {
     );
 
     await useCase.execute({
-      actor: { id_user: 27, role: UserRole.LOGISTICA },
+      actor: { id_user: 27, role: UserRole.LOGISTICS },
     });
 
     expect(calendarEventRepository.findAll).toHaveBeenCalledWith(

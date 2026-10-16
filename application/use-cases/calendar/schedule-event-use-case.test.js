@@ -52,7 +52,7 @@ describe("ScheduleEventUseCase", () => {
       () => now
     );
 
-    const actor = { id_user: 12, role: UserRole.LOGISTICA };
+    const actor = { id_user: 12, role: UserRole.LOGISTICS };
     const result = await useCase.execute(10, actor);
 
     expect(reservationRequestRepository.findById).toHaveBeenCalledWith(10);
@@ -107,7 +107,7 @@ describe("ScheduleEventUseCase", () => {
       () => now
     );
 
-    const actor = { id_user: 12, role: UserRole.LOGISTICA };
+    const actor = { id_user: 12, role: UserRole.LOGISTICS };
     await useCase.execute(10, actor);
 
     expect(calendarEventRepository.schedule).toHaveBeenCalledWith({

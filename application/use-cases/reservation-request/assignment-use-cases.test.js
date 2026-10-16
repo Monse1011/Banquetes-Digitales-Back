@@ -26,7 +26,7 @@ const LOGISTICS_USER = new User(
   "David Torres",
   "david@example.com",
   "$2b$hash",
-  UserRole.LOGISTICA,
+  UserRole.LOGISTICS,
   UserStatus.ACTIVE,
   new Date(),
   new Date()
@@ -39,7 +39,7 @@ function buildUser(overrides = {}) {
     overrides.fullName ?? "Cesar Huerta",
     overrides.email ?? "cesar@example.com",
     "$2b$hash",
-    overrides.role ?? UserRole.LOGISTICA,
+    overrides.role ?? UserRole.LOGISTICS,
     overrides.status ?? UserStatus.ACTIVE,
     new Date(),
     new Date()

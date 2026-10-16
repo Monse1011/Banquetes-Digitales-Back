@@ -1,5 +1,12 @@
 const nodemailer = require("nodemailer");
 
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 class NodemailerEmailService {
   constructor({ host, port, user, password, resetPasswordUrl } = {}) {
     this.user = user;
@@ -33,6 +40,7 @@ class NodemailerEmailService {
             `,
     });
   }
+
   // RF-2.3.4.6: la propuesta se remite como adjunto al correo del cliente.
   async sendProposalEmail(email, clientName, proposalCode, fileName, pdfBuffer) {
     await this.transporter.sendMail({
@@ -53,6 +61,23 @@ class NodemailerEmailService {
           contentType: "application/pdf",
         },
       ],
+    });
+  }
+
+  // RF-1.2.12.3: envía la contraseña temporal al correo del usuario recién registrado.
+  async sendCredentials({ to, fullName, tempPassword }) {
+    await this.transporter.sendMail({
+      from: `"Banquetes Elegancia" <${this.user}>`,
+      to,
+      subject: "Credenciales de acceso - Banquetes Elegancia",
+      html: `
+                <h2>Credenciales de acceso</h2>
+                <p>Hola ${escapeHtml(fullName)},</p>
+                <p>Se creó tu cuenta en Banquetes Digitales.</p>
+                <p>Tu contraseña temporal es: <strong>${escapeHtml(tempPassword)}</strong></p>
+                <p>Deberás cambiarla en tu primer inicio de sesión.</p>
+                <p>Saludos,<br>Banquetes Elegancia</p>
+            `,
     });
   }
 }

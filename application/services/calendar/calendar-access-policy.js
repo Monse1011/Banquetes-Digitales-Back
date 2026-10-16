@@ -13,7 +13,7 @@ function isResponsible(actor, logisticUserId) {
   const actorId = getActorId(actor);
 
   return (
-    actor?.role === UserRole.LOGISTICA &&
+    actor?.role === UserRole.LOGISTICS &&
     logisticUserId !== null &&
     logisticUserId !== undefined &&
     actorId !== null &&
@@ -41,7 +41,7 @@ function assertCanEditEvent(actor, logisticUserId) {
 }
 
 function assertCanListEvents(actor) {
-  if (!isAdmin(actor) && actor?.role !== UserRole.LOGISTICA) {
+  if (!isAdmin(actor) && actor?.role !== UserRole.LOGISTICS) {
     throw new CalendarAccessDeniedException();
   }
 }

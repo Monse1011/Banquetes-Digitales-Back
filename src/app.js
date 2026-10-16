@@ -116,6 +116,7 @@ const JwtTokenService = require("../infrastructure/security/jwt-token-service");
 const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
 
 // Authentication use cases
+const createUserManagementUseCases = require("./create-user-management-use-cases");
 const AuthenticateUser = require("../application/use-cases/auth/authenticate-user");
 const BlockService = require("../application/use-cases/auth/block-service");
 const ChangePassword = require("../application/use-cases/auth/change-password");
@@ -366,6 +367,8 @@ async function main() {
     editEventUseCase,
     cancelEventUseCase,
     listCalendarEventsUseCase,
+    // User management (Función 2.12)
+    ...createUserManagementUseCases({ pool, emailService }),
     // Resources
     ...createPostgresResourceUseCases(pool),
     // Proposals (Función 3.4)

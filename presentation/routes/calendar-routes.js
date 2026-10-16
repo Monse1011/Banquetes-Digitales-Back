@@ -4,7 +4,7 @@ const UserRole = require("../../domain/enums/auth/user-role");
 
 function createLogisticsCalendarRoutes(calendarController, authMiddleware) {
   const router = Router();
-  const requireAdminOrLogistics = requireRole(UserRole.ADMIN, UserRole.LOGISTICA);
+  const requireAdminOrLogistics = requireRole(UserRole.ADMIN, UserRole.LOGISTICS);
 
   router.use(authMiddleware, requireAdminOrLogistics);
   router.get("/calendar", calendarController.list.bind(calendarController));
