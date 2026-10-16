@@ -112,51 +112,62 @@ class PostgresReservationRequestRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
-  async update(request) {
+  // Con transaction, la actualización forma parte de esa transacción (Función 3.2).
+  async update(request, transaction = null) {
+    if (transaction) {
+      return this.updateWith(transaction.connection, request);
+    }
+
     const connection = await this.pool.connect();
 
     try {
       await connection.query("BEGIN");
-      const result = await connection.query(
-        `UPDATE reservations_request
-         SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
-             event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
-             request_date = $9
-         WHERE id_reservation_request = $10
-         RETURNING ${REQUEST_COLUMNS}`,
-        [...this.requestValues(request), request.requestId]
-      );
-
-      if (!result.rows[0]) {
-        throw new Error("Reservation request not found");
-      }
-
-      await this.replaceServices(connection, request.requestId, request.servicesIds);
+      const updatedRequest = await this.updateWith(connection, request);
       await connection.query("COMMIT");
-      const updatedRequest = this.toEntity(result.rows[0]);
 
-      return new ReservationRequest(
-        updatedRequest.requestId,
-        updatedRequest.folio,
-        updatedRequest.clientId,
-        updatedRequest.userId,
-        updatedRequest.eventDateTime,
-        updatedRequest.eventEndTime,
-        updatedRequest.guestCount,
-        updatedRequest.eventAddress,
-        updatedRequest.status,
-        updatedRequest.requestDate,
-        request.servicesIds,
-        updatedRequest.logisticUserId,
-        updatedRequest.assignedByUserId,
-        updatedRequest.assignedAt
-      );
+      return updatedRequest;
     } catch (error) {
       await connection.query("ROLLBACK");
       throw error;
     } finally {
       connection.release();
     }
+  }
+
+  async updateWith(connection, request) {
+    const result = await connection.query(
+      `UPDATE reservations_request
+       SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
+           event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
+           request_date = $9
+       WHERE id_reservation_request = $10
+       RETURNING ${REQUEST_COLUMNS}`,
+      [...this.requestValues(request), request.requestId]
+    );
+
+    if (!result.rows[0]) {
+      throw new Error("Reservation request not found");
+    }
+
+    await this.replaceServices(connection, request.requestId, request.servicesIds);
+    const updatedRequest = this.toEntity(result.rows[0]);
+
+    return new ReservationRequest(
+      updatedRequest.requestId,
+      updatedRequest.folio,
+      updatedRequest.clientId,
+      updatedRequest.userId,
+      updatedRequest.eventDateTime,
+      updatedRequest.eventEndTime,
+      updatedRequest.guestCount,
+      updatedRequest.eventAddress,
+      updatedRequest.status,
+      updatedRequest.requestDate,
+      request.servicesIds,
+      updatedRequest.logisticUserId,
+      updatedRequest.assignedByUserId,
+      updatedRequest.assignedAt
+    );
   }
 
   // RF-1.2.4.7: la (re)asignación se registra de forma atómica. El bloqueo de la fila
@@ -233,7 +244,7 @@ class PostgresReservationRequestRepository {
        FROM users
        WHERE id_user = $1 AND role = $2 AND status = $3
        FOR UPDATE`,
-      [logisticUserId, UserRole.LOGISTICA, UserStatus.ACTIVE]
+      [logisticUserId, UserRole.LOGISTICS, UserStatus.ACTIVE]
     );
 
     if (!userResult.rows[0]) {
@@ -269,6 +280,27 @@ class PostgresReservationRequestRepository {
     }
 
     return undefined;
+  }
+
+  // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
+  // horario confirmado de una solicitud.
+  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
+    const result = await this.pool.query(
+      `SELECT folio, event_date_time, event_end_time
+       FROM reservations_request
+       WHERE logistic_user_id = $1
+         AND id_reservation_request <> $2
+         AND status = ANY($3)
+         AND event_date_time < $4
+         AND event_end_time > $5`,
+      [logisticUserId, excludeRequestId, ActiveReservationRequestStatuses, end, start]
+    );
+
+    return result.rows.map((row) => ({
+      folio: row.folio,
+      startDateTime: new Date(row.event_date_time),
+      endDateTime: new Date(row.event_end_time),
+    }));
   }
 
   async findAll(filters = {}, sort = null, page = 1, perPage = 10) {

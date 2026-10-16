@@ -5,6 +5,8 @@
  * @typedef {Object} ResourceRepository
  * @property {(resource: Resource) => Promise<Resource>} create
  * @property {(id: number) => Promise<Resource | null>} findById
+ * @property {(ids: number[]) => Promise<Resource[]>} findByIds en una sola consulta; omite los
+ * que no existen
  * @property {(resource: Resource) => Promise<Resource | null>} updateDetails nombre, rol
  * operativo, cantidad y costo unitario
  * @property {(resource: Resource) => Promise<Resource | null>} updateStatus estado y fecha de baja

@@ -86,8 +86,7 @@ class PostgresUserRepository {
     const rawStatus = row.status ? String(row.status).toLowerCase() : "";
     const status = rawStatus === UserStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE;
 
-    const rawRole = row.role ? String(row.role).toLowerCase() : "";
-    const role = rawRole === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICA;
+    const role = row.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICS;
 
     return new User(
       Number(row.id_user),

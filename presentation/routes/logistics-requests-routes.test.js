@@ -97,7 +97,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       await repo.create(req1);
       await repo.create(reqOther);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app).get("/api/logistics/requests").set("Cookie", AUTH_COOKIE);
 
@@ -110,7 +110,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
 
     it("returns message 'No tiene solicitudes de eventos asignadas.' when empty (NC 15, RF-2.3.1.2)", async () => {
       const repo = new InMemoryReservationRequestRepository();
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app).get("/api/logistics/requests").set("Cookie", AUTH_COOKIE);
 
@@ -145,7 +145,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       await repo.create(reqTieB);
       await repo.create(reqTieA);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app).get("/api/logistics/requests").set("Cookie", AUTH_COOKIE);
 
@@ -164,7 +164,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       });
       await repo.create(req);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const resFiltered = await request(app)
         .get("/api/logistics/requests?status=Confirmado")
@@ -197,7 +197,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       await repo.create(reqHist);
       await repo.create(reqActive);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/history")
@@ -222,7 +222,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       });
       await repo.create(req);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/1")
@@ -249,7 +249,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       });
       await repo.create(req);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/2")
@@ -269,7 +269,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
       });
       await repo.create(req);
 
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/3")
@@ -281,7 +281,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
 
     it("returns 404 when request is not found", async () => {
       const repo = new InMemoryReservationRequestRepository();
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/999")
@@ -292,7 +292,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
 
     it("returns 400 for invalid id parameter", async () => {
       const repo = new InMemoryReservationRequestRepository();
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app)
         .get("/api/logistics/requests/invalid-id")
@@ -305,7 +305,7 @@ describe("Logistics reservation request routes (Función 3.1)", () => {
   describe("Security and roles", () => {
     it("requires authentication", async () => {
       const repo = new InMemoryReservationRequestRepository();
-      const app = buildApp(UserRole.LOGISTICA, 10, repo);
+      const app = buildApp(UserRole.LOGISTICS, 10, repo);
 
       const response = await request(app).get("/api/logistics/requests");
       expect(response.status).toBe(401);

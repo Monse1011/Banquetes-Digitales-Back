@@ -49,7 +49,7 @@ describe("App", () => {
 
   function buildApp() {
     currentUserId = 1;
-    currentUserRole = "admin";
+    currentUserRole = UserRole.ADMIN;
 
     const clientRepository = new InMemoryClientRepository();
     const serviceRepository = new InMemoryServiceRepository([
@@ -64,7 +64,7 @@ describe("App", () => {
         "David Torres",
         "david@example.com",
         "$2b$hash",
-        UserRole.LOGISTICA,
+        UserRole.LOGISTICS,
         UserStatus.ACTIVE,
         new Date(),
         new Date()
@@ -75,7 +75,7 @@ describe("App", () => {
         "Cesar Huerta",
         "cesar@example.com",
         "$2b$hash",
-        UserRole.LOGISTICA,
+        UserRole.LOGISTICS,
         UserStatus.ACTIVE,
         new Date(),
         new Date()
@@ -246,7 +246,7 @@ describe("App", () => {
   describe("Función 2.4 - Asignación de eventos", () => {
     it("rejects assignment when the user is not an admin (RF-1.2.4.16)", async () => {
       const requestId = await createApprovedRequest();
-      currentUserRole = UserRole.LOGISTICA;
+      currentUserRole = UserRole.LOGISTICS;
 
       const response = await request(app)
         .patch(`/api/admin/requests/${requestId}/assignment`)
@@ -431,6 +431,22 @@ describe("App", () => {
         email: "david@example.com",
       });
       expect(detail.body.data[0].logistic_user.id).toBe(7);
+    });
+
+    it("filters by any RequestStatus key of the DAD and rejects unknown ones", async () => {
+      const requestId = await createApprovedRequest();
+      (await reservationRequestRepository.findById(requestId)).status = "Coordinación Incompleta";
+
+      const list = await request(app)
+        .get("/api/admin/requests?status=coordination_incomplete")
+        .set("Cookie", "auth_token=valid-token");
+      const invalid = await request(app)
+        .get("/api/admin/requests?status=Asignada")
+        .set("Cookie", "auth_token=valid-token");
+
+      expect(list.status).toBe(200);
+      expect(list.body.data.map((item) => item.request_id)).toEqual([requestId]);
+      expect(invalid.status).toBe(400);
     });
 
     it("lists active logistics users for assignment (RF-1.2.4.10/12)", async () => {

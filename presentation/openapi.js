@@ -1,3 +1,5 @@
+const { ReservationRequestStatus } = require("../domain/enums/reservation-request/request-status");
+
 const resourceIdParameter = {
   name: "id",
   in: "path",
@@ -28,6 +30,61 @@ function dataEnvelope(schema) {
 function jsonBody(schema) {
   return { required: true, content: { "application/json": { schema: dataEnvelope(schema) } } };
 }
+
+const calendarEventSchema = {
+  type: "object",
+  properties: {
+    event_id: { type: "integer" },
+    request_id: { type: "integer" },
+    folio: { type: "string" },
+    title: { type: "string" },
+    logistics_responsible: {
+      type: "object",
+      nullable: true,
+      properties: {
+        user_id: { type: "integer" },
+        full_name: { type: "string" },
+      },
+    },
+    start_datetime: { type: "string", example: "2026-12-24 18:00:00" },
+    end_datetime: { type: "string", example: "2026-12-24 23:00:00" },
+    location: { type: "string" },
+    status: { type: "string" },
+    sync_status: { type: "string" },
+  },
+};
+
+const calendarListResponse = {
+  description: "Eventos del calendario",
+  content: {
+    "application/json": {
+      schema: {
+        type: "object",
+        properties: {
+          data: {
+            type: "object",
+            properties: {
+              events: { type: "array", items: calendarEventSchema },
+            },
+          },
+          metadata: {
+            type: "object",
+            properties: {
+              pagination: {
+                type: "object",
+                properties: {
+                  total_records: { type: "integer" },
+                  page: { type: "integer" },
+                  per_page: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 const humanResourceBody = {
   type: "object",
@@ -67,6 +124,44 @@ function softDeleteOperation(tag) {
         204: { description: "Deactivated" },
         404: { description: "Not found" },
         ...concurrencyConflictResponse,
+      },
+    },
+  };
+}
+
+// Función 3.2: la disponibilidad se calcula para el periodo del evento de la solicitud.
+const requestIdQueryParameter = {
+  name: "request_id",
+  in: "query",
+  schema: { type: "integer" },
+  description:
+    "Agrega available_quantity, assignment y metadata.request para la solicitud (RF-2.3.2.5)",
+};
+
+// RF-2.3.2.1 / RF-2.3.2.21
+const resourceConfirmationAccessResponses = {
+  403: { description: "Not the logistic user responsible for the request" },
+  404: { description: "Request not found" },
+  409: { description: "La solicitud no se encuentra en un estado que permita confirmar recursos." },
+};
+
+const observationsSchema = { type: "string", maxLength: 200, nullable: true };
+
+function logisticsResourcePath(path, listParameters) {
+  return {
+    [`/api/logistics/resources/${path}`]: {
+      get: {
+        tags: ["Logistics"],
+        summary: `List active ${path} resources (with request_id: availability for the event, Función 3.2)`,
+        security: [{ CookieAuth: [] }],
+        parameters: [
+          ...listParameters.filter((parameter) => parameter.name !== "status"),
+          requestIdQueryParameter,
+        ],
+        responses: {
+          200: { description: "Paginated active resources" },
+          ...resourceConfirmationAccessResponses,
+        },
       },
     },
   };
@@ -139,15 +234,7 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
       },
       ...(softDelete ? softDeleteOperation(tag) : {}),
     },
-    [`/api/logistics/resources/${path}`]: {
-      get: {
-        tags: ["Logistics"],
-        summary: `List active ${path} resources`,
-        security,
-        parameters: listParameters.filter((parameter) => parameter.name !== "status"),
-        responses: { 200: { description: "Paginated active resources" } },
-      },
-    },
+    ...logisticsResourcePath(path, listParameters),
   };
 }
 
@@ -200,6 +287,117 @@ const resourcePaths = {
   ),
 };
 
+const requestPathParameter = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "integer" },
+};
+
+// Función 3.2 - Confirmación de recursos.
+const resourceConfirmationPaths = {
+  "/api/logistics/requests/{id}/resources": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Register requested resources; sufficient ones are assigned provisionally",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["data"],
+              properties: {
+                data: {
+                  type: "array",
+                  minItems: 1,
+                  items: {
+                    type: "object",
+                    required: ["resource_id", "quantity"],
+                    properties: {
+                      resource_id: { type: "integer" },
+                      quantity: { type: "integer", minimum: 1 },
+                      usage_start: { type: "string", example: "2026-12-24 18:00:00" },
+                      usage_end: { type: "string", example: "2026-12-24 23:00:00" },
+                      observation: observationsSchema,
+                    },
+                  },
+                },
+                observations: observationsSchema,
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        204: { description: "Resources registered" },
+        ...resourceConfirmationAccessResponses,
+        409: {
+          description:
+            "Status does not allow confirming resources, or the availability changed (La disponibilidad del recurso cambió. Actualice la información.)",
+        },
+        422: { description: "Validation error" },
+      },
+    },
+  },
+  "/api/logistics/requests/{id}/resources/{resourceId}": {
+    delete: {
+      tags: ["Resource confirmation"],
+      summary: "Remove a registered resource by releasing its provisional assignment",
+      security: [{ CookieAuth: [] }],
+      parameters: [
+        requestPathParameter,
+        { name: "resourceId", in: "path", required: true, schema: { type: "integer" } },
+      ],
+      responses: {
+        204: { description: "Provisional assignment released" },
+        ...resourceConfirmationAccessResponses,
+        404: {
+          description:
+            "Request not found, or the resource has no provisional assignment in the request (El recurso no tiene una asignación provisional en la solicitud.)",
+        },
+      },
+    },
+  },
+  "/api/logistics/requests/{id}/resources/confirm": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Finish the confirmation (Coordinación Lista / Coordinación Incompleta)",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: { type: "object", properties: { observations: observationsSchema } },
+          },
+        },
+      },
+      responses: {
+        200: { description: "Confirmation saved" },
+        400: { description: "A Suficiente resource is not assigned" },
+        ...resourceConfirmationAccessResponses,
+        409: { description: "Status does not allow confirming resources, or availability changed" },
+        422: { description: "No resources registered or invalid observations" },
+      },
+    },
+  },
+  "/api/logistics/requests/{id}/resources/cancel": {
+    post: {
+      tags: ["Resource confirmation"],
+      summary: "Discard provisional assignments and pending observations",
+      security: [{ CookieAuth: [] }],
+      parameters: [requestPathParameter],
+      responses: {
+        200: { description: "Provisional assignments released" },
+        403: { description: "Not the logistic user responsible for the request" },
+        404: { description: "Request not found" },
+      },
+    },
+  },
+};
+
 const openApiDocument = {
   openapi: "3.0.3",
   info: {
@@ -209,6 +407,86 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
+    "/api/logistics/calendar": {
+      get: {
+        summary: "Consulta el calendario del responsable de logística",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
+      },
+    },
+    "/api/admin/calendar": {
+      get: {
+        summary: "Consulta el calendario del Administrador General",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        responses: { 200: calendarListResponse },
+      },
+    },
+    "/api/logistics/requests/{id}/calendar": {
+      post: {
+        summary: "Agenda un evento desde una solicitud",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          201: {
+            description: "Evento agendado",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      type: "object",
+                      properties: {
+                        event_id: { type: "integer" },
+                        request_id: { type: "integer" },
+                        status: { type: "string" },
+                        sync_status: { type: "string" },
+                        google_event_id: { type: "string", nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/logistics/calendar/{id}": {
+      patch: {
+        summary: "Edita un evento confirmado",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          properties: {
+            location: { type: "string" },
+            start_datetime: { type: "string", example: "2026-12-24 19:00:00" },
+            end_datetime: { type: "string", example: "2026-12-25 00:00:00" },
+            logistic_user_id: { type: "integer", description: "Campo inmutable." },
+            resources: {
+              type: "array",
+              description: "Campo inmutable.",
+              items: { type: "object" },
+            },
+          },
+        }),
+        responses: { 200: { description: "Body vacío" } },
+      },
+      delete: {
+        summary: "Cancela un evento confirmado",
+        tags: ["Calendar"],
+        security: [{ cookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: { 200: { description: "Body vacío" } },
+      },
+    },
     "/api/auth/login": {
       post: {
         tags: ["Authentication"],
@@ -345,7 +623,7 @@ const openApiDocument = {
             name: "status",
             in: "query",
             required: false,
-            schema: { type: "string", enum: ["PENDING", "APPROVED", "ASSIGNED"] },
+            schema: { type: "string", enum: Object.keys(ReservationRequestStatus) },
           },
           { name: "page", in: "query", required: false, schema: { type: "integer" } },
           { name: "per_page", in: "query", required: false, schema: { type: "integer" } },
@@ -377,6 +655,112 @@ const openApiDocument = {
       },
     },
     ...resourcePaths,
+    ...resourceConfirmationPaths,
+    "/api/logistics/requests/{id}": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Request detail with client contact data and assigned resources (RF-2.3.4.1)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Agreements form preloaded" },
+          404: { description: "Request not found or not owned by the user" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/derived-information": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Save client agreements without changing the request status (RF-2.3.4.11)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["location", "start_datetime", "end_datetime", "adjusted_resources"],
+          properties: {
+            location: { type: "string", maxLength: 255 },
+            start_datetime: { type: "string", format: "date-time" },
+            end_datetime: { type: "string", format: "date-time" },
+            observations: { type: "string" },
+            adjusted_resources: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["resource_id", "quantity"],
+                properties: {
+                  resource_id: { type: "integer" },
+                  quantity: { type: "integer", minimum: 0 },
+                },
+              },
+            },
+          },
+        }),
+        responses: {
+          201: { description: "Agreements saved" },
+          400: { description: "Required fields missing" },
+          404: { description: "Request not found or not owned by the user" },
+          409: { description: "Invalid state or availability exceeded" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Generate the formal proposal PDF (RF-2.3.4.4)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["derived_information_id"],
+          properties: {
+            derived_information_id: { type: "integer" },
+            client_observations: { type: "string" },
+          },
+        }),
+        responses: {
+          201: { description: "Proposal generated and request moved to Propuesta generada" },
+          400: { description: "Required fields missing" },
+          404: { description: "Agreements not found for the request" },
+          409: { description: "Invalid state or proposal already generated" },
+          500: { description: "PDF generation failed; status unchanged" },
+        },
+      },
+      get: {
+        tags: ["Proposals"],
+        summary: "Get the generated proposal of the request (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal data with pdf_url" },
+          404: { description: "Proposal not found or not visible in current status" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/download": {
+      get: {
+        tags: ["Proposals"],
+        summary: "Download the immutable proposal PDF (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "PDF file", content: { "application/pdf": {} } },
+          404: { description: "Proposal not found" },
+        },
+      },
+    },
+    "/api/logistics/requests/{id}/proposals/send": {
+      post: {
+        tags: ["Proposals"],
+        summary: "Send the proposal PDF to the client email (RF-2.3.4.6)",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        responses: {
+          200: { description: "Proposal sent" },
+          404: { description: "Proposal not found" },
+          500: { description: "Email sending failed" },
+        },
+      },
+    },
     "/api/admin/requests/{id}/assignment": {
       patch: {
         tags: ["Event assignment"],
@@ -417,6 +801,21 @@ const openApiDocument = {
             description:
               "Status not reassignable (Confirmado), the current responsible changed (La solicitud ya fue asignada.) or logistic user not available (includes conflict when caused by overlap)",
           },
+        },
+      },
+    },
+    "/api/admin/users/{id}/credentials": {
+      post: {
+        tags: ["User management"],
+        summary:
+          "Resend credentials: new temporary password, previous one invalidated (RF-1.2.12.3)",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          204: { description: "Credentials resent" },
+          404: { description: "User not found" },
+          409: { description: "User inactive or already defined their password" },
+          502: { description: "The email with the temporary password could not be sent" },
         },
       },
     },

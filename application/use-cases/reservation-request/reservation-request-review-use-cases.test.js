@@ -44,7 +44,7 @@ describe("ReservationRequest Review UseCases", () => {
         "David Torres",
         "david@example.com",
         "$2b$hash",
-        UserRole.LOGISTICA,
+        UserRole.LOGISTICS,
         UserStatus.ACTIVE,
         new Date(),
         new Date()

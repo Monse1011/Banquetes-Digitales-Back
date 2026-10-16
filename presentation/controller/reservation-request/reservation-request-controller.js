@@ -5,11 +5,8 @@ const ListAssignedRequestsUseCase = require("../../../application/use-cases/logi
 const GetAssignedRequestsHistoryUseCase = require("../../../application/use-cases/logistics/get-assigned-requests-history-use-case");
 const GetAssignedRequestDetailUseCase = require("../../../application/use-cases/logistics/get-assigned-request-detail-use-case");
 
-const STATUS_BY_QUERY_VALUE = Object.freeze({
-  PENDING: ReservationRequestStatus.PENDING,
-  APPROVED: ReservationRequestStatus.APPROVED,
-  ASSIGNED: ReservationRequestStatus.ASSIGNED,
-});
+// ?status= recibe las claves del enum RequestStatus del DAD (PENDING, APPROVED, ...).
+const STATUS_BY_QUERY_VALUE = ReservationRequestStatus;
 
 class ReservationRequestController {
   constructor(dependencies = {}) {

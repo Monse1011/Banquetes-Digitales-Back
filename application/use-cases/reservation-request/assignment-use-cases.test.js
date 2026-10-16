@@ -26,7 +26,7 @@ const LOGISTICS_USER = new User(
   "David Torres",
   "david@example.com",
   "$2b$hash",
-  UserRole.LOGISTICA,
+  UserRole.LOGISTICS,
   UserStatus.ACTIVE,
   new Date(),
   new Date()
@@ -39,7 +39,7 @@ function buildUser(overrides = {}) {
     overrides.fullName ?? "Cesar Huerta",
     overrides.email ?? "cesar@example.com",
     "$2b$hash",
-    overrides.role ?? UserRole.LOGISTICA,
+    overrides.role ?? UserRole.LOGISTICS,
     overrides.status ?? UserStatus.ACTIVE,
     new Date(),
     new Date()
@@ -96,7 +96,7 @@ describe("AssignReservationRequestUseCase", () => {
     expect(created.assignedByUserId).toBe(1);
   });
 
-  it("accepts requests in any state except Confirmado", async () => {
+  it("accepts requests that have not started the resource confirmation", async () => {
     const pending = await reservationRequestRepository.create(
       buildRequest({ status: ReservationRequestStatus.PENDING })
     );
@@ -115,6 +115,21 @@ describe("AssignReservationRequestUseCase", () => {
       RequestNotReassignableException
     );
     expect(created.logisticUserId).toBe(7);
+  });
+
+  it.each([
+    ReservationRequestStatus.REJECTED,
+    ReservationRequestStatus.COORDINATION_READY,
+    ReservationRequestStatus.COORDINATION_INCOMPLETE,
+    ReservationRequestStatus.PROPOSAL_GENERATED,
+    ReservationRequestStatus.FINISHED,
+    ReservationRequestStatus.CANCELLED,
+  ])("blocks reassignment when the request is %s", async (status) => {
+    const created = await reservationRequestRepository.create(buildRequest({ status }));
+
+    await expect(useCase.execute(created.requestId, 8, 1)).rejects.toThrow(
+      RequestNotReassignableException
+    );
   });
 
   it("rejects when the request does not exist", async () => {

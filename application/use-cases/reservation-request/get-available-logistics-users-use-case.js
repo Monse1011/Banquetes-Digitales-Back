@@ -8,7 +8,7 @@ class GetAvailableLogisticsUsersUseCase {
   }
 
   async execute() {
-    const users = await this.userRepository.findActiveByRole(UserRole.LOGISTICA);
+    const users = await this.userRepository.findActiveByRole(UserRole.LOGISTICS);
 
     return new GetAvailableUsersResponseDto(
       users.map((user) => ({

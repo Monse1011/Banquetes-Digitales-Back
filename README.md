@@ -40,7 +40,11 @@ PGPASSWORD=password
 PGDATABASE=banquetes_db
 JWT_SECRET=your-secret-key
 DATABASE_URL=postgresql://user:password@localhost:5432/banquetes_db
+PROPOSAL_STORAGE_DIR=storage/proposals
 ```
+
+`PROPOSAL_STORAGE_DIR` es opcional e indica el directorio donde se guardan los PDF
+de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
 
 4. Crear y ejecutar migraciones de base de datos:
 
@@ -52,6 +56,22 @@ psql -U postgres -d banquetes_db -f database.sql
 
 ```bash
 psql -U postgres -d banquetes_db -f database/increment-2/assignment.sql
+```
+
+6. Aplicar los cambios de esquema del Incremento 2 (Función 3.4 - Contacto con el
+   cliente), en el siguiente orden (`derived_information` antes de `proposals`):
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-2/derived-information.sql
+psql -U postgres -d banquetes_db -f database/increment-2/proposals.sql
+psql -U postgres -d banquetes_db -f database/increment-2/assigned-resources.sql
+psql -U postgres -d banquetes_db -f database/increment-2/audit-logs.sql
+```
+
+Opcional: cargar datos de prueba de la Función 3.4:
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-2/mock-data-3.4.sql
 ```
 
 ## Desarrollo
@@ -152,7 +172,15 @@ Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
 
 ### Logística
 
-- **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo
+El Personal de Logística responsable de la solicitud y el Administrador General (RF-2.3.2.21).
+
+- **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo; con `request_id` agrega la cantidad disponible para el periodo del evento y lo registrado para la solicitud
+- **POST** `/api/logistics/requests/:id/resources` - Registrar recursos solicitados; los suficientes quedan asignados como provisionales (3.2)
+- **DELETE** `/api/logistics/requests/:id/resources/:resourceId` - Quitar un recurso registrado: libera su asignación provisional sin descartar los demás (3.2)
+- **POST** `/api/logistics/requests/:id/resources/confirm` - Finalizar confirmación (3.2)
+- **POST** `/api/logistics/requests/:id/resources/cancel` - Descartar las asignaciones provisionales (3.2)
+
+Las asignaciones y confirmaciones de recursos (Función 3.2) se acceden con `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Sus tablas aún no tienen migración, así que por ahora esas clases usan un mock en memoria y los datos se pierden al reiniciar el servidor; al crear las tablas solo cambia el contenido de esas clases. Confirmar recursos guarda las asignaciones, el registro de la confirmación y el estado de la solicitud en una sola transacción.
 
 ## Documentación API
 
