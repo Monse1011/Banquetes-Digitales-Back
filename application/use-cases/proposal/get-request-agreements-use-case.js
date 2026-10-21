@@ -22,8 +22,13 @@ class GetRequestAgreementsUseCase {
     this.derivedInformationRepository = derivedInformationRepository;
   }
 
-  async execute(requestId, userId) {
-    const request = await findOwnedRequest(this.reservationRequestRepository, requestId, userId);
+  async execute(requestId, userId, role) {
+    const request = await findOwnedRequest(
+      this.reservationRequestRepository,
+      requestId,
+      userId,
+      role
+    );
     const client = await this.clientRepository.findById(request.clientId);
     const assignedResources =
       await this.assignedResourceRepository.findActiveByRequestId(requestId);
@@ -48,6 +53,8 @@ class GetRequestAgreementsUseCase {
       assignedResources,
       canRegisterAgreements: AgreementsEditableReservationRequestStatuses.includes(request.status),
       scheduleType,
+      observations: latestAgreements?.observations ?? null,
+      derivedInformationId: latestAgreements?.id ?? null,
     });
   }
 }

@@ -15,7 +15,8 @@ class ProposalController {
     const result = await this.dependencies.generateProposalUseCase.execute(
       parseId(request.params.id),
       request.user.id_user,
-      dto
+      dto,
+      request.user.role
     );
 
     response.status(201).json(result);
@@ -25,7 +26,8 @@ class ProposalController {
   async get(request, response) {
     const result = await this.dependencies.getProposalUseCase.execute(
       parseId(request.params.id),
-      request.user.id_user
+      request.user.id_user,
+      request.user.role
     );
 
     response.json(result);
@@ -35,7 +37,8 @@ class ProposalController {
   async download(request, response) {
     const { fileName, buffer } = await this.dependencies.downloadProposalUseCase.execute(
       parseId(request.params.id),
-      request.user.id_user
+      request.user.id_user,
+      request.user.role
     );
 
     response.setHeader("Content-Type", "application/pdf");

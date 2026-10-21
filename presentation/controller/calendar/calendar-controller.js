@@ -14,7 +14,9 @@ class CalendarController {
     editEventUseCase,
     cancelEventUseCase,
     listCalendarEventsUseCase,
+    retryCalendarSyncUseCase,
   }) {
+    this.retryCalendarSyncUseCase = retryCalendarSyncUseCase;
     this.scheduleEventUseCase = scheduleEventUseCase;
     this.editEventUseCase = editEventUseCase;
     this.cancelEventUseCase = cancelEventUseCase;
@@ -69,6 +71,22 @@ class CalendarController {
       await this.cancelEventUseCase.execute(eventId, req.user);
 
       return res.status(200).end();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async retrySync(req, res, next) {
+    try {
+      const eventId = Number(req.params.id);
+      if (!Number.isSafeInteger(eventId) || eventId < 1) {
+        return res.status(422).json({ message: "El ID del evento debe ser un entero positivo." });
+      }
+      const { event, syncWarning } = await this.retryCalendarSyncUseCase.execute(eventId, req.user);
+      return res.json({
+        data: { event_id: event.id, sync_status: event.syncStatus },
+        message: syncWarning,
+      });
     } catch (error) {
       next(error);
     }

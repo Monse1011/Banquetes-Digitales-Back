@@ -5,8 +5,9 @@ function valueOrFallback(value, fallback = "Sin registrar") {
 }
 
 class GetAssignedRequestDetailUseCase {
-  constructor({ reservationRequestRepository } = {}) {
+  constructor({ reservationRequestRepository, serviceRepository } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
+    this.serviceRepository = serviceRepository;
   }
 
   determineScheduleType(status) {
@@ -60,7 +61,7 @@ class GetAssignedRequestDetailUseCase {
     };
   }
 
-  buildDetailDto(request) {
+  buildDetailDto(request, services) {
     return {
       request_id: request.id || request.requestId,
       folio: request.folio,
@@ -71,7 +72,7 @@ class GetAssignedRequestDetailUseCase {
       schedule_type: this.determineScheduleType(request.status),
       event_address: valueOrFallback(request.event_address || request.eventAddress),
       guest_count: request.guest_count || request.guestCount,
-      selected_services: this.mapServices(request.services || request.selected_services),
+      selected_services: this.mapServices(services),
       status: request.status,
     };
   }
@@ -86,8 +87,13 @@ class GetAssignedRequestDetailUseCase {
 
     this.verifyAccess(request, userId);
 
+    let services = request.services || request.selected_services;
+    if (!services?.length && request.servicesIds?.length) {
+      services = await this.serviceRepository.findByIds(request.servicesIds);
+    }
+
     return {
-      data: this.buildDetailDto(request),
+      data: this.buildDetailDto(request, services),
     };
   }
 }

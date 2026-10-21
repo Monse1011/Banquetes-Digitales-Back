@@ -24,15 +24,22 @@ class SaveAgreementsUseCase {
   constructor(
     reservationRequestRepository,
     assignedResourceRepository,
-    derivedInformationRepository
+    derivedInformationRepository,
+    transactionManager
   ) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.assignedResourceRepository = assignedResourceRepository;
     this.derivedInformationRepository = derivedInformationRepository;
+    this.transactionManager = transactionManager;
   }
 
-  async execute(requestId, userId, dto) {
-    const request = await findOwnedRequest(this.reservationRequestRepository, requestId, userId);
+  async execute(requestId, userId, dto, role) {
+    const request = await findOwnedRequest(
+      this.reservationRequestRepository,
+      requestId,
+      userId,
+      role
+    );
 
     // RF-2.3.4.1 / RF-2.3.4.12: solo en estados de coordinación.
     if (!AgreementsEditableReservationRequestStatuses.includes(request.status)) {
@@ -58,28 +65,33 @@ class SaveAgreementsUseCase {
     await this.validateAdjustedAvailability(requestId, adjustments, startDatetime, endDatetime);
 
     // RF-2.3.4.9: las cantidades ajustadas actualizan las asignaciones.
-    await this.assignedResourceRepository.syncAssignments(
-      requestId,
-      adjustments,
-      startDatetime,
-      endDatetime
-    );
-
-    // RF-2.3.4.11: el guardado conserva usuario, fecha y hora.
-    const created = await this.derivedInformationRepository.create(
-      new DerivedInformation(
-        null,
+    const save = async (transaction = null) => {
+      await this.assignedResourceRepository.syncAssignments(
         requestId,
-        dto.location.trim(),
+        adjustments,
         startDatetime,
         endDatetime,
-        typeof dto.observations === "string" ? dto.observations : null,
-        userId,
-        null
-      )
-    );
+        transaction
+      );
 
-    return new SaveAgreementsResponseDto(created.id);
+      // RF-2.3.4.11: el guardado conserva usuario, fecha y hora.
+      const created = await this.derivedInformationRepository.create(
+        new DerivedInformation(
+          null,
+          requestId,
+          dto.location.trim(),
+          startDatetime,
+          endDatetime,
+          typeof dto.observations === "string" ? dto.observations : null,
+          userId,
+          null
+        ),
+        transaction
+      );
+
+      return new SaveAgreementsResponseDto(created.id);
+    };
+    return this.transactionManager ? this.transactionManager.run(save) : save();
   }
 
   // RF-2.3.4.10: si el horario confirmado difiere del vigente, se reevalúa la

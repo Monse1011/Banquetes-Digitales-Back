@@ -41,10 +41,15 @@ class GenerateProposalUseCase {
     this.pdfGenerator = pdfGenerator;
   }
 
-  async execute(requestId, userId, dto) {
+  async execute(requestId, userId, dto, role) {
     this.validateDto(dto);
 
-    const request = await findOwnedRequest(this.reservationRequestRepository, requestId, userId);
+    const request = await findOwnedRequest(
+      this.reservationRequestRepository,
+      requestId,
+      userId,
+      role
+    );
 
     this.validateState(request);
 
@@ -64,7 +69,11 @@ class GenerateProposalUseCase {
       throw new AgreementsValidationException(informationErrors);
     }
 
-    const { proposalsCode, fileName } = await this.renderDocument(dto, request, information);
+    const { proposalsCode, fileName, resources } = await this.renderDocument(
+      dto,
+      request,
+      information
+    );
     const created = await this.proposalRepository.createWithRequestStatus(
       new Proposal(
         null,
@@ -78,7 +87,8 @@ class GenerateProposalUseCase {
         null
       ),
       requestId,
-      AgreementsEditableReservationRequestStatuses
+      AgreementsEditableReservationRequestStatuses,
+      resources
     );
 
     // El estado cambió entre la validación y el registro: no hay propuesta duplicada.
@@ -115,13 +125,19 @@ class GenerateProposalUseCase {
     const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
       request.requestId
     );
+    if (assignedResources.length === 0) {
+      throw new AgreementsValidationException({
+        adjusted_resources: "No hay recursos confirmados disponibles para generar la propuesta.",
+      });
+    }
     const proposalsCode = await this.proposalRepository.nextProposalCode();
-    const fileName = buildProposalFileName(
+    const baseFileName = buildProposalFileName(
       client?.fullName ?? "",
       information.startDatetime,
       request.folio
     );
 
+    const fileName = `${proposalsCode}_${baseFileName}`;
     try {
       const document = await this.pdfGenerator.generate({
         proposalsCode,
@@ -135,7 +151,7 @@ class GenerateProposalUseCase {
 
       await this.pdfGenerator.store(fileName, document.buffer);
 
-      return { proposalsCode, fileName };
+      return { proposalsCode, fileName, resources: assignedResources };
     } catch (error) {
       if (error instanceof ProposalGenerationFailedException) {
         throw error;

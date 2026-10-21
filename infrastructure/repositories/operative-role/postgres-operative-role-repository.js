@@ -5,6 +5,13 @@ class PostgresOperativeRoleRepository {
     this.pool = pool;
   }
 
+  async findActive() {
+    const result = await this.pool.query(
+      "SELECT id, name, is_active FROM operative_roles WHERE is_active = true ORDER BY name"
+    );
+    return result.rows.map((row) => this.toEntity(row));
+  }
+
   async findById(id) {
     const result = await this.pool.query(
       `SELECT id, name, is_active

@@ -117,6 +117,13 @@ describe("GenerateProposalUseCase", () => {
       )
     );
 
+    assignedResourceRepository.addAssignment({
+      requestId: request.requestId,
+      resourceId: 1,
+      quantity: 1,
+      usageStart: request.eventDateTime,
+      usageEnd: request.eventEndTime,
+    });
     return { client, request, information };
   }
 
@@ -135,7 +142,9 @@ describe("GenerateProposalUseCase", () => {
     expect(result.data.proposals_code).toMatch(/^PROP-\d{4}-0001$/);
     expect(result.data.request_status).toBe(ReservationRequestStatus.PROPOSAL_GENERATED);
     expect(result.data.status).toBe(ProposalStatus.IN_REVIEW);
-    expect(result.data.name).toMatch(/^Propuesta_AndreaMorales_\d{8}_EVT-2026-0101\.pdf$/);
+    expect(result.data.name).toMatch(
+      /^PROP-\d{4}-0001_Propuesta_AndreaMorales_\d{8}_EVT-2026-0101\.pdf$/
+    );
     expect(pdfGenerator.stored).toHaveLength(1);
     expect((await reservationRequestRepository.findById(request.requestId)).status).toBe(
       ReservationRequestStatus.PROPOSAL_GENERATED
@@ -150,12 +159,30 @@ describe("GenerateProposalUseCase", () => {
       LOGISTIC_USER_ID,
       new GenerateProposalRequestDto({ derived_information_id: information.id })
     );
-    const [prefix, clientName, date, folio] = result.data.name.replace(".pdf", "").split("_");
+    const [code, prefix, clientName, date, folio] = result.data.name.replace(".pdf", "").split("_");
 
+    expect(code).toMatch(/^PROP-\d{4}-0001$/);
     expect(prefix).toBe("Propuesta");
     expect(clientName).toBe("AndreaMorales");
     expect(date).toMatch(/^\d{8}$/);
     expect(folio).toBe("EVT-2026-0101");
+  });
+
+  it("does not generate an empty proposal after assignments are lost", async () => {
+    const { request, information } = await setup();
+    assignedResourceRepository.assignments = [];
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({ derived_information_id: information.id })
+      )
+    ).rejects.toMatchObject({
+      errors: {
+        adjusted_resources: "No hay recursos confirmados disponibles para generar la propuesta.",
+      },
+    });
+    expect(pdfGenerator.stored).toHaveLength(0);
   });
 
   it("rejects regeneration once the proposal exists (RF-2.3.4.12)", async () => {

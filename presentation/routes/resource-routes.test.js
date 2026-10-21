@@ -48,7 +48,7 @@ function buildApp(role) {
   ]);
 
   return createApp({
-    authController: { login: notUsed, changePassword: notUsed, firstAccess: notUsed },
+    authController: { session: (_req, res) => res.sendStatus(501), logout: (_req, res) => res.sendStatus(501), login: notUsed, changePassword: notUsed, firstAccess: notUsed },
     passwordResetController: { requestReset: notUsed, resetPassword: notUsed },
     tokenService: { verifyToken: () => ({ id_user: 1, role }) },
     ...createResourceUseCases(resourceRepository, operativeRoleRepository),
@@ -61,6 +61,14 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
 
     beforeEach(() => {
       app = buildApp(UserRole.ADMIN);
+    });
+
+    it("lists operative roles for the human resource form", async () => {
+      const response = await request(app)
+        .get("/api/admin/resources/operative-roles")
+        .set("Cookie", AUTH_COOKIE);
+      expect(response.status).toBe(200);
+      expect(response.body.data.roles).toEqual([{ id: 1, name: "Mesero" }]);
     });
 
     it("lists active human resources with pagination metadata", async () => {

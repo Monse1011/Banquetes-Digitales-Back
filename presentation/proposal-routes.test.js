@@ -62,9 +62,11 @@ describe("Rutas de la Función 3.4", () => {
   let pdfGenerator;
   let emailService;
   let currentRole;
+  let currentUserId;
 
   beforeEach(() => {
     currentRole = UserRole.LOGISTICS;
+    currentUserId = LOGISTIC_USER_ID;
 
     const clientRepository = new InMemoryClientRepository();
     reservationRequestRepository = new InMemoryReservationRequestRepository();
@@ -93,7 +95,7 @@ describe("Rutas de la Función 3.4", () => {
     );
 
     app = createApp({
-      authController: {
+      authController: { session: (_req, res) => res.sendStatus(501), logout: (_req, res) => res.sendStatus(501),
         login: (_req, res) => res.status(200).json({}),
         changePassword: (_req, res) => res.status(200).json({}),
         firstAccess: (_req, res) => res.status(200).json({ firstAccess: true }),
@@ -103,7 +105,7 @@ describe("Rutas de la Función 3.4", () => {
         resetPassword: (_req, res) => res.status(200).json({}),
       },
       tokenService: {
-        verifyToken: () => ({ id_user: LOGISTIC_USER_ID, role: currentRole }),
+        verifyToken: () => ({ id_user: currentUserId, role: currentRole }),
       },
       clientRepository,
       getRequestAgreementsUseCase: new GetRequestAgreementsUseCase(
@@ -186,16 +188,82 @@ describe("Rutas de la Función 3.4", () => {
     };
   }
 
-  it("rejects unauthenticated and non-logistics users", async () => {
+  it("rejects unauthenticated and unsupported roles", async () => {
     const requestId = await createRequest();
 
     await request(app).get(`/api/logistics/requests/${requestId}/derived-information`).expect(401);
 
-    currentRole = UserRole.ADMIN;
+    currentRole = "CLIENT";
     await request(app)
       .get(`/api/logistics/requests/${requestId}/derived-information`)
       .set("Cookie", AUTH_COOKIE)
       .expect(403);
+  });
+
+  it("allows an unrelated administrator to manage agreements and proposals without bypassing immutability", async () => {
+    const requestId = await createRequest();
+    currentRole = UserRole.ADMIN;
+    currentUserId = 99;
+    await request(app)
+      .get(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .expect(200);
+    const saved = await request(app)
+      .post(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody())
+      .expect(201);
+    const agreementId = saved.body.data.derived_information_id;
+    expect(
+      (await derivedInformationRepository.findByIdAndRequestId(agreementId, requestId))
+        .createdByUserId
+    ).toBe(99);
+    await request(app)
+      .post(`/api/logistics/requests/${requestId}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ data: { derived_information_id: agreementId } })
+      .expect(201);
+    expect((await proposalRepository.findByRequestId(requestId)).createdByUserId).toBe(99);
+    await request(app)
+      .get(`/api/logistics/requests/${requestId}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .expect(200);
+    await request(app)
+      .get(`/api/logistics/requests/${requestId}/proposals/download`)
+      .set("Cookie", AUTH_COOKIE)
+      .expect(200);
+    const edit = await request(app)
+      .post(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody());
+    expect(edit.status).toBeGreaterThanOrEqual(400);
+    const regenerate = await request(app)
+      .post(`/api/logistics/requests/${requestId}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ data: { derived_information_id: agreementId } });
+    expect(regenerate.status).toBeGreaterThanOrEqual(400);
+    await request(app)
+      .post(`/api/logistics/requests/${requestId}/proposals/send`)
+      .set("Cookie", AUTH_COOKIE)
+      .expect(403);
+    currentRole = UserRole.LOGISTICS;
+    for (const route of ["derived-information", "proposals", "proposals/download"]) {
+      await request(app)
+        .get(`/api/logistics/requests/${requestId}/${route}`)
+        .set("Cookie", AUTH_COOKIE)
+        .expect(404);
+    }
+    // A role supplied in the body cannot grant administrator access.
+    await request(app)
+      .post(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ ...agreementsBody(), role: UserRole.ADMIN })
+      .expect(404);
+    await request(app)
+      .post(`/api/logistics/requests/${requestId}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ role: UserRole.ADMIN, data: { derived_information_id: agreementId } })
+      .expect(404);
   });
 
   it("preloads the agreements form with client data and assigned resources", async () => {

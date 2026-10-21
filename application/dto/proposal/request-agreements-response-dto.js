@@ -6,8 +6,17 @@ const {
 // RF-2.3.4.1 / RF-2.3.4.2: datos previos de la solicitud para el formulario de
 // acuerdos: contacto del cliente, horario vigente y recursos asignados.
 class RequestAgreementsResponseDto {
-  constructor({ request, client, assignedResources, canRegisterAgreements, scheduleType }) {
+  constructor({
+    request,
+    client,
+    assignedResources,
+    canRegisterAgreements,
+    scheduleType,
+    observations,
+    derivedInformationId,
+  }) {
     this.data = {
+      derived_information_id: derivedInformationId ?? null,
       request_id: request.requestId,
       folio: request.folio,
       status: request.status,
@@ -17,7 +26,11 @@ class RequestAgreementsResponseDto {
         client_phone: client?.phone || "Sin registrar",
       },
       location: request.eventAddress || "Sin registrar",
+      start_datetime: request.eventDateTime.toISOString(),
+      end_datetime: request.eventEndTime.toISOString(),
       event_date: formatDate(request.eventDateTime),
+      end_date: formatDate(request.eventEndTime),
+      observations: observations ?? null,
       start_time: formatTime(request.eventDateTime),
       end_time: formatTime(request.eventEndTime),
       schedule_type: scheduleType,

@@ -34,6 +34,10 @@ function createAdminResourceRoutes(resourceControllers, authMiddleware) {
     resourceControllers.resource.list(request, response).catch(next);
   });
 
+  router.get("/operative-roles", (request, response, next) => {
+    resourceControllers.human.listOperativeRoles(request, response).catch(next);
+  });
+
   registerResourceRoutes(router, "/human", resourceControllers.human);
   registerResourceRoutes(router, "/material", resourceControllers.material);
   registerResourceRoutes(router, "/logistic", resourceControllers.logistic);

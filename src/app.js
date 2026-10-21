@@ -30,8 +30,8 @@ const {
   PostgresTransactionManager,
 } = require("../infrastructure/services/transaction/postgres-transaction-manager");
 const {
-  PostgresAssignedResourceRepository,
-} = require("../infrastructure/repositories/proposal/postgres-assigned-resource-repository");
+  ConfirmedResourceAdapter,
+} = require("../infrastructure/repositories/proposal/confirmed-resource-adapter");
 const {
   PostgresDerivedInformationRepository,
 } = require("../infrastructure/repositories/proposal/postgres-derived-information-repository");
@@ -174,6 +174,7 @@ const {
 const {
   PostgresCalendarSyncRepository,
 } = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
+const { RetryCalendarSyncUseCase } = require("../application/use-cases/calendar/retry-calendar-sync-use-case");
 const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
@@ -208,13 +209,15 @@ const PasswordResetController = require("../presentation/controller/password-res
 function createResourceDependencies(pool, reservationRequestRepository, userRepository) {
   const resourceRepository = new PostgresResourceRepository(pool);
   const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
+  const assignmentRepository = new PostgresResourceAssignmentRepository(pool);
 
   return {
+    assignedResourceRepository: new ConfirmedResourceAdapter(assignmentRepository, resourceRepository),
     ...createResourceUseCases(resourceRepository, operativeRoleRepository),
     ...createResourceAssignmentUseCases(
       resourceRepository,
       reservationRequestRepository,
-      new PostgresResourceAssignmentRepository(pool),
+      assignmentRepository,
       new PostgresResourceConfirmationRepository(pool),
       operativeRoleRepository,
       userRepository,
@@ -300,7 +303,8 @@ async function main() {
   );
 
   // Función 3.4 - Contacto con el cliente.
-  const assignedResourceRepository = new PostgresAssignedResourceRepository(pool);
+  const resourceDependencies = createResourceDependencies(pool, reservationRequestRepository, userRepository);
+  const { assignedResourceRepository } = resourceDependencies;
   const derivedInformationRepository = new PostgresDerivedInformationRepository(pool);
   const proposalRepository = new PostgresProposalRepository(pool);
   const auditLogRepository = new PostgresAuditLogRepository(pool);
@@ -315,7 +319,8 @@ async function main() {
   const saveAgreementsUseCase = new SaveAgreementsUseCase(
     reservationRequestRepository,
     assignedResourceRepository,
-    derivedInformationRepository
+    derivedInformationRepository,
+    new PostgresTransactionManager(pool)
   );
   const generateProposalUseCase = new GenerateProposalUseCase(
     reservationRequestRepository,
@@ -367,6 +372,7 @@ async function main() {
     calendarEventRepository,
     processPendingCalendarSyncUseCase
   );
+  const retryCalendarSyncUseCase = new RetryCalendarSyncUseCase(calendarEventRepository, calendarSyncRepository, processPendingCalendarSyncUseCase);
   const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
   const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
 
@@ -391,10 +397,11 @@ async function main() {
     editEventUseCase,
     cancelEventUseCase,
     listCalendarEventsUseCase,
+    retryCalendarSyncUseCase,
     // User management (Función 2.12)
     ...createUserManagementUseCases({ pool, emailService }),
     // Resources
-    ...createResourceDependencies(pool, reservationRequestRepository, userRepository),
+    ...resourceDependencies,
     // Proposals (Función 3.4)
     getRequestAgreementsUseCase,
     saveAgreementsUseCase,

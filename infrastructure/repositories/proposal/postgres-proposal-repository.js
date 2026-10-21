@@ -2,71 +2,74 @@ const { Proposal } = require("../../../domain/entities/proposal/proposal");
 const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
+const { toDatabaseStatus } = require("../reservation-request/postgres-request-status");
 
 class PostgresProposalRepository {
   constructor(pool) {
     this.pool = pool;
   }
 
-  // RF-2.3.4.4: el folio de la propuesta es único, consecutivo e inmutable.
   async nextProposalCode() {
-    const year = new Date().getFullYear();
-    const prefix = `PROP-${year}-`;
-    const result = await this.pool.query(
-      `SELECT COALESCE(
-          MAX(CAST(SUBSTRING(proposals_code FROM 'PROP-[0-9]{4}-([0-9]+)') AS BIGINT)),
-          0
-        ) + 1 AS next_sequence
-       FROM proposals
-       WHERE proposals_code LIKE $1`,
-      [`${prefix}%`]
+    const year = Number(
+      new Intl.DateTimeFormat("en", {
+        year: "numeric",
+        timeZone: "America/Merida",
+      }).format(new Date())
     );
-    const sequence = Number(result.rows[0].next_sequence);
-
-    return `${prefix}${String(sequence).padStart(4, "0")}`;
+    const result = await this.pool.query(
+      `INSERT INTO document_counters (kind, year, last_number)
+       VALUES ('PROPOSAL_CODE', $1, 1)
+       ON CONFLICT (kind, year) DO UPDATE
+       SET last_number = document_counters.last_number + 1
+       RETURNING last_number`,
+      [year]
+    );
+    return `PROP-${year}-${String(result.rows[0].last_number).padStart(4, "0")}`;
   }
 
-  // RF-2.3.4.5: registro de la propuesta y cambio de estado de la solicitud en
-  // una sola operación. Devuelve null si el estado esperado ya no coincide.
-  async createWithRequestStatus(proposal, requestId, expectedStatuses) {
+  async createWithRequestStatus(proposal, requestId, expectedStatuses, resources = []) {
     const connection = await this.pool.connect();
-
     try {
       await connection.query("BEGIN");
-
-      const updateResult = await connection.query(
-        `UPDATE reservations_request
-         SET status = $1
-         WHERE id_reservation_request = $2 AND status = ANY($3)`,
-        [ReservationRequestStatus.PROPOSAL_GENERATED, requestId, expectedStatuses]
+      const update = await connection.query(
+        "UPDATE reservations_request SET status = $1 WHERE id = $2 AND status = ANY($3)",
+        [
+          toDatabaseStatus(ReservationRequestStatus.PROPOSAL_GENERATED),
+          requestId,
+          expectedStatuses.map(toDatabaseStatus),
+        ]
       );
-
-      if (updateResult.rowCount === 0) {
+      if (update.rowCount === 0) {
         await connection.query("ROLLBACK");
         return null;
       }
-
+      const subtotal = resources.reduce((sum, r) => sum + r.quantity * (r.unitCost ?? 0), 0);
       const result = await connection.query(
         `INSERT INTO proposals
-          (derived_information_id, proposals_code, name, creation_date, status,
-           client_observations, created_by_user_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, derived_information_id, proposals_code, name, creation_date,
-           status, client_observations, created_by_user_id, created_at`,
+         (request_id, derived_information_id, proposal_code, file_name, status,
+          subtotal, discount_amount, client_observations, created_by_user_id, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9) RETURNING *`,
         [
+          requestId,
           proposal.derivedInformationId,
           proposal.proposalsCode,
           proposal.name,
-          proposal.creationDate,
-          proposal.status,
+          proposal.status.toUpperCase(),
+          subtotal,
           proposal.clientObservations,
           proposal.createdByUserId,
+          proposal.creationDate,
         ]
       );
       const created = this.toEntity(result.rows[0]);
-
+      for (const resource of resources.filter((r) => r.quantity > 0)) {
+        await connection.query(
+          `INSERT INTO proposal_resources (proposal_id, resource_id, quantity, unit_cost)
+           VALUES ($1,$2,$3,$4)`,
+          [created.id, resource.resourceId, resource.quantity, resource.unitCost ?? 0]
+        );
+      }
       await connection.query("COMMIT");
-
       return created;
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -78,17 +81,9 @@ class PostgresProposalRepository {
 
   async findByRequestId(requestId) {
     const result = await this.pool.query(
-      `SELECT p.id, p.derived_information_id, p.proposals_code, p.name,
-        p.creation_date, p.status, p.client_observations, p.created_by_user_id,
-        p.created_at
-       FROM proposals p
-       JOIN derived_information di ON di.id = p.derived_information_id
-       WHERE di.event_request_id = $1
-       ORDER BY p.id DESC
-       LIMIT 1`,
+      "SELECT * FROM proposals WHERE request_id = $1 ORDER BY id DESC LIMIT 1",
       [requestId]
     );
-
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
@@ -96,15 +91,14 @@ class PostgresProposalRepository {
     return new Proposal(
       Number(row.id),
       Number(row.derived_information_id),
-      row.proposals_code,
-      row.name,
-      new Date(row.creation_date),
-      row.status,
+      row.proposal_code,
+      row.file_name,
+      new Date(row.created_at),
+      row.status.toLowerCase(),
       row.client_observations,
-      row.created_by_user_id === null ? null : Number(row.created_by_user_id),
+      Number(row.created_by_user_id),
       new Date(row.created_at)
     );
   }
 }
-
 module.exports = { PostgresProposalRepository };

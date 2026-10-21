@@ -187,12 +187,16 @@ describe("User Management Use Cases (Función 2.12)", () => {
       );
     });
 
-    it("hasActiveRequests queries with the enum statuses", async () => {
+    it("hasActiveRequests maps the active statuses to PostgreSQL values", async () => {
       const pool = { query: vi.fn().mockResolvedValue({ rows: [{ total: "1" }] }) };
       const repository = new UserRepositoryImpl({ pool });
       await expect(repository.hasActiveRequests(3)).resolves.toBe(true);
       expect(pool.query.mock.calls[0][1][1]).toEqual([
-        ...UserResponsibilityReservationRequestStatuses,
+        "ASSIGNED",
+        "COORDINATION_READY",
+        "COORDINATION_INCOMPLETE",
+        "PROPOSAL_GENERATED",
+        "CONFIRMED",
       ]);
     });
 

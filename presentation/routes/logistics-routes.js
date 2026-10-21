@@ -81,25 +81,37 @@ function createLogisticsRoutes(
   // Función 3.4 - Contacto con el cliente.
   // Precarga del formulario de acuerdos (RF-2.3.4.1 / RF-2.3.4.2). Antes usaba
   // GET /requests/:id, ruta que el DAD reserva para el detalle de la Función 3.1.
-  router.get("/requests/:id/derived-information", requireLogistics, (request, response, next) => {
-    agreementsController.getRequestAgreements(request, response).catch(next);
-  });
+  router.get(
+    "/requests/:id/derived-information",
+    requireLogisticsOrAdmin,
+    (request, response, next) => {
+      agreementsController.getRequestAgreements(request, response).catch(next);
+    }
+  );
 
-  router.post("/requests/:id/derived-information", requireLogistics, (request, response, next) => {
-    agreementsController.saveAgreements(request, response).catch(next);
-  });
+  router.post(
+    "/requests/:id/derived-information",
+    requireLogisticsOrAdmin,
+    (request, response, next) => {
+      agreementsController.saveAgreements(request, response).catch(next);
+    }
+  );
 
-  router.post("/requests/:id/proposals", requireLogistics, (request, response, next) => {
+  router.post("/requests/:id/proposals", requireLogisticsOrAdmin, (request, response, next) => {
     proposalController.generate(request, response).catch(next);
   });
 
-  router.get("/requests/:id/proposals", requireLogistics, (request, response, next) => {
+  router.get("/requests/:id/proposals", requireLogisticsOrAdmin, (request, response, next) => {
     proposalController.get(request, response).catch(next);
   });
 
-  router.get("/requests/:id/proposals/download", requireLogistics, (request, response, next) => {
-    proposalController.download(request, response).catch(next);
-  });
+  router.get(
+    "/requests/:id/proposals/download",
+    requireLogisticsOrAdmin,
+    (request, response, next) => {
+      proposalController.download(request, response).catch(next);
+    }
+  );
 
   router.post("/requests/:id/proposals/send", requireLogistics, (request, response, next) => {
     proposalController.send(request, response).catch(next);

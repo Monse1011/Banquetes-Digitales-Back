@@ -14,8 +14,13 @@ class DownloadProposalUseCase {
     this.pdfGenerator = pdfGenerator;
   }
 
-  async execute(requestId, userId) {
-    const request = await findOwnedRequest(this.reservationRequestRepository, requestId, userId);
+  async execute(requestId, userId, role) {
+    const request = await findOwnedRequest(
+      this.reservationRequestRepository,
+      requestId,
+      userId,
+      role
+    );
 
     if (!ProposalVisibleReservationRequestStatuses.includes(request.status)) {
       throw new ProposalNotFoundException();

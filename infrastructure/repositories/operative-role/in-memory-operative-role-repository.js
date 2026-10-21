@@ -3,6 +3,10 @@ class InMemoryOperativeRoleRepository {
     this.operativeRoles = operativeRoles;
   }
 
+  async findActive() {
+    return this.operativeRoles.filter((role) => role.isActive);
+  }
+
   async findById(id) {
     return this.operativeRoles.find((operativeRole) => operativeRole.id === id) ?? null;
   }

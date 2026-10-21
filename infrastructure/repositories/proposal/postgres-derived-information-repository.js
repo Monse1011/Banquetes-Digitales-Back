@@ -5,13 +5,14 @@ class PostgresDerivedInformationRepository {
     this.pool = pool;
   }
 
-  async create(information) {
-    const result = await this.pool.query(
+  async create(information, transaction = null) {
+    const connection = transaction?.connection ?? this.pool;
+    const result = await connection.query(
       `INSERT INTO derived_information
-        (event_request_id, location, start_datetime, end_datetime, observations,
+        (request_id, location, start_datetime, end_datetime, observations,
          created_by_user_id)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, event_request_id, location, start_datetime, end_datetime,
+       RETURNING id, request_id, location, start_datetime, end_datetime,
          observations, created_by_user_id, created_at`,
       [
         information.eventRequestId,
@@ -28,10 +29,10 @@ class PostgresDerivedInformationRepository {
 
   async findByIdAndRequestId(id, requestId) {
     const result = await this.pool.query(
-      `SELECT id, event_request_id, location, start_datetime, end_datetime,
+      `SELECT id, request_id, location, start_datetime, end_datetime,
         observations, created_by_user_id, created_at
        FROM derived_information
-       WHERE id = $1 AND event_request_id = $2`,
+       WHERE id = $1 AND request_id = $2`,
       [id, requestId]
     );
 
@@ -40,10 +41,10 @@ class PostgresDerivedInformationRepository {
 
   async findLatestByRequestId(requestId) {
     const result = await this.pool.query(
-      `SELECT id, event_request_id, location, start_datetime, end_datetime,
+      `SELECT id, request_id, location, start_datetime, end_datetime,
         observations, created_by_user_id, created_at
        FROM derived_information
-       WHERE event_request_id = $1
+       WHERE request_id = $1
        ORDER BY id DESC
        LIMIT 1`,
       [requestId]
@@ -55,7 +56,7 @@ class PostgresDerivedInformationRepository {
   toEntity(row) {
     return new DerivedInformation(
       Number(row.id),
-      Number(row.event_request_id),
+      Number(row.request_id),
       row.location,
       new Date(row.start_datetime),
       new Date(row.end_datetime),

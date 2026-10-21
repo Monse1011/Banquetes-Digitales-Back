@@ -7,7 +7,7 @@ class PostgresClientRepository {
 
   async findByEmail(email) {
     const result = await this.pool.query(
-      `SELECT id_client, full_name, email, phone, registration_date
+      `SELECT id, full_name, email, phone, registration_date
        FROM clients
        WHERE email = $1`,
       [email]
@@ -20,7 +20,7 @@ class PostgresClientRepository {
     const result = await this.pool.query(
       `INSERT INTO clients (full_name, email, phone, registration_date)
        VALUES ($1, $2, $3, $4)
-       RETURNING id_client, full_name, email, phone, registration_date`,
+       RETURNING id, full_name, email, phone, registration_date`,
       [client.fullName, client.email, client.phone, client.registrationDate]
     );
 
@@ -37,8 +37,8 @@ class PostgresClientRepository {
     const result = await this.pool.query(
       `UPDATE clients
        SET full_name = $1, email = $2, phone = $3
-       WHERE id_client = $4
-       RETURNING id_client, full_name, email, phone, registration_date`,
+       WHERE id = $4
+       RETURNING id, full_name, email, phone, registration_date`,
       [client.fullName, client.email, client.phone, client.clientId]
     );
 
@@ -51,9 +51,9 @@ class PostgresClientRepository {
 
   async findById(id) {
     const result = await this.pool.query(
-      `SELECT id_client, full_name, email, phone, registration_date
+      `SELECT id, full_name, email, phone, registration_date
        FROM clients
-       WHERE id_client = $1`,
+       WHERE id = $1`,
       [id]
     );
 
@@ -64,9 +64,9 @@ class PostgresClientRepository {
     if (ids.length === 0) return [];
 
     const result = await this.pool.query(
-      `SELECT id_client, full_name, email, phone, registration_date
+      `SELECT id, full_name, email, phone, registration_date
        FROM clients
-       WHERE id_client = ANY($1::bigint[])`,
+       WHERE id = ANY($1::bigint[])`,
       [ids]
     );
 
@@ -75,7 +75,7 @@ class PostgresClientRepository {
 
   toEntity(row) {
     return new Client(
-      Number(row.id_client),
+      Number(row.id),
       row.full_name,
       row.email,
       row.phone,

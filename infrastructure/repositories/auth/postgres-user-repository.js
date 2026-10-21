@@ -49,7 +49,7 @@ class PostgresUserRepository {
             FROM users
             WHERE role = $1 AND status = $2
             ORDER BY full_name`,
-      [role, UserStatus.ACTIVE]
+      [role, UserStatus.ACTIVE.toUpperCase()]
     );
     return result.rows.map((row) => this.toEntity(row));
   }

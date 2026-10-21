@@ -30,6 +30,7 @@ function createResourceUseCases(resourceRepository, operativeRoleRepository) {
     resourceUseCases: { getResources: new GetResourcesUseCase(resourceRepository) },
     humanResourceUseCases: {
       ...commonUseCases(ResourceType.HUMAN),
+      getOperativeRoles: { execute: () => operativeRoleRepository.findActive() },
       create: new CreateHumanResourceUseCase(resourceRepository, operativeRoleRepository),
       update: new UpdateHumanResourceUseCase(resourceRepository, operativeRoleRepository),
     },

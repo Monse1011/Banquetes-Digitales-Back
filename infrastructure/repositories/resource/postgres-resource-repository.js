@@ -5,11 +5,11 @@ const { ResourceType } = require("../../../domain/enums/resource/resource-type")
 const RESOURCE_COLUMNS = `id, name, type, operative_role_id, total_quantity, unit_cost,
   is_active, created_at, updated_at, deactivated_at, version`;
 
-// La columna type guarda los valores en español; el dominio y la API usan los del contrato.
+// El esquema actual usa los mismos tipos que el contrato API.
 const DATABASE_TYPES = Object.freeze({
-  [ResourceType.HUMAN]: "humano",
-  [ResourceType.MATERIAL]: "material",
-  [ResourceType.LOGISTIC]: "logistico",
+  [ResourceType.HUMAN]: "HUMAN",
+  [ResourceType.MATERIAL]: "MATERIAL",
+  [ResourceType.LOGISTIC]: "LOGISTIC",
 });
 
 const DOMAIN_TYPES = Object.freeze(
