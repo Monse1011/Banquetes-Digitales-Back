@@ -95,7 +95,9 @@ describe("Rutas de la Función 3.4", () => {
     );
 
     app = createApp({
-      authController: { session: (_req, res) => res.sendStatus(501), logout: (_req, res) => res.sendStatus(501),
+      authController: {
+        session: (_req, res) => res.sendStatus(501),
+        logout: (_req, res) => res.sendStatus(501),
         login: (_req, res) => res.status(200).json({}),
         changePassword: (_req, res) => res.status(200).json({}),
         firstAccess: (_req, res) => res.status(200).json({ firstAccess: true }),
@@ -322,6 +324,45 @@ describe("Rutas de la Función 3.4", () => {
       .expect(200);
 
     expect(auditLogRepository.entries[0].action).toBe("PROPOSAL_SENT");
+  });
+
+  it("returns a reloadable 409 for stale agreements and generates only after refreshing", async () => {
+    const id = await createRequest();
+    const endpoint = `/api/logistics/requests/${id}`;
+    const first = await request(app)
+      .post(`${endpoint}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody({ derived_information_id: null }))
+      .expect(201);
+    const revision = first.body.data.derived_information_id;
+    await request(app)
+      .post(`${endpoint}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody({ derived_information_id: revision, observations: "Revisión B" }))
+      .expect(201);
+    const conflict = await request(app)
+      .post(`${endpoint}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ data: { derived_information_id: revision } })
+      .expect(409);
+    expect(conflict.body.code).toBe("AGREEMENTS_REVISION_CHANGED");
+    expect(conflict.body.message).toContain("Actualiza los acuerdos");
+    const staleSave = await request(app)
+      .post(`${endpoint}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody({ derived_information_id: revision }))
+      .expect(409);
+    expect(staleSave.body.code).toBe("AGREEMENTS_REVISION_CHANGED");
+    const refreshed = await request(app)
+      .get(`${endpoint}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .expect(200);
+    expect(refreshed.body.data.observations).toBe("Revisión B");
+    await request(app)
+      .post(`${endpoint}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ data: { derived_information_id: refreshed.body.data.derived_information_id } })
+      .expect(201);
   });
 
   it("rejects agreements with missing required fields (RF-2.3.4.3)", async () => {

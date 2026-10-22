@@ -49,8 +49,8 @@ class PostgresClientRepository {
     return this.toEntity(result.rows[0]);
   }
 
-  async findById(id) {
-    const result = await this.pool.query(
+  async findById(id, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT id, full_name, email, phone, registration_date
        FROM clients
        WHERE id = $1`,

@@ -144,6 +144,46 @@ describe("SaveAgreementsUseCase", () => {
     ).toBe(1);
   });
 
+  it("rejects a stale form without overwriting quantities or notes and allows refresh", async () => {
+    const request = await createRequest();
+    const first = await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({ derived_information_id: null })
+    );
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          derived_information_id: null,
+          observations: "No debe reemplazar la revisión guardada",
+          adjusted_resources: [
+            { resource_id: 1, quantity: 1 },
+            { resource_id: 2, quantity: 9 },
+          ],
+        })
+      )
+    ).rejects.toMatchObject({ code: "AGREEMENTS_REVISION_CHANGED" });
+    expect(
+      (await assignedResourceRepository.findActiveByRequestId(request.requestId)).find(
+        (r) => r.resourceId === 2
+      ).quantity
+    ).toBe(50);
+    expect(
+      (await derivedInformationRepository.findLatestByRequestId(request.requestId)).observations
+    ).toBe("Montaje imperial");
+    const next = await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({
+        derived_information_id: first.data.derived_information_id,
+        observations: "Revisado después de actualizar",
+      })
+    );
+    expect(next.data.derived_information_id).not.toBe(first.data.derived_information_id);
+  });
+
   it("rejects requests of another responsible (RF-2.3.4.12)", async () => {
     const request = await createRequest();
 

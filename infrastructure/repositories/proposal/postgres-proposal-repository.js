@@ -9,14 +9,14 @@ class PostgresProposalRepository {
     this.pool = pool;
   }
 
-  async nextProposalCode() {
+  async nextProposalCode(transaction = null) {
     const year = Number(
       new Intl.DateTimeFormat("en", {
         year: "numeric",
         timeZone: "America/Merida",
       }).format(new Date())
     );
-    const result = await this.pool.query(
+    const result = await (transaction?.connection ?? this.pool).query(
       `INSERT INTO document_counters (kind, year, last_number)
        VALUES ('PROPOSAL_CODE', $1, 1)
        ON CONFLICT (kind, year) DO UPDATE
@@ -27,10 +27,17 @@ class PostgresProposalRepository {
     return `PROP-${year}-${String(result.rows[0].last_number).padStart(4, "0")}`;
   }
 
-  async createWithRequestStatus(proposal, requestId, expectedStatuses, resources = []) {
-    const connection = await this.pool.connect();
+  async createWithRequestStatus(
+    proposal,
+    requestId,
+    expectedStatuses,
+    resources = [],
+    transaction = null
+  ) {
+    const connection = transaction?.connection ?? (await this.pool.connect());
+    const ownsTransaction = !transaction?.connection;
     try {
-      await connection.query("BEGIN");
+      if (ownsTransaction) await connection.query("BEGIN");
       const update = await connection.query(
         "UPDATE reservations_request SET status = $1 WHERE id = $2 AND status = ANY($3)",
         [
@@ -40,7 +47,7 @@ class PostgresProposalRepository {
         ]
       );
       if (update.rowCount === 0) {
-        await connection.query("ROLLBACK");
+        if (ownsTransaction) await connection.query("ROLLBACK");
         return null;
       }
       const subtotal = resources.reduce((sum, r) => sum + r.quantity * (r.unitCost ?? 0), 0);
@@ -69,13 +76,13 @@ class PostgresProposalRepository {
           [created.id, resource.resourceId, resource.quantity, resource.unitCost ?? 0]
         );
       }
-      await connection.query("COMMIT");
+      if (ownsTransaction) await connection.query("COMMIT");
       return created;
     } catch (error) {
-      await connection.query("ROLLBACK");
+      if (ownsTransaction) await connection.query("ROLLBACK");
       throw error;
     } finally {
-      connection.release();
+      if (ownsTransaction) connection.release();
     }
   }
 

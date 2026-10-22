@@ -7,9 +7,10 @@ async function findOwnedRequest(
   reservationRequestRepository,
   requestId,
   userId,
-  role = UserRole.LOGISTICS
+  role = UserRole.LOGISTICS,
+  transaction = null
 ) {
-  const request = await reservationRequestRepository.findById(requestId);
+  const request = await reservationRequestRepository.findById(requestId, transaction);
 
   if (
     !request ||

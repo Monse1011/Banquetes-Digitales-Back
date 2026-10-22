@@ -1,9 +1,6 @@
 const { AssignedResource } = require("../../../domain/entities/proposal/assigned-resource");
 const { AssignmentStatus } = require("../../../domain/enums/resource-assignment/assignment-status");
 const {
-  ResourceSufficiency,
-} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
-const {
   blockingPeriod,
   availableQuantity,
 } = require("../../../application/services/resource-assignment/resource-availability");
@@ -18,14 +15,17 @@ class ConfirmedResourceAdapter {
     this.resources = resources;
   }
 
-  async findActiveByRequestId(requestId) {
+  async findActiveByRequestId(requestId, transaction = null) {
     const rows = await this.assignments.findByRequest(requestId);
     const confirmed = rows.filter((row) => row.status === AssignmentStatus.CONFIRMED);
-    const resources = await this.resources.findByIds(confirmed.map((row) => row.resourceId));
+    const resources = await this.resources.findByIds(
+      confirmed.map((row) => row.resourceId),
+      transaction
+    );
     return confirmed.map((row) => {
       const resource = resources.find((item) => item.id === row.resourceId);
       if (!resource) throw new Error(`Resource ${row.resourceId} not found`);
-      return new AssignedResource(
+      const assigned = new AssignedResource(
         row.id,
         requestId,
         row.resourceId,
@@ -37,11 +37,17 @@ class ConfirmedResourceAdapter {
         resource.type,
         resource.unitCost
       );
+      return Object.assign(assigned, {
+        requestedQuantity: row.requestedQuantity ?? null,
+        availableQuantity: row.availableQuantity ?? null,
+        sufficiency: row.sufficiency ?? null,
+        observation: row.observation ?? null,
+      });
     });
   }
 
-  async findAvailability(ids, start, end, requestId) {
-    const resources = await this.resources.findByIds(ids);
+  async findAvailability(ids, start, end, requestId, transaction = null) {
+    const resources = await this.resources.findByIds(ids, transaction);
     const period = blockingPeriod(start, end);
     const blocking = await this.assignments.findBlocking(ids, period, requestId);
     return resources.map((resource) => ({
@@ -62,7 +68,7 @@ class ConfirmedResourceAdapter {
     const period = blockingPeriod(start, end);
     const ids = adjustments.map((item) => item.resourceId);
     const blocking = await this.assignments.findBlocking(ids, period, requestId);
-    const resources = await this.resources.findByIds(ids);
+    const resources = await this.resources.findByIds(ids, transaction);
     const updated = adjustments.map((item) => {
       const row = rows.find((candidate) => candidate.resourceId === item.resourceId);
       const resource = resources.find((candidate) => candidate.id === item.resourceId);
@@ -75,9 +81,7 @@ class ConfirmedResourceAdapter {
       }
       Object.assign(row, {
         quantity: item.quantity,
-        requestedQuantity: Math.max(1, item.quantity),
-        availableQuantity: available,
-        sufficiency: ResourceSufficiency.SUFFICIENT,
+        // El ajuste cambia la asignación; conserva los datos y notas de la revisión previa.
         usageStart: start,
         usageEnd: end,
         eventStart: start,

@@ -53,6 +53,7 @@ const EventNotModifiableException = require("../domain/exceptions/calendar/event
 const RequestNotSchedulableException = require("../domain/exceptions/calendar/request-not-schedulable-exception");
 const AgreementsValidationException = require("../domain/exceptions/proposal/agreements-validation-exception");
 const RequestNotInAgreementsStateException = require("../domain/exceptions/proposal/request-not-in-agreements-state-exception");
+const AgreementsRevisionChangedException = require("../domain/exceptions/proposal/agreements-revision-changed-exception");
 const ProposalGenerationNotAllowedException = require("../domain/exceptions/proposal/proposal-generation-not-allowed-exception");
 const ProposalAlreadyGeneratedException = require("../domain/exceptions/proposal/proposal-already-generated-exception");
 const ProposalNotFoundException = require("../domain/exceptions/proposal/proposal-not-found-exception");
@@ -203,6 +204,10 @@ function handleCalendarError(error, response) {
 
 // Función 3.4: validaciones y conflictos de acuerdos y propuestas.
 function handleProposalConflictError(error, response) {
+  if (error instanceof AgreementsRevisionChangedException) {
+    response.status(409).json({ message: error.message, code: error.code });
+    return true;
+  }
   if (error instanceof AgreementsValidationException) {
     response.status(400).json({ message: error.message, errors: error.errors });
     return true;

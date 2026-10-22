@@ -64,8 +64,8 @@ class PostgresResourceRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
-  async findByIds(ids) {
-    const result = await this.pool.query(
+  async findByIds(ids, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT ${RESOURCE_COLUMNS}
        FROM resources
        WHERE id = ANY($1)`,

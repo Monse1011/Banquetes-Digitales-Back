@@ -13,6 +13,8 @@ const {
 } = require("../../../domain/constants/proposal-messages");
 const { SaveAgreementsResponseDto } = require("../../dto/proposal/save-agreements-response-dto");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
+const { withAgreementsLock } = require("../../services/proposal/with-agreements-lock");
+const AgreementsRevisionChangedException = require("../../../domain/exceptions/proposal/agreements-revision-changed-exception");
 const {
   formatDate,
   formatTime,
@@ -34,11 +36,21 @@ class SaveAgreementsUseCase {
   }
 
   async execute(requestId, userId, dto, role) {
+    return withAgreementsLock(
+      this.derivedInformationRepository,
+      this.transactionManager,
+      requestId,
+      (transaction) => this.executeLocked(requestId, userId, dto, role, transaction)
+    );
+  }
+
+  async executeLocked(requestId, userId, dto, role, transaction) {
     const request = await findOwnedRequest(
       this.reservationRequestRepository,
       requestId,
       userId,
-      role
+      role,
+      transaction
     );
 
     // RF-2.3.4.1 / RF-2.3.4.12: solo en estados de coordinación.
@@ -53,50 +65,63 @@ class SaveAgreementsUseCase {
       throw new AgreementsValidationException(errors);
     }
 
+    if (dto.derivedInformationId !== undefined) {
+      const latest = await this.derivedInformationRepository.findLatestByRequestId(
+        requestId,
+        transaction
+      );
+      if ((latest?.id ?? null) !== dto.derivedInformationId) {
+        throw new AgreementsRevisionChangedException();
+      }
+    }
+
     const startDatetime = dto.parseDate(dto.startDatetime);
     const endDatetime = dto.parseDate(dto.endDatetime);
     const adjustments = dto.toAdjustments();
 
     // RF-2.3.4.2 / RF-2.3.4.8: los recursos ajustados deben corresponder a los
     // recursos asignados a la solicitud y debe capturarse la cantidad de cada uno.
-    await this.validateAdjustedResourcesCoverage(requestId, adjustments);
+    await this.validateAdjustedResourcesCoverage(requestId, adjustments, transaction);
 
-    await this.validateResponsibleSchedule(request, startDatetime, endDatetime);
-    await this.validateAdjustedAvailability(requestId, adjustments, startDatetime, endDatetime);
+    await this.validateResponsibleSchedule(request, startDatetime, endDatetime, transaction);
+    await this.validateAdjustedAvailability(
+      requestId,
+      adjustments,
+      startDatetime,
+      endDatetime,
+      transaction
+    );
 
     // RF-2.3.4.9: las cantidades ajustadas actualizan las asignaciones.
-    const save = async (transaction = null) => {
-      await this.assignedResourceRepository.syncAssignments(
+    await this.assignedResourceRepository.syncAssignments(
+      requestId,
+      adjustments,
+      startDatetime,
+      endDatetime,
+      transaction
+    );
+
+    // RF-2.3.4.11: el guardado conserva usuario, fecha y hora.
+    const created = await this.derivedInformationRepository.create(
+      new DerivedInformation(
+        null,
         requestId,
-        adjustments,
+        dto.location.trim(),
         startDatetime,
         endDatetime,
-        transaction
-      );
+        typeof dto.observations === "string" ? dto.observations : null,
+        userId,
+        null
+      ),
+      transaction
+    );
 
-      // RF-2.3.4.11: el guardado conserva usuario, fecha y hora.
-      const created = await this.derivedInformationRepository.create(
-        new DerivedInformation(
-          null,
-          requestId,
-          dto.location.trim(),
-          startDatetime,
-          endDatetime,
-          typeof dto.observations === "string" ? dto.observations : null,
-          userId,
-          null
-        ),
-        transaction
-      );
-
-      return new SaveAgreementsResponseDto(created.id);
-    };
-    return this.transactionManager ? this.transactionManager.run(save) : save();
+    return new SaveAgreementsResponseDto(created.id);
   }
 
   // RF-2.3.4.10: si el horario confirmado difiere del vigente, se reevalúa la
   // agenda del responsable y se reporta cada conflicto.
-  async validateResponsibleSchedule(request, startDatetime, endDatetime) {
+  async validateResponsibleSchedule(request, startDatetime, endDatetime, transaction) {
     const scheduleChanged =
       startDatetime.getTime() !== request.eventDateTime.getTime() ||
       endDatetime.getTime() !== request.eventEndTime.getTime();
@@ -109,7 +134,8 @@ class SaveAgreementsUseCase {
       request.logisticUserId,
       request.requestId,
       startDatetime,
-      endDatetime
+      endDatetime,
+      transaction
     );
 
     if (conflicts.length > 0) {
@@ -126,9 +152,11 @@ class SaveAgreementsUseCase {
 
   // RF-2.3.4.2 / RF-2.3.4.8: valida que cada resource_id ajustado exista y esté
   // asignado a la solicitud, y que se capture la cantidad de todos los asignados.
-  async validateAdjustedResourcesCoverage(requestId, adjustments) {
-    const assignedResources =
-      await this.assignedResourceRepository.findActiveByRequestId(requestId);
+  async validateAdjustedResourcesCoverage(requestId, adjustments, transaction) {
+    const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
+      requestId,
+      transaction
+    );
     const assignedIds = new Set(assignedResources.map((assignment) => assignment.resourceId));
     const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
 
@@ -156,7 +184,13 @@ class SaveAgreementsUseCase {
 
   // RF-2.3.4.8: cada cantidad ajustada se valida contra la disponibilidad del
   // horario confirmado, excluyendo las asignaciones propias del registro.
-  async validateAdjustedAvailability(requestId, adjustments, startDatetime, endDatetime) {
+  async validateAdjustedAvailability(
+    requestId,
+    adjustments,
+    startDatetime,
+    endDatetime,
+    transaction
+  ) {
     if (adjustments.length === 0) {
       return;
     }
@@ -166,7 +200,8 @@ class SaveAgreementsUseCase {
       resourceIds,
       startDatetime,
       endDatetime,
-      requestId
+      requestId,
+      transaction
     );
     const conflicts = [];
 

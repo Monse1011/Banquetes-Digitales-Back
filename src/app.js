@@ -210,15 +210,20 @@ function createResourceDependencies(pool, reservationRequestRepository, userRepo
   const resourceRepository = new PostgresResourceRepository(pool);
   const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
   const assignmentRepository = new PostgresResourceAssignmentRepository(pool);
+  const resourceConfirmationRepository = new PostgresResourceConfirmationRepository(pool);
 
   return {
-    assignedResourceRepository: new ConfirmedResourceAdapter(assignmentRepository, resourceRepository),
+    resourceConfirmationRepository,
+    assignedResourceRepository: new ConfirmedResourceAdapter(
+      assignmentRepository,
+      resourceRepository
+    ),
     ...createResourceUseCases(resourceRepository, operativeRoleRepository),
     ...createResourceAssignmentUseCases(
       resourceRepository,
       reservationRequestRepository,
       assignmentRepository,
-      new PostgresResourceConfirmationRepository(pool),
+      resourceConfirmationRepository,
       operativeRoleRepository,
       userRepository,
       new PostgresTransactionManager(pool)
@@ -303,8 +308,12 @@ async function main() {
   );
 
   // Función 3.4 - Contacto con el cliente.
-  const resourceDependencies = createResourceDependencies(pool, reservationRequestRepository, userRepository);
-  const { assignedResourceRepository } = resourceDependencies;
+  const resourceDependencies = createResourceDependencies(
+    pool,
+    reservationRequestRepository,
+    userRepository
+  );
+  const { assignedResourceRepository, resourceConfirmationRepository } = resourceDependencies;
   const derivedInformationRepository = new PostgresDerivedInformationRepository(pool);
   const proposalRepository = new PostgresProposalRepository(pool);
   const auditLogRepository = new PostgresAuditLogRepository(pool);
@@ -314,7 +323,9 @@ async function main() {
     reservationRequestRepository,
     clientRepository,
     assignedResourceRepository,
-    derivedInformationRepository
+    derivedInformationRepository,
+    resourceConfirmationRepository,
+    new PostgresTransactionManager(pool)
   );
   const saveAgreementsUseCase = new SaveAgreementsUseCase(
     reservationRequestRepository,
@@ -328,7 +339,8 @@ async function main() {
     derivedInformationRepository,
     proposalRepository,
     assignedResourceRepository,
-    pdfGenerator
+    pdfGenerator,
+    new PostgresTransactionManager(pool)
   );
   const getProposalUseCase = new GetProposalUseCase(
     reservationRequestRepository,

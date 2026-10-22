@@ -102,8 +102,8 @@ class PostgresReservationRequestRepository {
     }
   }
 
-  async findById(id) {
-    const result = await this.pool.query(
+  async findById(id, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
         ` WHERE rr.id = $1
           GROUP BY rr.id, c.id, c.full_name, c.email, c.phone`,
@@ -285,8 +285,14 @@ class PostgresReservationRequestRepository {
 
   // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
   // horario confirmado de una solicitud.
-  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
-    const result = await this.pool.query(
+  async findOverlappingByLogisticUser(
+    logisticUserId,
+    excludeRequestId,
+    start,
+    end,
+    transaction = null
+  ) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT folio, event_date_time, event_end_time
        FROM reservations_request
        WHERE logistic_user_id = $1

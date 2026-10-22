@@ -5,6 +5,13 @@ class PostgresDerivedInformationRepository {
     this.pool = pool;
   }
 
+  async lockRequest(requestId, transaction) {
+    await transaction.connection.query(
+      "SELECT id FROM reservations_request WHERE id = $1 FOR UPDATE",
+      [requestId]
+    );
+  }
+
   async create(information, transaction = null) {
     const connection = transaction?.connection ?? this.pool;
     const result = await connection.query(
@@ -27,8 +34,8 @@ class PostgresDerivedInformationRepository {
     return this.toEntity(result.rows[0]);
   }
 
-  async findByIdAndRequestId(id, requestId) {
-    const result = await this.pool.query(
+  async findByIdAndRequestId(id, requestId, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT id, request_id, location, start_datetime, end_datetime,
         observations, created_by_user_id, created_at
        FROM derived_information
@@ -39,8 +46,8 @@ class PostgresDerivedInformationRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
-  async findLatestByRequestId(requestId) {
-    const result = await this.pool.query(
+  async findLatestByRequestId(requestId, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT id, request_id, location, start_datetime, end_datetime,
         observations, created_by_user_id, created_at
        FROM derived_information

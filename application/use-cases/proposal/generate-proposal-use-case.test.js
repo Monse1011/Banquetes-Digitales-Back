@@ -197,6 +197,44 @@ describe("GenerateProposalUseCase", () => {
     ).rejects.toBeInstanceOf(ProposalAlreadyGeneratedException);
   });
 
+  it("rejects a stale agreement before generating a PDF and accepts the refreshed revision", async () => {
+    const { request, information } = await setup();
+    const latest = await derivedInformationRepository.create(
+      new DerivedInformation(
+        null,
+        request.requestId,
+        "Nuevo lugar",
+        futureDate(11, 18),
+        futureDate(11, 23),
+        "Revisión B",
+        LOGISTIC_USER_ID,
+        new Date()
+      )
+    );
+    let rendered;
+    pdfGenerator.generate = async (input) => {
+      rendered = input;
+      return { buffer: Buffer.from("%PDF-test") };
+    };
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({ derived_information_id: information.id })
+      )
+    ).rejects.toMatchObject({ code: "AGREEMENTS_REVISION_CHANGED" });
+    expect(rendered).toBeUndefined();
+    expect(pdfGenerator.stored).toHaveLength(0);
+    expect(proposalRepository.proposals).toHaveLength(0);
+    await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      new GenerateProposalRequestDto({ derived_information_id: latest.id })
+    );
+    expect(rendered.information.id).toBe(latest.id);
+    expect(rendered.information.location).toBe("Nuevo lugar");
+  });
+
   it("rejects generation outside coordination states", async () => {
     const { request, information } = await setup(ReservationRequestStatus.ASSIGNED);
 

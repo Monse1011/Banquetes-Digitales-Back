@@ -14,6 +14,7 @@ class RequestAgreementsResponseDto {
     scheduleType,
     observations,
     derivedInformationId,
+    confirmationObservations,
   }) {
     this.data = {
       derived_information_id: derivedInformationId ?? null,
@@ -31,6 +32,7 @@ class RequestAgreementsResponseDto {
       event_date: formatDate(request.eventDateTime),
       end_date: formatDate(request.eventEndTime),
       observations: observations ?? null,
+      confirmation_observations: confirmationObservations ?? null,
       start_time: formatTime(request.eventDateTime),
       end_time: formatTime(request.eventEndTime),
       schedule_type: scheduleType,
@@ -41,6 +43,10 @@ class RequestAgreementsResponseDto {
         name: resource.name,
         type: resource.type,
         quantity: resource.quantity,
+        requested_quantity: resource.requestedQuantity ?? null,
+        available_quantity: resource.availableQuantity ?? null,
+        sufficiency: resource.sufficiency ?? null,
+        observation: resource.observation ?? null,
         unit_cost: resource.unitCost,
       })),
     };
