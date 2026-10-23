@@ -15,7 +15,12 @@ const mockRetry = vi.fn();
 
 function buildApp(role) {
   return createApp({
-    authController: { session: (_req, res) => res.sendStatus(501), logout: (_req, res) => res.sendStatus(501), login: vi.fn(), changePassword: vi.fn(), firstAccess: vi.fn() },
+    authController: { 
+      session: (_req, res) => res.sendStatus(501), 
+      logout: (_req, res) => res.sendStatus(501), 
+      login: vi.fn(), changePassword: vi.fn(), 
+      firstAccess: vi.fn() 
+    },
     passwordResetController: { requestReset: vi.fn(), resetPassword: vi.fn() },
     tokenService: { verifyToken: () => ({ id_user: 1, role }) },
     scheduleEventUseCase: { execute: mockSchedule },

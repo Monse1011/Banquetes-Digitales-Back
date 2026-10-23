@@ -48,7 +48,16 @@ function gate() {
 describe.skipIf(!process.env.TEST_PGDATABASE)(
   "Agreement revisions with concurrent PostgreSQL transactions",
   () => {
-    let admin, pool, schema, derived, proposals, adapter, save, get, generate, pdf;
+    let admin; 
+    let pool; 
+    let schema; 
+    let derived; 
+    let proposals; 
+    let adapter; 
+    let save; 
+    let get; 
+    let generate; 
+    let pdf;
     const start = new Date("2035-06-02T00:00:00Z");
     const end = new Date("2035-06-02T04:00:00Z");
     beforeEach(async () => {
@@ -190,7 +199,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
           [schema]
         );
         if (result.rowCount) return;
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
       }
       throw new Error("Expected an independent connection waiting on the request row lock");
     }
@@ -216,8 +227,8 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
     });
     it("waits for a concurrent save before reading its quantities and rejects the old revision", async () => {
       const a = (await save.execute(1, 9, form(null))).data.derived_information_id;
-      const reached = gate(),
-        finish = gate();
+      const reached = gate();
+      const finish = gate();
       const create = derived.create.bind(derived);
       derived.create = async (...args) => {
         reached.resolve();
@@ -239,8 +250,8 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
     });
     it("prevents an agreement save from changing resources during PDF generation", async () => {
       const a = (await save.execute(1, 9, form(null))).data.derived_information_id;
-      const reached = gate(),
-        finish = gate();
+      const reached = gate();
+      const finish = gate();
       const render = pdf.generate.bind(pdf);
       pdf.generate = async (input) => {
         reached.resolve();

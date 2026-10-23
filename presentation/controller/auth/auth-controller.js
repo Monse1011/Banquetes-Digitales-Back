@@ -78,7 +78,10 @@ class AuthController {
   };
 
   logout = (req, res) => {
-    res.clearCookie(SecurityConstants.AUTH_COOKIE_NAME, getAuthCookieOptions(this.authCookieOptions));
+    res.clearCookie(
+      SecurityConstants.AUTH_COOKIE_NAME, 
+      getAuthCookieOptions(this.authCookieOptions)
+    );
     return res.status(204).end();
   };
 
