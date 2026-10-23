@@ -19,6 +19,7 @@ const {
 } = require("./routes/calendar-routes");
 const { ResourceController } = require("./controller/resource/resource-controller");
 const { HumanResourceController } = require("./controller/resource/human-resource-controller");
+const { OperativeRoleController } = require("./controller/resource/operative-role-controller");
 const {
   InventoryResourceController,
 } = require("./controller/resource/inventory-resource-controller");
@@ -36,6 +37,8 @@ const AccountBlockedException = require("../domain/exceptions/auth/account-block
 const InvalidPasswordException = require("../domain/exceptions/password-reset/invalid-password-exception");
 const InvalidResetTokenException = require("../domain/exceptions/password-reset/invalid-reset-token-exception");
 const ResourceValidationException = require("../domain/exceptions/resource/resource-validation-exception");
+const OperativeRoleNotFoundException = require("../domain/exceptions/operative-role/operative-role-not-found-exception");
+const OperativeRoleValidationException = require("../domain/exceptions/operative-role/operative-role-validation-exception");
 const ResourceNotFoundException = require("../domain/exceptions/resource/resource-not-found-exception");
 const DuplicateResourceException = require("../domain/exceptions/resource/duplicate-resource-exception");
 const ResourceConcurrencyException = require("../domain/exceptions/resource/resource-concurrency-exception");
@@ -67,8 +70,24 @@ const { AgreementsController } = require("./controller/proposal/agreements-contr
 const { ProposalController } = require("./controller/proposal/proposal-controller");
 const ErrorMessages = require("./constants/error-messages");
 
+function handleOperativeRoleError(error, response) {
+  if (error instanceof OperativeRoleNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof OperativeRoleValidationException) {
+    response.status(422).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  return false;
+}
+
 // Funciones 2.8 a 2.10: errores de los recursos.
 function handleResourceError(error, response) {
+  if (handleOperativeRoleError(error, response)) return true;
+
   if (error instanceof ResourceValidationException) {
     response.status(422).json({ message: error.message, errors: error.errors });
     return true;
@@ -295,18 +314,11 @@ function handleAuthError(error, response) {
   return false;
 }
 
-function createApp(dependencies) {
-  const app = express();
-
-  // Authentication
-  const authMiddleware = createAuthMiddleware(dependencies.tokenService);
-  const reservationRequestController = new ReservationRequestController(dependencies);
-  const userController = new UserController(dependencies);
-  const serviceController = new ServiceController(dependencies.serviceRepository);
-  const calendarController = new CalendarController(dependencies);
-  const resourceControllers = {
+function createResourceControllers(dependencies) {
+  return {
     resource: new ResourceController(dependencies.resourceUseCases),
     human: new HumanResourceController(dependencies.humanResourceUseCases),
+    operativeRole: new OperativeRoleController(dependencies.operativeRoleUseCases),
     material: new InventoryResourceController(
       dependencies.materialResourceUseCases,
       ResourceType.MATERIAL
@@ -318,6 +330,18 @@ function createApp(dependencies) {
     // Función 3.2: confirmación de recursos de una solicitud.
     assignment: new ResourceAssignmentController(dependencies.resourceAssignmentUseCases),
   };
+}
+
+function createApp(dependencies) {
+  const app = express();
+
+  // Authentication
+  const authMiddleware = createAuthMiddleware(dependencies.tokenService);
+  const reservationRequestController = new ReservationRequestController(dependencies);
+  const userController = new UserController(dependencies);
+  const serviceController = new ServiceController(dependencies.serviceRepository);
+  const calendarController = new CalendarController(dependencies);
+  const resourceControllers = createResourceControllers(dependencies);
   const proposalControllers = {
     agreementsController: new AgreementsController(dependencies),
     proposalController: new ProposalController(dependencies),

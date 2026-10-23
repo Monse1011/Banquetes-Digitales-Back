@@ -6,6 +6,9 @@ const { UpdateInventoryResourceUseCase } = require("./update-inventory-resource-
 const { ChangeResourceStatusUseCase } = require("./change-resource-status-use-case");
 const { GetResourcesUseCase } = require("./get-resources-use-case");
 const { GetResourceUseCase } = require("./get-resource-use-case");
+const {
+  createOperativeRoleUseCases,
+} = require("../operative-role/create-operative-role-use-cases");
 
 // Casos de uso de las Funciones 2.8 (humanos), 2.9 (materiales) y 2.10 (logísticos),
 // agrupados por tipo para inyectarlos en su controlador.
@@ -27,6 +30,7 @@ function createResourceUseCases(resourceRepository, operativeRoleRepository) {
   });
 
   return {
+    operativeRoleUseCases: createOperativeRoleUseCases(operativeRoleRepository),
     resourceUseCases: { getResources: new GetResourcesUseCase(resourceRepository) },
     humanResourceUseCases: {
       ...commonUseCases(ResourceType.HUMAN),

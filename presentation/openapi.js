@@ -239,6 +239,66 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
 }
 
 const resourcePaths = {
+  "/api/admin/resources/operative-roles": {
+    get: {
+      tags: ["Operative roles"],
+      summary: "List active operative roles",
+      security: [{ CookieAuth: [] }],
+      responses: { 200: { description: "Active operative roles" } },
+    },
+    post: {
+      tags: ["Operative roles"],
+      summary: "Create an operative role",
+      security: [{ CookieAuth: [] }],
+      requestBody: jsonBody({
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", minLength: 1, maxLength: 100 } },
+      }),
+      responses: {
+        201: { description: "Created; the Location header has the new operative role path" },
+        422: { description: "Validation error" },
+      },
+    },
+  },
+  "/api/admin/resources/operative-roles/{id}": {
+    get: {
+      tags: ["Operative roles"],
+      summary: "Get an operative role",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      responses: {
+        200: { description: "Operative role details" },
+        404: { description: "Not found" },
+      },
+    },
+    patch: {
+      tags: ["Operative roles"],
+      summary: "Edit an operative role name",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      requestBody: jsonBody({
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", minLength: 1, maxLength: 100 } },
+      }),
+      responses: {
+        204: { description: "Updated" },
+        404: { description: "Not found" },
+        422: { description: "Validation error" },
+      },
+    },
+    delete: {
+      tags: ["Operative roles"],
+      summary: "Deactivate an operative role (logical delete)",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      responses: {
+        204: { description: "Deactivated; existing resource associations are preserved" },
+        404: { description: "Not found" },
+      },
+    },
+  },
   "/api/admin/resources": {
     get: {
       tags: ["Resources"],

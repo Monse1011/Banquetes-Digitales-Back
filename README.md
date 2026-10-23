@@ -170,6 +170,14 @@ Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
 - **PUT** `/api/admin/resources/<tipo>/:id` - Desactivar (baja lógica) o reactivar
 - **DELETE** `/api/admin/resources/logistic/:id` - Borrado suave (solo recursos logísticos)
 
+### Roles operativos (Administrador)
+
+- **GET** `/api/admin/resources/operative-roles` - Listar roles activos
+- **POST** `/api/admin/resources/operative-roles` - Crear rol (`data.name`; máximo 100 caracteres)
+- **GET** `/api/admin/resources/operative-roles/:id` - Consultar un rol
+- **PATCH** `/api/admin/resources/operative-roles/:id` - Editar el nombre
+- **DELETE** `/api/admin/resources/operative-roles/:id` - Desactivar (baja lógica; conserva asociaciones con recursos)
+
 ### Logística
 
 El Personal de Logística responsable de la solicitud y el Administrador General (RF-2.3.2.21).

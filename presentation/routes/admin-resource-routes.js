@@ -35,7 +35,23 @@ function createAdminResourceRoutes(resourceControllers, authMiddleware) {
   });
 
   router.get("/operative-roles", (request, response, next) => {
-    resourceControllers.human.listOperativeRoles(request, response).catch(next);
+    resourceControllers.operativeRole.list(request, response).catch(next);
+  });
+
+  router.post("/operative-roles", (request, response, next) => {
+    resourceControllers.operativeRole.create(request, response).catch(next);
+  });
+
+  router.get("/operative-roles/:id", (request, response, next) => {
+    resourceControllers.operativeRole.getById(request, response).catch(next);
+  });
+
+  router.patch("/operative-roles/:id", (request, response, next) => {
+    resourceControllers.operativeRole.update(request, response).catch(next);
+  });
+
+  router.delete("/operative-roles/:id", (request, response, next) => {
+    resourceControllers.operativeRole.deactivate(request, response).catch(next);
   });
 
   registerResourceRoutes(router, "/human", resourceControllers.human);

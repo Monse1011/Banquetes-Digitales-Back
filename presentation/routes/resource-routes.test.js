@@ -77,6 +77,54 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       expect(response.body.data.roles).toEqual([{ id: 1, name: "Mesero" }]);
     });
 
+    it("creates, edits, retrieves and logically deletes operative roles", async () => {
+      const created = await request(app)
+        .post("/api/admin/resources/operative-roles")
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: "  Chef  " } });
+      const id = 2;
+      const update = await request(app)
+        .patch(`/api/admin/resources/operative-roles/${id}`)
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: "Cocinero" } });
+      const detail = await request(app)
+        .get(`/api/admin/resources/operative-roles/${id}`)
+        .set("Cookie", AUTH_COOKIE);
+      const deactivate = await request(app)
+        .delete(`/api/admin/resources/operative-roles/${id}`)
+        .set("Cookie", AUTH_COOKIE);
+      const list = await request(app)
+        .get("/api/admin/resources/operative-roles")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(created.status).toBe(201);
+      expect(created.headers.location).toBe("/api/admin/resources/operative-roles/2");
+      expect(update.status).toBe(204);
+      expect(detail.body.data.role).toEqual({ id, name: "Cocinero", is_active: true });
+      expect(deactivate.status).toBe(204);
+      expect(list.body.data.roles).toEqual([{ id: 1, name: "Mesero" }]);
+    });
+
+    it("validates operative role names and reports missing roles", async () => {
+      const invalid = await request(app)
+        .post("/api/admin/resources/operative-roles")
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: " " } });
+      const duplicate = await request(app)
+        .post("/api/admin/resources/operative-roles")
+        .set("Cookie", AUTH_COOKIE)
+        .send({ data: { name: "mesero" } });
+      const missing = await request(app)
+        .delete("/api/admin/resources/operative-roles/999")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(invalid.status).toBe(422);
+      expect(invalid.body.errors.name).toBe("El nombre es obligatorio.");
+      expect(duplicate.status).toBe(422);
+      expect(duplicate.body.errors.name).toBe("Ya existe un rol operativo con ese nombre.");
+      expect(missing.status).toBe(404);
+    });
+
     it("lists active human resources with pagination metadata", async () => {
       const response = await request(app)
         .get("/api/admin/resources/human?status=active&sort_by=name&order=asc&page=1&per_page=10")
