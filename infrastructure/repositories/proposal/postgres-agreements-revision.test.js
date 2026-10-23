@@ -48,15 +48,15 @@ function gate() {
 describe.skipIf(!process.env.TEST_PGDATABASE)(
   "Agreement revisions with concurrent PostgreSQL transactions",
   () => {
-    let admin; 
-    let pool; 
-    let schema; 
-    let derived; 
-    let proposals; 
-    let adapter; 
-    let save; 
-    let get; 
-    let generate; 
+    let admin;
+    let pool;
+    let schema;
+    let derived;
+    let proposals;
+    let adapter;
+    let save;
+    let get;
+    let generate;
     let pdf;
     const start = new Date("2035-06-02T00:00:00Z");
     const end = new Date("2035-06-02T04:00:00Z");

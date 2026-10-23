@@ -15,11 +15,12 @@ const mockRetry = vi.fn();
 
 function buildApp(role) {
   return createApp({
-    authController: { 
-      session: (_req, res) => res.sendStatus(501), 
-      logout: (_req, res) => res.sendStatus(501), 
-      login: vi.fn(), changePassword: vi.fn(), 
-      firstAccess: vi.fn() 
+    authController: {
+      session: (_req, res) => res.sendStatus(501),
+      logout: (_req, res) => res.sendStatus(501),
+      login: vi.fn(),
+      changePassword: vi.fn(),
+      firstAccess: vi.fn(),
     },
     passwordResetController: { requestReset: vi.fn(), resetPassword: vi.fn() },
     tokenService: { verifyToken: () => ({ id_user: 1, role }) },
@@ -86,16 +87,15 @@ describe("Calendar Routes (Función 3.3)", () => {
       expect(documentation.body.paths["/api/calendar/{id}"]).toBeUndefined();
       expect(documentation.body.paths["/api/calendar/{id}/sync"]).toBeUndefined();
       expect(
-        Object.keys(documentation.body.paths).filter(
-          (path) =>
-            path.startsWith("/api/calendar") ||
-            (path.startsWith("/api/logistics/calendar") && path !== "/api/logistics/calendar") ||
-            (path.startsWith("/api/admin/calendar") && path !== "/api/admin/calendar")
-        ).sort()
-      ).toEqual([
-        "/api/logistics/calendar/{id}",
-        "/api/logistics/calendar/{id}/sync",
-      ]);
+        Object.keys(documentation.body.paths)
+          .filter(
+            (path) =>
+              path.startsWith("/api/calendar") ||
+              (path.startsWith("/api/logistics/calendar") && path !== "/api/logistics/calendar") ||
+              (path.startsWith("/api/admin/calendar") && path !== "/api/admin/calendar")
+          )
+          .sort()
+      ).toEqual(["/api/logistics/calendar/{id}", "/api/logistics/calendar/{id}/sync"]);
     });
 
     it("edits events using the DAD route and forwards immutable fields for validation", async () => {
@@ -256,19 +256,34 @@ describe("Calendar Routes (Función 3.3)", () => {
 
 describe("calendar retry HTTP integration", () => {
   it("returns pending state without claiming Google success", async () => {
-    mockRetry.mockResolvedValue({event:{id:4,syncStatus:"Pendiente de sincronización"},syncWarning:"No pudo sincronizarse"});
-    const response = await request(buildApp(UserRole.ADMIN)).post("/api/logistics/calendar/4/sync").set("Cookie", AUTH_COOKIE);
+    mockRetry.mockResolvedValue({
+      event: { id: 4, syncStatus: "Pendiente de sincronización" },
+      syncWarning: "No pudo sincronizarse",
+    });
+    const response = await request(buildApp(UserRole.ADMIN))
+      .post("/api/logistics/calendar/4/sync")
+      .set("Cookie", AUTH_COOKIE);
     expect(response.status).toBe(200);
-    expect(mockRetry).toHaveBeenCalledWith(4, {id_user:1,role:UserRole.ADMIN});
+    expect(mockRetry).toHaveBeenCalledWith(4, { id_user: 1, role: UserRole.ADMIN });
     expect(response.body.data.sync_status).toBe("Pendiente de sincronización");
   });
   it("preserves ownership denial from the existing use case", async () => {
     mockRetry.mockRejectedValue(new CalendarAccessDeniedException());
-    const response = await request(buildApp(UserRole.LOGISTICS)).post("/api/logistics/calendar/4/sync").set("Cookie", AUTH_COOKIE);
+    const response = await request(buildApp(UserRole.LOGISTICS))
+      .post("/api/logistics/calendar/4/sync")
+      .set("Cookie", AUTH_COOKIE);
     expect(response.status).toBe(403);
   });
   it("rejects invalid ids and unauthenticated retries", async () => {
-    expect((await request(buildApp(UserRole.ADMIN)).post("/api/logistics/calendar/invalid/sync").set("Cookie", AUTH_COOKIE)).status).toBe(422);
-    expect((await request(buildApp(UserRole.ADMIN)).post("/api/logistics/calendar/4/sync")).status).toBe(401);
+    expect(
+      (
+        await request(buildApp(UserRole.ADMIN))
+          .post("/api/logistics/calendar/invalid/sync")
+          .set("Cookie", AUTH_COOKIE)
+      ).status
+    ).toBe(422);
+    expect(
+      (await request(buildApp(UserRole.ADMIN)).post("/api/logistics/calendar/4/sync")).status
+    ).toBe(401);
   });
 });

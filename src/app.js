@@ -174,7 +174,9 @@ const {
 const {
   PostgresCalendarSyncRepository,
 } = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
-const { RetryCalendarSyncUseCase } = require("../application/use-cases/calendar/retry-calendar-sync-use-case");
+const {
+  RetryCalendarSyncUseCase,
+} = require("../application/use-cases/calendar/retry-calendar-sync-use-case");
 const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
@@ -384,7 +386,11 @@ async function main() {
     calendarEventRepository,
     processPendingCalendarSyncUseCase
   );
-  const retryCalendarSyncUseCase = new RetryCalendarSyncUseCase(calendarEventRepository, calendarSyncRepository, processPendingCalendarSyncUseCase);
+  const retryCalendarSyncUseCase = new RetryCalendarSyncUseCase(
+    calendarEventRepository,
+    calendarSyncRepository,
+    processPendingCalendarSyncUseCase
+  );
   const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
   const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
 

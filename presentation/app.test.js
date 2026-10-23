@@ -111,8 +111,8 @@ describe("App", () => {
     const getAvailableLogisticsUsersUseCase = new GetAvailableLogisticsUsersUseCase(userRepository);
 
     app = createApp({
-      authController: { 
-        session: (_req, res) => res.sendStatus(501), 
+      authController: {
+        session: (_req, res) => res.sendStatus(501),
         logout: (_req, res) => res.sendStatus(501),
         login: (_req, res) => res.status(200).json({}),
         changePassword: (_req, res) => res.status(200).json({}),

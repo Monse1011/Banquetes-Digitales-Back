@@ -410,9 +410,13 @@ const openApiDocument = {
     "/api/logistics/calendar/{id}/sync": {
       post: {
         summary: "Retry existing calendar synchronization (admin or responsible logistics user)",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } },
+        ],
         responses: {
-          200: { description: "Attempt completed; data.sync_status reports synced or still pending" },
+          200: {
+            description: "Attempt completed; data.sync_status reports synced or still pending",
+          },
           401: { description: "Authentication required" },
           403: { description: "Not the responsible user or administrator" },
           404: { description: "Event not found" },
@@ -532,7 +536,9 @@ const openApiDocument = {
         security: [{ CookieAuth: [] }],
         responses: {
           200: { description: "Public user profile and firstAccess flag; Cache-Control: no-store" },
-          401: { description: "Missing, expired or invalid session; inactive or changed-role account" },
+          401: {
+            description: "Missing, expired or invalid session; inactive or changed-role account",
+          },
           500: { description: "Session verification unavailable; retry allowed" },
         },
       },

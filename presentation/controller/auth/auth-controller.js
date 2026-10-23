@@ -60,7 +60,9 @@ class AuthController {
     try {
       const user = await this.userRepository.findById(req.user.id_user);
       if (!user || user.status !== UserStatus.ACTIVE || user.role !== req.user.role) {
-        return res.status(401).json({ message: "La sesión ya no es válida. Inicia sesión nuevamente." });
+        return res
+          .status(401)
+          .json({ message: "La sesión ya no es válida. Inicia sesión nuevamente." });
       }
       return res.status(200).json({
         user: {
@@ -73,13 +75,15 @@ class AuthController {
         firstAccess: user.isFirstAccess(),
       });
     } catch (error) {
-      return res.status(500).json({ message: "No fue posible comprobar la sesión. Intenta nuevamente." });
+      return res
+        .status(500)
+        .json({ message: "No fue posible comprobar la sesión. Intenta nuevamente." });
     }
   };
 
   logout = (req, res) => {
     res.clearCookie(
-      SecurityConstants.AUTH_COOKIE_NAME, 
+      SecurityConstants.AUTH_COOKIE_NAME,
       getAuthCookieOptions(this.authCookieOptions)
     );
     return res.status(204).end();

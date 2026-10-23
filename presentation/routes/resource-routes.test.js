@@ -48,12 +48,12 @@ function buildApp(role) {
   ]);
 
   return createApp({
-    authController: { 
-      session: (_req, res) => res.sendStatus(501), 
-      logout: (_req, res) => res.sendStatus(501), 
-      login: notUsed, 
-      changePassword: notUsed, 
-      firstAccess: notUsed 
+    authController: {
+      session: (_req, res) => res.sendStatus(501),
+      logout: (_req, res) => res.sendStatus(501),
+      login: notUsed,
+      changePassword: notUsed,
+      firstAccess: notUsed,
     },
     passwordResetController: { requestReset: notUsed, resetPassword: notUsed },
     tokenService: { verifyToken: () => ({ id_user: 1, role }) },

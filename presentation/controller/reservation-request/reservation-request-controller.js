@@ -23,10 +23,12 @@ class ReservationRequestController {
 
     this.getAssignedRequestDetailUseCase =
       dependencies.getAssignedRequestDetailUseCase ||
-      (repo ? new GetAssignedRequestDetailUseCase({
-        reservationRequestRepository: repo,
-        serviceRepository: dependencies.serviceRepository,
-      }) : null);
+      (repo
+        ? new GetAssignedRequestDetailUseCase({
+            reservationRequestRepository: repo,
+            serviceRepository: dependencies.serviceRepository,
+          })
+        : null);
   }
 
   async create(request, response) {
