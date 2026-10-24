@@ -37,6 +37,9 @@ const ProposalMessages = Object.freeze({
   DATE_IN_PAST: "La fecha no puede ser anterior a la actual.",
   LOCATION_TOO_LONG: "La ubicación no puede exceder 255 caracteres.",
   ADJUSTED_QUANTITY_INVALID: "La cantidad ajustada debe ser un número entero mayor o igual a 0.",
+  ADJUSTED_RESOURCES_DUPLICATE: "No se puede repetir un recurso en las cantidades ajustadas.",
+  HUMAN_ADJUSTED_QUANTITY_INVALID:
+    "La cantidad ajustada de un recurso humano debe ser 1 o 0 para liberarlo.",
   ADJUSTED_QUANTITY_MISSING:
     "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
   RESOURCE_ID_INVALID: "El identificador del recurso no es válido.",

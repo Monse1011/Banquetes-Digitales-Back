@@ -206,8 +206,8 @@ const { SendProposalUseCase } = require("../application/use-cases/proposal/send-
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
 
-// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Los repositorios de
-// asignaciones y confirmaciones aún usan un mock en memoria (sus tablas no tienen migración).
+// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Los datos de asignación y
+// confirmación se persisten en PostgreSQL con la migración assigned-resources.sql.
 function createResourceDependencies(pool, reservationRequestRepository, userRepository) {
   const resourceRepository = new PostgresResourceRepository(pool);
   const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);

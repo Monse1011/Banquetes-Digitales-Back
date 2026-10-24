@@ -108,6 +108,11 @@ class SaveAgreementsRequestDto {
       return ProposalMessages.ADJUSTED_QUANTITY_INVALID;
     }
 
+    const resourceIds = this.adjustedResources.map((item) => Number(item.resource_id));
+    if (new Set(resourceIds).size !== resourceIds.length) {
+      return ProposalMessages.ADJUSTED_RESOURCES_DUPLICATE;
+    }
+
     return undefined;
   }
 

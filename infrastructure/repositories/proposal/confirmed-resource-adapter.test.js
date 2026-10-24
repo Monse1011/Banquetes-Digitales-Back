@@ -9,6 +9,12 @@ const {
 const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
+const {
+  InMemoryResourceAssignmentRepository,
+} = require("../resource-assignment/in-memory-resource-assignment-repository");
+const {
+  ResourceAssignment,
+} = require("../../../domain/entities/resource-assignment/resource-assignment");
 
 it("preserves requested and available quantities, zero assignment and shortage notes through agreements and adjustments", async () => {
   const start = new Date("2035-06-01T20:00:00Z");
@@ -81,4 +87,88 @@ it("preserves requested and available quantities, zero assignment and shortage n
   await adapter.syncAssignments(3, [{ resourceId: 7, quantity: 8 }], start, end);
   const after = (await useCase.execute(3, 9)).data.assigned_resources[0];
   expect(after).toEqual({ ...before.assigned_resources[0], quantity: 8 });
+});
+
+it("releases an assignment when agreements change its quantity to zero", async () => {
+  const start = new Date("2035-06-01T20:00:00Z");
+  const end = new Date("2035-06-01T23:00:00Z");
+  const assignments = new InMemoryResourceAssignmentRepository([
+    new ResourceAssignment(
+      1,
+      3,
+      7,
+      1,
+      1,
+      1,
+      ResourceSufficiency.SUFFICIENT,
+      AssignmentStatus.CONFIRMED,
+      start,
+      end,
+      start,
+      end,
+      null,
+      9,
+      start,
+      9,
+      start
+    ),
+  ]);
+  const adapter = new ConfirmedResourceAdapter(assignments, {
+    findByIds: async () => [
+      { id: 7, name: "Ana", type: "HUMAN", isActive: true, totalQuantity: 1, unitCost: null },
+    ],
+  });
+
+  await adapter.syncAssignments(3, [{ resourceId: 7, quantity: 0 }], start, end, null, 9);
+
+  expect(await assignments.findByRequest(3)).toEqual([]);
+  expect(assignments.assignments[0].status).toBe(AssignmentStatus.RELEASED);
+});
+
+it("adds newly selected human resources and releases the replaced person", async () => {
+  const start = new Date("2035-06-01T20:00:00Z");
+  const end = new Date("2035-06-01T23:00:00Z");
+  const assignments = new InMemoryResourceAssignmentRepository([
+    new ResourceAssignment(
+      1,
+      3,
+      7,
+      1,
+      1,
+      1,
+      ResourceSufficiency.SUFFICIENT,
+      AssignmentStatus.CONFIRMED,
+      start,
+      end,
+      start,
+      end,
+      null,
+      9,
+      start,
+      9,
+      start
+    ),
+  ]);
+  const adapter = new ConfirmedResourceAdapter(assignments, {
+    findByIds: async (ids) =>
+      [
+        { id: 7, name: "Ana", type: "HUMAN", isActive: true, totalQuantity: 1, unitCost: null },
+        { id: 8, name: "Luis", type: "HUMAN", isActive: true, totalQuantity: 1, unitCost: null },
+      ].filter((resource) => ids.includes(resource.id)),
+  });
+
+  await adapter.syncAssignments(3, [{ resourceId: 8, quantity: 1 }], start, end, null, 9);
+
+  expect(assignments.assignments.find((assignment) => assignment.resourceId === 7).status).toBe(
+    AssignmentStatus.RELEASED
+  );
+  const active = await assignments.findByRequest(3);
+  expect(active).toHaveLength(1);
+  expect(active[0]).toMatchObject({
+    id: 2,
+    resourceId: 8,
+    quantity: 1,
+    status: AssignmentStatus.CONFIRMED,
+    confirmedByUserId: 9,
+  });
 });

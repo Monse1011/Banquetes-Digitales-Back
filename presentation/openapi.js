@@ -782,6 +782,8 @@ const openApiDocument = {
             observations: { type: "string" },
             adjusted_resources: {
               type: "array",
+              description:
+                "Incluye materiales y recursos logísticos actualmente asignados. Para personal, incluye las personas seleccionadas; se pueden agregar personas humanas activas disponibles, y omitir una persona confirmada la libera. Cantidad 0 libera una asignación; una persona nueva requiere cantidad 1.",
               items: {
                 type: "object",
                 required: ["resource_id", "quantity"],

@@ -88,21 +88,31 @@ class InMemoryResourceAssignmentRepository {
   }
 
   async confirm(assignments, releasedIds, blocking, transaction = null) {
-    if (!this.isStillBlockedBy(assignments, blocking)) return null;
+    if (assignments.length > 0 && !this.isStillBlockedBy(assignments, blocking)) return null;
 
-    this.write(transaction, () =>
-      this.assignments.map((existing) => {
-        const confirmed = assignments.find((assignment) => assignment.id === existing.id);
+    const savedAssignments = assignments.map((assignment) =>
+      assignment.id === null || assignment.id === undefined
+        ? copyOf(assignment, { id: this.nextId++ })
+        : copyOf(assignment)
+    );
+    const savedById = new Map(savedAssignments.map((assignment) => [assignment.id, assignment]));
+
+    this.write(transaction, () => [
+      ...this.assignments.map((existing) => {
+        const confirmed = savedById.get(existing.id);
 
         if (confirmed) return copyOf(confirmed);
 
         return releasedIds.includes(existing.id)
           ? copyOf(existing, { status: AssignmentStatus.RELEASED })
           : existing;
-      })
-    );
+      }),
+      ...savedAssignments.filter(
+        (assignment) => !this.assignments.some((existing) => existing.id === assignment.id)
+      ),
+    ]);
 
-    return assignments.map((assignment) => copyOf(assignment));
+    return savedAssignments.map((assignment) => copyOf(assignment));
   }
 
   async releaseProvisional(requestId, transaction = null) {

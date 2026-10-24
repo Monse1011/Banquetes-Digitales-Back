@@ -1,5 +1,7 @@
 const { Pool } = require("pg");
 const { randomUUID } = require("crypto");
+const fs = require("fs/promises");
+const path = require("path");
 const {
   PostgresDerivedInformationRepository,
 } = require("./postgres-derived-information-repository");
@@ -44,7 +46,8 @@ function gate() {
 }
 
 // Opt-in. Real commits and independent connections in a unique disposable schema.
-// The current resource wrapper is consumed unchanged; no production data or PDF is used.
+// Repositories run against the real migration in an isolated schema; no production data or PDF
+// is used.
 describe.skipIf(!process.env.TEST_PGDATABASE)(
   "Agreement revisions with concurrent PostgreSQL transactions",
   () => {
@@ -70,7 +73,15 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
         application_name: schema,
       });
       await pool.query(`
-      CREATE TABLE reservations_request (id bigint PRIMARY KEY, status text);
+      CREATE TABLE users (id_user bigint PRIMARY KEY);
+      CREATE TABLE resources (id bigint PRIMARY KEY);
+      CREATE TABLE reservations_request (
+        id bigint PRIMARY KEY,
+        id_reservation_request bigint UNIQUE,
+        status text,
+        event_date_time timestamp NOT NULL,
+        event_end_time timestamp NOT NULL
+      );
       CREATE TABLE derived_information (id bigserial PRIMARY KEY, request_id bigint,
         location text, start_datetime timestamptz, end_datetime timestamptz,
         observations text, created_by_user_id bigint, created_at timestamptz DEFAULT now());
@@ -79,8 +90,20 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
         proposal_code text, file_name text, status text, subtotal numeric, discount_amount numeric,
         client_observations text, created_by_user_id bigint, created_at timestamptz);
       CREATE TABLE proposal_resources (proposal_id bigint, resource_id bigint, quantity integer, unit_cost numeric);
-      INSERT INTO reservations_request VALUES (1, 'COORDINATION_READY');
     `);
+      const assignmentMigration = await fs.readFile(
+        path.join(__dirname, "../../../database/increment-2/assigned-resources.sql"),
+        "utf8"
+      );
+      await pool.query(assignmentMigration);
+      await pool.query("INSERT INTO users (id_user) VALUES (9)");
+      await pool.query("INSERT INTO resources (id) VALUES (7)");
+      await pool.query(
+        `INSERT INTO reservations_request
+          (id, id_reservation_request, status, event_date_time, event_end_time)
+         VALUES (1, 1, 'COORDINATION_READY', $1, $2)`,
+        [start, end]
+      );
       const requests = {
         findById: async (id, transaction) => {
           const row = (

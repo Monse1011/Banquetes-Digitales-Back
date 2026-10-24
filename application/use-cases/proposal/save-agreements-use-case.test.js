@@ -47,6 +47,7 @@ describe("SaveAgreementsUseCase", () => {
     assignedResourceRepository = new InMemoryAssignedResourceRepository([
       { id: 1, name: "Mesero", type: ResourceType.HUMAN, unitCost: 300, totalQuantity: 5 },
       { id: 2, name: "Vajilla", type: ResourceType.MATERIAL, unitCost: 50, totalQuantity: 100 },
+      { id: 3, name: "Ana López", type: ResourceType.HUMAN, unitCost: null, totalQuantity: 1 },
     ]);
     derivedInformationRepository = new InMemoryDerivedInformationRepository();
     useCase = new SaveAgreementsUseCase(
@@ -142,6 +143,70 @@ describe("SaveAgreementsUseCase", () => {
           assignment.resourceId === 1 && assignment.status === AssignedResourceStatus.RELEASED
       ).length
     ).toBe(1);
+  });
+
+  it("adds an available human resource that was not previously confirmed", async () => {
+    const request = await createRequest();
+
+    await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({
+        adjusted_resources: [
+          { resource_id: 1, quantity: 2 },
+          { resource_id: 2, quantity: 50 },
+          { resource_id: 3, quantity: 1 },
+        ],
+      })
+    );
+
+    const active = await assignedResourceRepository.findActiveByRequestId(request.requestId);
+    expect(active.map((assignment) => assignment.resourceId).sort()).toEqual([1, 2, 3]);
+    expect(active.find((assignment) => assignment.resourceId === 3).quantity).toBe(1);
+  });
+
+  it("releases a human resource omitted from the selected personnel", async () => {
+    const request = await createRequest();
+
+    await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({
+        adjusted_resources: [
+          { resource_id: 2, quantity: 50 },
+          { resource_id: 3, quantity: 1 },
+        ],
+      })
+    );
+
+    const active = await assignedResourceRepository.findActiveByRequestId(request.requestId);
+    expect(active.map((assignment) => assignment.resourceId)).toEqual([2, 3]);
+    expect(
+      assignedResourceRepository.assignments.find((assignment) => assignment.resourceId === 1)
+        .status
+    ).toBe(AssignedResourceStatus.RELEASED);
+  });
+
+  it("releases an assignment when its adjusted quantity is zero", async () => {
+    const request = await createRequest();
+
+    await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      dto({
+        adjusted_resources: [
+          { resource_id: 1, quantity: 0 },
+          { resource_id: 2, quantity: 50 },
+        ],
+      })
+    );
+
+    const active = await assignedResourceRepository.findActiveByRequestId(request.requestId);
+    expect(active.map((assignment) => assignment.resourceId)).toEqual([2]);
+    expect(
+      assignedResourceRepository.assignments.find((assignment) => assignment.resourceId === 1)
+        .status
+    ).toBe(AssignedResourceStatus.RELEASED);
   });
 
   it("rejects a stale form without overwriting quantities or notes and allows refresh", async () => {
