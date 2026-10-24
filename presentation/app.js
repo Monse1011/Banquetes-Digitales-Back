@@ -11,6 +11,9 @@ const {
   ReservationRequestController,
 } = require("./controller/reservation-request/reservation-request-controller");
 const { UserController } = require("./controller/user/user-controller");
+const {
+  EventTrackingController,
+} = require("./controller/event-tracking/event-tracking-controller");
 const { ServiceController } = require("./controller/service/service-controller");
 const CalendarController = require("./controller/calendar/calendar-controller");
 const {
@@ -339,6 +342,7 @@ function createApp(dependencies) {
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
+  const eventTrackingController = new EventTrackingController(dependencies);
   const serviceController = new ServiceController(dependencies.serviceRepository);
   const calendarController = new CalendarController(dependencies);
   const resourceControllers = createResourceControllers(dependencies);
@@ -377,7 +381,12 @@ function createApp(dependencies) {
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
-    createAdminRoutes(reservationRequestController, userController, authMiddleware)
+    createAdminRoutes(
+      reservationRequestController,
+      userController,
+      authMiddleware,
+      eventTrackingController
+    )
   );
   app.use(
     "/api/logistics",

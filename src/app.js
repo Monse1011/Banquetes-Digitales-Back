@@ -202,6 +202,17 @@ const {
 } = require("../application/use-cases/proposal/download-proposal-use-case");
 const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
 
+// Funciones 2.11 y 2.5 (consultas de eventos del Administrador General)
+const {
+  PostgresEventQueryRepository,
+} = require("../infrastructure/repositories/event-tracking/postgres-event-query-repository");
+const {
+  ListFinishedEventsUseCase,
+} = require("../application/use-cases/event-tracking/list-finished-events-use-case");
+const {
+  GetFinishedEventUseCase,
+} = require("../application/use-cases/event-tracking/get-finished-event-use-case");
+
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
@@ -282,6 +293,7 @@ async function main() {
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
+  const eventQueryRepository = new PostgresEventQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
   const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
   const createReservationRequestUseCase = new CreateReservationRequestUseCase(
@@ -427,6 +439,10 @@ async function main() {
     getProposalUseCase,
     downloadProposalUseCase,
     sendProposalUseCase,
+
+    // Función 2.11
+    listFinishedEventsUseCase: new ListFinishedEventsUseCase(eventQueryRepository),
+    getFinishedEventUseCase: new GetFinishedEventUseCase(eventQueryRepository),
   });
 
   // Start background jobs for calendar sync and finalization

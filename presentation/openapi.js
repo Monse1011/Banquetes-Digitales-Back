@@ -752,6 +752,48 @@ const openApiDocument = {
         },
       },
     },
+    "/api/admin/finished-events": {
+      get: {
+        tags: ["Admin", "Finished events"],
+        summary: "List finished events with combined filters (RF-1.2.11.1/3/4)",
+        security: [{ CookieAuth: [] }],
+        parameters: [
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            description: "Client name or folio (partial match)",
+            schema: { type: "string" },
+          },
+          {
+            name: "from",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date" },
+          },
+          { name: "to", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "page", in: "query", required: false, schema: { type: "integer" } },
+          { name: "per_page", in: "query", required: false, schema: { type: "integer" } },
+        ],
+        responses: {
+          200: { description: "Finished events (with message when filters match nothing)" },
+          400: { description: "Invalid date or date range" },
+          403: { description: "Forbidden" },
+        },
+      },
+    },
+    "/api/admin/finished-events/{id}": {
+      get: {
+        tags: ["Admin", "Finished events"],
+        summary: "Read-only detail of a finished event (RF-1.2.11.2)",
+        security: [{ CookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: {
+          200: { description: "Finished event detail" },
+          404: { description: "Not found or not finished" },
+        },
+      },
+    },
     ...resourcePaths,
     ...resourceConfirmationPaths,
     "/api/logistics/requests/{id}": {
