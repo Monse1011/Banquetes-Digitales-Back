@@ -2,12 +2,7 @@ const express = require("express");
 const UserRole = require("../../domain/enums/auth/user-role");
 const requireRole = require("../middleware/auth/role-middleware");
 
-function createAdminRoutes(
-  reservationRequestController,
-  userController,
-  authMiddleware,
-  eventTrackingController
-) {
+function createAdminRoutes(reservationRequestController, userController, authMiddleware) {
   const router = express.Router();
   // RF-1.2.4.16: las funciones de la Función 2.4 se restringen a Administrador General.
   router.use(authMiddleware, requireRole(UserRole.ADMIN));
@@ -26,15 +21,6 @@ function createAdminRoutes(
 
   router.patch("/requests/:id/assignment", (request, response, next) => {
     reservationRequestController.assign(request, response).catch(next);
-  });
-
-  // Función 2.11: solo lectura, no hay rutas de modificación.
-  router.get("/finished-events", (request, response, next) => {
-    eventTrackingController.listFinished(request, response).catch(next);
-  });
-
-  router.get("/finished-events/:id", (request, response, next) => {
-    eventTrackingController.getFinished(request, response).catch(next);
   });
 
   router.get("/users/usersavailable", (request, response, next) => {

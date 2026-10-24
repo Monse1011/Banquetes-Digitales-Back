@@ -74,6 +74,13 @@ Opcional: cargar datos de prueba de la Función 3.4:
 psql -U postgres -d banquetes_db -f database/increment-2/mock-data-3.4.sql
 ```
 
+7. Aplicar los cambios de esquema del Incremento 3 (Función 2.5 - fecha del último cambio de
+   estado e historial de estados):
+
+```bash
+psql -U postgres -d banquetes_db -f database/increment-3/request-status-history.sql
+```
+
 ## Desarrollo
 
 Iniciar servidor en modo desarrollo con auto-reload:

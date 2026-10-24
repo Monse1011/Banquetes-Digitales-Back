@@ -1,60 +1,70 @@
-const GetReservationRequestResponseDto = require("../../dto/reservation-request/get-reservation-request-response-dto");
-const ReservationRequestNotFoundException = require("../../../domain/exceptions/reservation-request/reservation-request-not-found-exception");
+const {
+  availableQuantity,
+  blockingPeriod,
+} = require("../../services/resource-assignment/resource-availability");
+const {
+  ResourceSufficiency,
+} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
+const {
+  AssignedResourceStatus,
+} = require("../../../domain/enums/proposal/assigned-resource-status");
+const { AdminRequestMessages } = require("../../../domain/constants/admin-request-messages");
 
+// GET /api/admin/requests/{request_id} (DAD v3.0): ficha de solo lectura de una solicitud
+// (RF-1.2.4.2, RF-1.2.5.3 y RF-1.2.11.2).
 class GetReservationRequestUseCase {
-  constructor(reservationRequestRepository, clientRepository, serviceRepository, userRepository) {
-    this.reservationRequestRepository = reservationRequestRepository;
-    this.clientRepository = clientRepository;
-    this.serviceRepository = serviceRepository;
-    this.userRepository = userRepository;
+  constructor(adminRequestQueryRepository) {
+    this.adminRequestQueryRepository = adminRequestQueryRepository;
   }
 
   async execute(id) {
-    const request = await this.reservationRequestRepository.findById(id);
+    const found = await this.adminRequestQueryRepository.findById(id);
 
-    if (!request) {
-      throw new ReservationRequestNotFoundException();
+    if (!found) {
+      const error = new Error(AdminRequestMessages.REQUEST_NOT_FOUND);
+      error.status = 404;
+      throw error;
     }
 
-    const client = await this.clientRepository.findById(request.clientId);
-    const services = await this.serviceRepository.findByIds(request.servicesIds);
-
-    if (!client) {
-      throw new Error(`Client ${request.clientId} not found`);
-    }
-
-    // RF-1.2.4.2 / RF-1.2.4.9: ficha con responsable asignado o null ("Sin asignar").
-    let logisticUser = null;
-
-    if (request.logisticUserId !== null) {
-      const user = await this.userRepository.findById(request.logisticUserId);
-
-      if (!user) {
-        throw new Error(`Logistic user ${request.logisticUserId} not found`);
-      }
-
-      logisticUser = {
-        id: user.id,
-        full_name: user.fullName,
-        email: user.email,
-      };
-    }
-
-    return new GetReservationRequestResponseDto(
-      request.requestId,
-      request.folio,
-      client.fullName,
-      client.email,
-      client.phone,
-      request.guestCount,
-      request.eventAddress,
-      request.eventDateTime.toISOString(),
-      request.eventEndTime.toISOString(),
-      request.requestDate.toISOString(),
-      request.status,
-      services.map((service) => service.name),
-      logisticUser
+    const { request, assignments, currentStart, currentEnd } = found;
+    const blocking = await this.adminRequestQueryRepository.findBlockingAssignments(
+      assignments.map((assignment) => assignment.id),
+      request.request_id
     );
+    const period = blockingPeriod(currentStart, currentEnd ?? currentStart);
+    const resourceAssignments = { human: [], material: [], logistic: [] };
+
+    assignments.forEach((assignment) => {
+      resourceAssignments[assignment.type.toLowerCase()].push({
+        id: assignment.id,
+        name: assignment.name,
+        type: assignment.type,
+        ...(assignment.type === "HUMAN"
+          ? {
+              operative_role_id: assignment.operative_role_id,
+              operative_role: assignment.operative_role,
+            }
+          : {}),
+        assignment: {
+          requested_quantity: assignment.requested_quantity,
+          assigned_quantity: assignment.quantity,
+          available_quantity: availableQuantity(
+            {
+              id: assignment.id,
+              isActive: assignment.is_active,
+              totalQuantity: assignment.total_quantity,
+            },
+            blocking,
+            period
+          ),
+          sufficiency: ResourceSufficiency[assignment.sufficiency],
+          status: AssignedResourceStatus[assignment.status],
+          observation: assignment.observation,
+        },
+      });
+    });
+
+    return { data: { ...request, resource_assignments: resourceAssignments } };
   }
 }
 

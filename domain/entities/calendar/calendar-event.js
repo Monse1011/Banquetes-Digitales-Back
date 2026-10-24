@@ -47,7 +47,7 @@ class CalendarEvent {
   }
 
   isCancelled() {
-    return this.status === ReservationRequestStatus.CANCELLED;
+    return this.status === ReservationRequestStatus.CANCELED;
   }
 
   hasStarted(now) {

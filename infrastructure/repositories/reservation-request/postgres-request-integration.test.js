@@ -65,6 +65,9 @@ const {
   PostgresReservationRequestRepository,
 } = require("./postgres-reservation-request-repository");
 const {
+  PostgresAdminRequestQueryRepository,
+} = require("./postgres-admin-request-query-repository");
+const {
   PostgresCalendarEventRepository,
 } = require("../calendar/postgres-calendar-event-repository");
 const PostgresFolioGenerator = require("../../services/reservation-request/postgres-folio-generator");
@@ -148,12 +151,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       });
       expect(listed.requests.some((r) => r.requestId === created.requestId)).toBe(true);
       const summary = await new GetReservationRequestsUseCase(
-        requests,
-        clients,
-        services,
-        new PostgresUserRepository(adapter)
+        new PostgresAdminRequestQueryRepository(adapter)
       ).execute({
-        filters: { clientName: "Prueba Integracion", status: ReservationRequestStatus.PENDING },
+        filters: { search: "Prueba Integracion", statuses: [ReservationRequestStatus.PENDING] },
       });
       expect(
         summary.data.find((row) => row.request_id === created.requestId).selected_services
@@ -502,7 +502,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         );
         await cancel.execute(scheduled.event.id, actor);
         expect((await calendar.findById(scheduled.event.id)).status).toBe(
-          ReservationRequestStatus.CANCELLED
+          ReservationRequestStatus.CANCELED
         );
         const released = (
           await connection.query(

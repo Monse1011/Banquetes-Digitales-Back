@@ -2,6 +2,10 @@ const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
 
+// La BD conserva FINISHED y CANCELLED (estructura.sql); el código usa las claves del DAD v3.0.
+const DATABASE_KEY_BY_API_KEY = Object.freeze({ FINALIZED: "FINISHED", CANCELED: "CANCELLED" });
+const API_KEY_BY_DATABASE_KEY = Object.freeze({ FINISHED: "FINALIZED", CANCELLED: "CANCELED" });
+
 const databaseStatuses = Object.fromEntries(
   Object.entries(ReservationRequestStatus).map(([key, value]) => [value, key])
 );
@@ -18,14 +22,24 @@ function toDatabaseStatus(status) {
   const normalized = normalizeStatus(status);
   const key =
     aliases[normalized] ||
-    { COMPLETED: "FINISHED", PROPUESTA_GENERADA: "PROPOSAL_GENERATED" }[normalized] ||
+    // Alias heredados: la Función 3.1 aún envía COMPLETED/CANCELLED.
+    {
+      COMPLETED: "FINALIZED",
+      FINISHED: "FINALIZED",
+      CANCELLED: "CANCELED",
+      PROPUESTA_GENERADA: "PROPOSAL_GENERATED",
+    }[normalized] ||
     normalized;
   if (!ReservationRequestStatus[key]) throw new Error(`Unknown request status: ${status}`);
+  return DATABASE_KEY_BY_API_KEY[key] || key;
+}
+// Clave del DAD (código de la API) para un valor guardado en la BD.
+function toApiStatus(status) {
+  const key = API_KEY_BY_DATABASE_KEY[status] || status;
+  if (!ReservationRequestStatus[key]) throw new Error(`Unknown database request status: ${status}`);
   return key;
 }
 function fromDatabaseStatus(status) {
-  if (!ReservationRequestStatus[status])
-    throw new Error(`Unknown database request status: ${status}`);
-  return ReservationRequestStatus[status];
+  return ReservationRequestStatus[toApiStatus(status)];
 }
-module.exports = { toDatabaseStatus, fromDatabaseStatus };
+module.exports = { toDatabaseStatus, fromDatabaseStatus, toApiStatus };

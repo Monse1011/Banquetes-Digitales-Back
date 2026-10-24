@@ -202,16 +202,10 @@ const {
 } = require("../application/use-cases/proposal/download-proposal-use-case");
 const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
 
-// Funciones 2.11 y 2.5 (consultas de eventos del Administrador General)
+// Funciones 2.4, 2.5 y 2.11: consultas de GET /api/admin/requests (DAD v3.0)
 const {
-  PostgresEventQueryRepository,
-} = require("../infrastructure/repositories/event-tracking/postgres-event-query-repository");
-const {
-  ListFinishedEventsUseCase,
-} = require("../application/use-cases/event-tracking/list-finished-events-use-case");
-const {
-  GetFinishedEventUseCase,
-} = require("../application/use-cases/event-tracking/get-finished-event-use-case");
+  PostgresAdminRequestQueryRepository,
+} = require("../infrastructure/repositories/reservation-request/postgres-admin-request-query-repository");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -293,7 +287,7 @@ async function main() {
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
-  const eventQueryRepository = new PostgresEventQueryRepository(pool);
+  const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
   const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
   const createReservationRequestUseCase = new CreateReservationRequestUseCase(
@@ -305,16 +299,10 @@ async function main() {
     reservationRequestRepository
   );
   const getReservationRequestUseCase = new GetReservationRequestUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository,
-    userRepository
+    adminRequestQueryRepository
   );
   const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository,
-    userRepository
+    adminRequestQueryRepository
   );
   const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
     reservationRequestRepository,
@@ -439,10 +427,6 @@ async function main() {
     getProposalUseCase,
     downloadProposalUseCase,
     sendProposalUseCase,
-
-    // Función 2.11
-    listFinishedEventsUseCase: new ListFinishedEventsUseCase(eventQueryRepository),
-    getFinishedEventUseCase: new GetFinishedEventUseCase(eventQueryRepository),
   });
 
   // Start background jobs for calendar sync and finalization

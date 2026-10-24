@@ -122,8 +122,8 @@ describe("AssignReservationRequestUseCase", () => {
     ReservationRequestStatus.COORDINATION_READY,
     ReservationRequestStatus.COORDINATION_INCOMPLETE,
     ReservationRequestStatus.PROPOSAL_GENERATED,
-    ReservationRequestStatus.FINISHED,
-    ReservationRequestStatus.CANCELLED,
+    ReservationRequestStatus.FINALIZED,
+    ReservationRequestStatus.CANCELED,
   ])("blocks reassignment when the request is %s", async (status) => {
     const created = await reservationRequestRepository.create(buildRequest({ status }));
 
