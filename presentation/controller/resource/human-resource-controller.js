@@ -6,6 +6,11 @@ class HumanResourceController extends ResourceController {
     super(useCases, ResourceType.HUMAN);
   }
 
+  async listOperativeRoles(request, response) {
+    const roles = await this.useCases.getOperativeRoles.execute();
+    response.json({ data: { roles: roles.map(({ id, name }) => ({ id, name })) } });
+  }
+
   // POST /api/admin/resources/human (RF-1.2.8.1 / RF-1.2.8.7)
   async create(request, response) {
     const data = this.bodyData(request);

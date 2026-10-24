@@ -170,6 +170,14 @@ Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
 - **PUT** `/api/admin/resources/<tipo>/:id` - Desactivar (baja lógica) o reactivar
 - **DELETE** `/api/admin/resources/logistic/:id` - Borrado suave (solo recursos logísticos)
 
+### Roles operativos (Administrador)
+
+- **GET** `/api/admin/resources/operative-roles` - Listar roles activos
+- **POST** `/api/admin/resources/operative-roles` - Crear rol (`data.name`; máximo 100 caracteres)
+- **GET** `/api/admin/resources/operative-roles/:id` - Consultar un rol
+- **PATCH** `/api/admin/resources/operative-roles/:id` - Editar el nombre
+- **DELETE** `/api/admin/resources/operative-roles/:id` - Desactivar (baja lógica; conserva asociaciones con recursos)
+
 ### Logística
 
 El Personal de Logística responsable de la solicitud y el Administrador General (RF-2.3.2.21).
@@ -180,7 +188,7 @@ El Personal de Logística responsable de la solicitud y el Administrador General
 - **POST** `/api/logistics/requests/:id/resources/confirm` - Finalizar confirmación (3.2)
 - **POST** `/api/logistics/requests/:id/resources/cancel` - Descartar las asignaciones provisionales (3.2)
 
-Las asignaciones y confirmaciones de recursos (Función 3.2) se acceden con `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Sus tablas aún no tienen migración, así que por ahora esas clases usan un mock en memoria y los datos se pierden al reiniciar el servidor; al crear las tablas solo cambia el contenido de esas clases. Confirmar recursos guarda las asignaciones, el registro de la confirmación y el estado de la solicitud en una sola transacción.
+Las asignaciones, confirmaciones y observaciones pendientes de recursos (Función 3.2) se guardan en PostgreSQL mediante `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Aplica `database/increment-2/assigned-resources.sql` después de crear las tablas base; la migración crea las tablas necesarias y agrega los datos de auditoría que usan los flujos de confirmación y acuerdos. La información persiste entre reinicios del servidor. Confirmar recursos guarda las asignaciones, el registro de confirmación, las observaciones pendientes y el estado de la solicitud en una sola transacción.
 
 ## Documentación API
 

@@ -92,7 +92,7 @@ class UserController {
     const { id } = request.params;
     const payload = request.body.data || request.body;
     const { status, is_active: isActive } = payload;
-    const currentUserId = request.user ? request.user.id : null;
+    const currentUserId = request.user ? (request.user.id_user ?? request.user.id) : null;
 
     await this.dependencies.toggleUserStatusUseCase.execute(id, {
       status,

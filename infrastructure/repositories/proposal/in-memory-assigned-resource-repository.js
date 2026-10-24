@@ -41,6 +41,10 @@ class InMemoryAssignedResourceRepository {
       .map((assignment) => this.withResourceSnapshot(assignment));
   }
 
+  async findResourcesByIds(resourceIds) {
+    return this.resources.filter((resource) => resourceIds.includes(resource.id));
+  }
+
   async findAvailability(resourceIds, start, end, excludeRequestId) {
     return resourceIds
       .map((resourceId) => {
@@ -79,6 +83,26 @@ class InMemoryAssignedResourceRepository {
         assignment.reservationRequestId === requestId &&
         ActiveAssignedResourceStatuses.includes(assignment.status)
     );
+    const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
+
+    active.forEach((assignment) => {
+      const resource = this.resources.find((candidate) => candidate.id === assignment.resourceId);
+      if (resource?.type === "HUMAN" && !adjustedIds.has(assignment.resourceId)) {
+        const index = this.assignments.indexOf(assignment);
+        this.assignments[index] = new AssignedResource(
+          assignment.id,
+          assignment.reservationRequestId,
+          assignment.resourceId,
+          assignment.quantity,
+          assignment.usageStart,
+          assignment.usageEnd,
+          AssignedResourceStatus.RELEASED,
+          assignment.name,
+          assignment.type,
+          assignment.unitCost
+        );
+      }
+    });
 
     for (const adjustment of adjustments) {
       const existing = active.find((assignment) => assignment.resourceId === adjustment.resourceId);

@@ -21,6 +21,8 @@ const {
 } = require("../../dto/proposal/generate-proposal-response-dto");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
 const { buildProposalFileName } = require("../../services/proposal/proposal-file-name");
+const { withAgreementsLock } = require("../../services/proposal/with-agreements-lock");
+const AgreementsRevisionChangedException = require("../../../domain/exceptions/proposal/agreements-revision-changed-exception");
 
 // Función 3.4 - RF-2.3.4.4 / RF-2.3.4.5: generación del PDF de propuesta y cambio
 // de estado a "Propuesta generada" en una sola operación.
@@ -31,7 +33,8 @@ class GenerateProposalUseCase {
     derivedInformationRepository,
     proposalRepository,
     assignedResourceRepository,
-    pdfGenerator
+    pdfGenerator,
+    transactionManager = null
   ) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.clientRepository = clientRepository;
@@ -39,22 +42,46 @@ class GenerateProposalUseCase {
     this.proposalRepository = proposalRepository;
     this.assignedResourceRepository = assignedResourceRepository;
     this.pdfGenerator = pdfGenerator;
+    this.transactionManager = transactionManager;
   }
 
-  async execute(requestId, userId, dto) {
+  async execute(requestId, userId, dto, role) {
     this.validateDto(dto);
+    return withAgreementsLock(
+      this.derivedInformationRepository,
+      this.transactionManager,
+      requestId,
+      (transaction) => this.executeLocked(requestId, userId, dto, role, transaction)
+    );
+  }
 
-    const request = await findOwnedRequest(this.reservationRequestRepository, requestId, userId);
+  async executeLocked(requestId, userId, dto, role, transaction) {
+    const request = await findOwnedRequest(
+      this.reservationRequestRepository,
+      requestId,
+      userId,
+      role,
+      transaction
+    );
 
     this.validateState(request);
 
     const information = await this.derivedInformationRepository.findByIdAndRequestId(
       Number(dto.derivedInformationId),
-      requestId
+      requestId,
+      transaction
     );
 
     if (!information) {
       throw new DerivedInformationNotFoundException();
+    }
+
+    const latest = await this.derivedInformationRepository.findLatestByRequestId(
+      requestId,
+      transaction
+    );
+    if (latest?.id !== information.id) {
+      throw new AgreementsRevisionChangedException();
     }
 
     // RF-2.3.4.3: el documento no se genera con campos obligatorios vacíos.
@@ -64,7 +91,12 @@ class GenerateProposalUseCase {
       throw new AgreementsValidationException(informationErrors);
     }
 
-    const { proposalsCode, fileName } = await this.renderDocument(dto, request, information);
+    const { proposalsCode, fileName, resources } = await this.renderDocument(
+      dto,
+      request,
+      information,
+      transaction
+    );
     const created = await this.proposalRepository.createWithRequestStatus(
       new Proposal(
         null,
@@ -78,7 +110,9 @@ class GenerateProposalUseCase {
         null
       ),
       requestId,
-      AgreementsEditableReservationRequestStatuses
+      AgreementsEditableReservationRequestStatuses,
+      resources,
+      transaction
     );
 
     // El estado cambió entre la validación y el registro: no hay propuesta duplicada.
@@ -110,18 +144,25 @@ class GenerateProposalUseCase {
 
   // RF-2.3.4.4 / RF-2.3.4.5: el PDF se genera y almacena antes de tocar la base
   // de datos; si falla, el estado de la solicitud no cambia.
-  async renderDocument(dto, request, information) {
-    const client = await this.clientRepository.findById(request.clientId);
+  async renderDocument(dto, request, information, transaction) {
+    const client = await this.clientRepository.findById(request.clientId, transaction);
     const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
-      request.requestId
+      request.requestId,
+      transaction
     );
-    const proposalsCode = await this.proposalRepository.nextProposalCode();
-    const fileName = buildProposalFileName(
+    if (assignedResources.length === 0) {
+      throw new AgreementsValidationException({
+        adjusted_resources: "No hay recursos confirmados disponibles para generar la propuesta.",
+      });
+    }
+    const proposalsCode = await this.proposalRepository.nextProposalCode(transaction);
+    const baseFileName = buildProposalFileName(
       client?.fullName ?? "",
       information.startDatetime,
       request.folio
     );
 
+    const fileName = `${proposalsCode}_${baseFileName}`;
     try {
       const document = await this.pdfGenerator.generate({
         proposalsCode,
@@ -135,7 +176,7 @@ class GenerateProposalUseCase {
 
       await this.pdfGenerator.store(fileName, document.buffer);
 
-      return { proposalsCode, fileName };
+      return { proposalsCode, fileName, resources: assignedResources };
     } catch (error) {
       if (error instanceof ProposalGenerationFailedException) {
         throw error;

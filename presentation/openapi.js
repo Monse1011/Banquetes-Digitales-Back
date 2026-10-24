@@ -239,6 +239,66 @@ function resourceTypePaths(path, tag, createBody, updateBody, { softDelete = fal
 }
 
 const resourcePaths = {
+  "/api/admin/resources/operative-roles": {
+    get: {
+      tags: ["Operative roles"],
+      summary: "List active operative roles",
+      security: [{ CookieAuth: [] }],
+      responses: { 200: { description: "Active operative roles" } },
+    },
+    post: {
+      tags: ["Operative roles"],
+      summary: "Create an operative role",
+      security: [{ CookieAuth: [] }],
+      requestBody: jsonBody({
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", minLength: 1, maxLength: 100 } },
+      }),
+      responses: {
+        201: { description: "Created; the Location header has the new operative role path" },
+        422: { description: "Validation error" },
+      },
+    },
+  },
+  "/api/admin/resources/operative-roles/{id}": {
+    get: {
+      tags: ["Operative roles"],
+      summary: "Get an operative role",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      responses: {
+        200: { description: "Operative role details" },
+        404: { description: "Not found" },
+      },
+    },
+    patch: {
+      tags: ["Operative roles"],
+      summary: "Edit an operative role name",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      requestBody: jsonBody({
+        type: "object",
+        required: ["name"],
+        properties: { name: { type: "string", minLength: 1, maxLength: 100 } },
+      }),
+      responses: {
+        204: { description: "Updated" },
+        404: { description: "Not found" },
+        422: { description: "Validation error" },
+      },
+    },
+    delete: {
+      tags: ["Operative roles"],
+      summary: "Deactivate an operative role (logical delete)",
+      security: [{ CookieAuth: [] }],
+      parameters: [resourceIdParameter],
+      responses: {
+        204: { description: "Deactivated; existing resource associations are preserved" },
+        404: { description: "Not found" },
+      },
+    },
+  },
   "/api/admin/resources": {
     get: {
       tags: ["Resources"],
@@ -407,6 +467,23 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
+    "/api/logistics/calendar/{id}/sync": {
+      post: {
+        summary: "Retry existing calendar synchronization (admin or responsible logistics user)",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } },
+        ],
+        responses: {
+          200: {
+            description: "Attempt completed; data.sync_status reports synced or still pending",
+          },
+          401: { description: "Authentication required" },
+          403: { description: "Not the responsible user or administrator" },
+          404: { description: "Event not found" },
+          422: { description: "Invalid event ID" },
+        },
+      },
+    },
     "/api/logistics/calendar": {
       get: {
         summary: "Consulta el calendario del responsable de logística",
@@ -510,6 +587,27 @@ const openApiDocument = {
           200: { description: "Authenticated" },
           401: { description: "Invalid credentials" },
         },
+      },
+    },
+    "/api/auth/session": {
+      get: {
+        tags: ["Authentication"],
+        summary: "Restore the current session from its HttpOnly cookie",
+        security: [{ CookieAuth: [] }],
+        responses: {
+          200: { description: "Public user profile and firstAccess flag; Cache-Control: no-store" },
+          401: {
+            description: "Missing, expired or invalid session; inactive or changed-role account",
+          },
+          500: { description: "Session verification unavailable; retry allowed" },
+        },
+      },
+    },
+    "/api/auth/logout": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Expire the authentication cookie, including an already expired session",
+        responses: { 204: { description: "HttpOnly cookie cleared" } },
       },
     },
     "/api/auth/first-access": {
@@ -684,6 +782,8 @@ const openApiDocument = {
             observations: { type: "string" },
             adjusted_resources: {
               type: "array",
+              description:
+                "Incluye materiales y recursos logísticos actualmente asignados. Para personal, incluye las personas seleccionadas; se pueden agregar personas humanas activas disponibles, y omitir una persona confirmada la libera. Cantidad 0 libera una asignación; una persona nueva requiere cantidad 1.",
               items: {
                 type: "object",
                 required: ["resource_id", "quantity"],

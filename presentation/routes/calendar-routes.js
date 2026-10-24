@@ -9,6 +9,7 @@ function createLogisticsCalendarRoutes(calendarController, authMiddleware) {
   router.use(authMiddleware, requireAdminOrLogistics);
   router.get("/calendar", calendarController.list.bind(calendarController));
   router.post("/requests/:id/calendar", calendarController.schedule.bind(calendarController));
+  router.post("/calendar/:id/sync", calendarController.retrySync.bind(calendarController));
   router.patch("/calendar/:id", calendarController.edit.bind(calendarController));
   router.delete("/calendar/:id", calendarController.cancel.bind(calendarController));
 

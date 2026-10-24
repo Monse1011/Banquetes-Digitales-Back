@@ -8,11 +8,11 @@ class PostgresServiceRepository {
 
   async findAll() {
     const result = await this.pool.query(
-      `SELECT id_service, name, description, status
+      `SELECT id, name, description, status
        FROM services
        WHERE status = $1
-       ORDER BY id_service`,
-      [ServiceStatus.ACTIVE]
+       ORDER BY id`,
+      ["ACTIVE"]
     );
 
     return result.rows.map((row) => this.toEntity(row));
@@ -22,9 +22,9 @@ class PostgresServiceRepository {
     if (ids.length === 0) return [];
 
     const result = await this.pool.query(
-      `SELECT id_service, name, description, status
+      `SELECT id, name, description, status
        FROM services
-       WHERE id_service = ANY($1::integer[])`,
+       WHERE id = ANY($1::integer[])`,
       [ids]
     );
 
@@ -32,7 +32,12 @@ class PostgresServiceRepository {
   }
 
   toEntity(row) {
-    return new Service(row.id_service, row.name, row.description, row.status);
+    return new Service(
+      Number(row.id),
+      row.name,
+      row.description,
+      row.status === "ACTIVE" ? ServiceStatus.ACTIVE : ServiceStatus.INACTIVE
+    );
   }
 }
 

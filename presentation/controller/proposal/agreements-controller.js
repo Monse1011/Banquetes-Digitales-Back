@@ -13,7 +13,8 @@ class AgreementsController {
   async getRequestAgreements(request, response) {
     const result = await this.dependencies.getRequestAgreementsUseCase.execute(
       parseId(request.params.id),
-      request.user.id_user
+      request.user.id_user,
+      request.user.role
     );
 
     response.json(result);
@@ -25,7 +26,8 @@ class AgreementsController {
     const result = await this.dependencies.saveAgreementsUseCase.execute(
       parseId(request.params.id),
       request.user.id_user,
-      dto
+      dto,
+      request.user.role
     );
 
     response.status(201).json(result);

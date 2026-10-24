@@ -12,6 +12,8 @@ class SaveAgreementsRequestDto {
     this.endDatetime = data.end_datetime;
     this.observations = data.observations;
     this.adjustedResources = data.adjusted_resources;
+    // Opcional para clientes anteriores; null significa que aún no había acuerdos.
+    this.derivedInformationId = data.derived_information_id;
   }
 
   validate() {
@@ -26,6 +28,12 @@ class SaveAgreementsRequestDto {
       start_datetime: this.validateStartDatetime(),
       end_datetime: this.validateEndDatetime(),
       adjusted_resources: this.validateAdjustedResources(),
+      derived_information_id:
+        this.derivedInformationId !== undefined &&
+        this.derivedInformationId !== null &&
+        (!Number.isInteger(this.derivedInformationId) || this.derivedInformationId < 1)
+          ? "La revisión de acuerdos no es válida. Actualiza los acuerdos."
+          : undefined,
     };
   }
 
@@ -98,6 +106,11 @@ class SaveAgreementsRequestDto {
 
     if (invalidItem) {
       return ProposalMessages.ADJUSTED_QUANTITY_INVALID;
+    }
+
+    const resourceIds = this.adjustedResources.map((item) => Number(item.resource_id));
+    if (new Set(resourceIds).size !== resourceIds.length) {
+      return ProposalMessages.ADJUSTED_RESOURCES_DUPLICATE;
     }
 
     return undefined;

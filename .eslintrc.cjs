@@ -18,7 +18,7 @@ module.exports = {
   plugins: ["check-file"],
 
   rules: {
-    indent: ["error", 2, { SwitchCase: 1 }],
+    indent: "off",
 
     quotes: [
       "error",

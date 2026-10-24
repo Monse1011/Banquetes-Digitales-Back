@@ -26,7 +26,13 @@ function buildApp(role, userId = 10, reservationRequestRepository = null) {
   const repo = reservationRequestRepository || new InMemoryReservationRequestRepository();
 
   return createApp({
-    authController: { login: notUsed, changePassword: notUsed, firstAccess: notUsed },
+    authController: {
+      session: (_req, res) => res.sendStatus(501),
+      logout: (_req, res) => res.sendStatus(501),
+      login: notUsed,
+      changePassword: notUsed,
+      firstAccess: notUsed,
+    },
     passwordResetController: { requestReset: notUsed, resetPassword: notUsed },
     tokenService: { verifyToken: () => ({ id_user: userId, role }) },
     reservationRequestRepository: repo,

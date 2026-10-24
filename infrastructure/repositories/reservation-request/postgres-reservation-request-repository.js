@@ -1,3 +1,4 @@
+const { toDatabaseStatus, fromDatabaseStatus } = require("./postgres-request-status");
 const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
@@ -12,7 +13,7 @@ const {
 const UserRole = require("../../../domain/enums/auth/user-role");
 const UserStatus = require("../../../domain/enums/auth/user-status");
 
-const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
+const REQUEST_COLUMNS = `id, folio, client_id, reviewed_by_user_id,
             event_date_time, event_end_time, guest_count, event_address, status,
             request_date, logistic_user_id, assigned_by_user_id, assigned_at,
             ARRAY[]::integer[] AS services_ids`;
@@ -20,7 +21,7 @@ const REQUEST_COLUMNS = `id_reservation_request, folio, id_client, id_user,
 function addStatusCondition(filters, parameters, conditions) {
   const statusList = filters.statuses || (filters.status ? [filters.status].flat() : null);
   if (!statusList) return;
-  parameters.push(statusList);
+  parameters.push(statusList.map(toDatabaseStatus));
   conditions.push(`rr.status = ANY($${parameters.length})`);
 }
 
@@ -60,9 +61,9 @@ class PostgresReservationRequestRepository {
       await connection.query("BEGIN");
       const result = await connection.query(
         `INSERT INTO reservations_request
-          (folio, id_client, id_user, event_date_time, event_end_time, guest_count,
+          (folio, client_id, reviewed_by_user_id, event_date, event_time, event_end_time, guest_count,
            event_address, status, request_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         VALUES ($1, $2, $3, ($4::timestamptz AT TIME ZONE 'America/Merida')::date, ($4::timestamptz AT TIME ZONE 'America/Merida')::time, $5, $6, $7, $8, $9)
          RETURNING ${REQUEST_COLUMNS}`,
         this.requestValues(request)
       );
@@ -101,11 +102,11 @@ class PostgresReservationRequestRepository {
     }
   }
 
-  async findById(id) {
-    const result = await this.pool.query(
+  async findById(id, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
-        ` WHERE rr.id_reservation_request = $1
-          GROUP BY rr.id_reservation_request, c.id_client, c.full_name, c.email, c.phone`,
+        ` WHERE rr.id = $1
+          GROUP BY rr.id, c.id, c.full_name, c.email, c.phone`,
       [id]
     );
 
@@ -137,10 +138,10 @@ class PostgresReservationRequestRepository {
   async updateWith(connection, request) {
     const result = await connection.query(
       `UPDATE reservations_request
-       SET folio = $1, id_client = $2, id_user = $3, event_date_time = $4,
+       SET folio = $1, client_id = $2, reviewed_by_user_id = $3, event_date = ($4::timestamptz AT TIME ZONE 'America/Merida')::date, event_time = ($4::timestamptz AT TIME ZONE 'America/Merida')::time,
            event_end_time = $5, guest_count = $6, event_address = $7, status = $8,
            request_date = $9
-       WHERE id_reservation_request = $10
+       WHERE id = $10
        RETURNING ${REQUEST_COLUMNS}`,
       [...this.requestValues(request), request.requestId]
     );
@@ -193,14 +194,14 @@ class PostgresReservationRequestRepository {
         `UPDATE reservations_request
          SET status = $1, logistic_user_id = $2, assigned_by_user_id = $3,
              assigned_at = NOW()
-         WHERE id_reservation_request = $4 AND status = ANY($5)
+         WHERE id = $4 AND status = ANY($5)
            AND ($6::bigint IS NULL OR logistic_user_id IS NOT DISTINCT FROM $6::bigint)`,
         [
-          ReservationRequestStatus.ASSIGNED,
+          toDatabaseStatus(ReservationRequestStatus.ASSIGNED),
           logisticUserId,
           assignedByUserId,
           requestId,
-          ReassignableReservationRequestStatuses,
+          ReassignableReservationRequestStatuses.map(toDatabaseStatus),
           currentLogisticUserId,
         ]
       );
@@ -223,9 +224,9 @@ class PostgresReservationRequestRepository {
 
   async validateAssignment(connection, requestId, logisticUserId) {
     const requestResult = await connection.query(
-      `SELECT id_reservation_request, event_date_time, event_end_time, status
+      `SELECT id, event_date_time, event_end_time, status
        FROM reservations_request
-       WHERE id_reservation_request = $1
+       WHERE id = $1
        FOR UPDATE`,
       [requestId]
     );
@@ -235,7 +236,7 @@ class PostgresReservationRequestRepository {
       return { status: "not_found" };
     }
 
-    if (!ReassignableReservationRequestStatuses.includes(request.status)) {
+    if (!ReassignableReservationRequestStatuses.includes(fromDatabaseStatus(request.status))) {
       return { status: "not_reassignable" };
     }
 
@@ -244,7 +245,7 @@ class PostgresReservationRequestRepository {
        FROM users
        WHERE id_user = $1 AND role = $2 AND status = $3
        FOR UPDATE`,
-      [logisticUserId, UserRole.LOGISTICS, UserStatus.ACTIVE]
+      [logisticUserId, UserRole.LOGISTICS, UserStatus.ACTIVE.toUpperCase()]
     );
 
     if (!userResult.rows[0]) {
@@ -255,14 +256,14 @@ class PostgresReservationRequestRepository {
       `SELECT folio, event_date_time, event_end_time
        FROM reservations_request
        WHERE logistic_user_id = $1
-         AND id_reservation_request <> $2
+         AND id <> $2
          AND status = ANY($3)
          AND event_date_time < $4
          AND event_end_time > $5`,
       [
         logisticUserId,
         requestId,
-        ActiveReservationRequestStatuses,
+        ActiveReservationRequestStatuses.map(toDatabaseStatus),
         request.event_end_time,
         request.event_date_time,
       ]
@@ -284,16 +285,28 @@ class PostgresReservationRequestRepository {
 
   // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
   // horario confirmado de una solicitud.
-  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
-    const result = await this.pool.query(
+  async findOverlappingByLogisticUser(
+    logisticUserId,
+    excludeRequestId,
+    start,
+    end,
+    transaction = null
+  ) {
+    const result = await (transaction?.connection ?? this.pool).query(
       `SELECT folio, event_date_time, event_end_time
        FROM reservations_request
        WHERE logistic_user_id = $1
-         AND id_reservation_request <> $2
+         AND id <> $2
          AND status = ANY($3)
          AND event_date_time < $4
          AND event_end_time > $5`,
-      [logisticUserId, excludeRequestId, ActiveReservationRequestStatuses, end, start]
+      [
+        logisticUserId,
+        excludeRequestId,
+        ActiveReservationRequestStatuses.map(toDatabaseStatus),
+        end,
+        start,
+      ]
     );
 
     return result.rows.map((row) => ({
@@ -308,9 +321,9 @@ class PostgresReservationRequestRepository {
     const where = this.buildConditions(filters, parameters);
 
     const countResult = await this.pool.query(
-      `SELECT COUNT(DISTINCT rr.id_reservation_request)::int AS total_records
+      `SELECT COUNT(DISTINCT rr.id)::int AS total_records
        FROM reservations_request rr
-       JOIN clients c ON c.id_client = rr.id_client${where}`,
+       JOIN clients c ON c.id = rr.client_id${where}`,
       parameters
     );
 
@@ -326,7 +339,7 @@ class PostgresReservationRequestRepository {
     const result = await this.pool.query(
       this.baseSelect() +
         `${where}
-         GROUP BY rr.id_reservation_request, c.id_client, c.full_name, c.email, c.phone
+         GROUP BY rr.id, c.id, c.full_name, c.email, c.phone
          ${orderClause}
          LIMIT $${dataParameters.length - 1} OFFSET $${dataParameters.length}`,
       dataParameters
@@ -339,19 +352,19 @@ class PostgresReservationRequestRepository {
   }
 
   baseSelect() {
-    return `SELECT rr.id_reservation_request, rr.folio, rr.id_client, rr.id_user,
+    return `SELECT rr.id, rr.folio, rr.client_id, rr.reviewed_by_user_id,
       rr.event_date_time, rr.event_end_time, rr.guest_count, rr.event_address,
       rr.status, rr.request_date, rr.logistic_user_id, rr.assigned_by_user_id,
       rr.assigned_at,
       c.full_name AS client_name, c.email AS client_email, c.phone AS client_phone,
       COALESCE(
-        ARRAY_AGG(rs.id_service) FILTER (WHERE rs.id_service IS NOT NULL),
+        ARRAY_AGG(rs.service_id) FILTER (WHERE rs.service_id IS NOT NULL),
         ARRAY[]::integer[]
       ) AS services_ids
       FROM reservations_request rr
-      JOIN clients c ON c.id_client = rr.id_client
+      JOIN clients c ON c.id = rr.client_id
       LEFT JOIN request_services rs
-        ON rs.id_request = rr.id_reservation_request`;
+        ON rs.request_id = rr.id`;
   }
 
   requestValues(request) {
@@ -363,20 +376,20 @@ class PostgresReservationRequestRepository {
       request.eventEndTime,
       request.guestCount,
       request.eventAddress,
-      request.status,
+      toDatabaseStatus(request.status),
       request.requestDate,
     ];
   }
 
   async replaceServices(connection, requestId, serviceIds) {
-    await connection.query("DELETE FROM request_services WHERE id_request = $1", [requestId]);
+    await connection.query("DELETE FROM request_services WHERE request_id = $1", [requestId]);
 
     if (serviceIds.length === 0) return;
 
     const values = serviceIds.map((_serviceId, index) => `($1, $${index + 2})`).join(", ");
 
     await connection.query(
-      `INSERT INTO request_services (id_request, id_service) VALUES ${values}`,
+      `INSERT INTO request_services (request_id, service_id) VALUES ${values}`,
       [requestId, ...serviceIds]
     );
   }
@@ -387,15 +400,15 @@ class PostgresReservationRequestRepository {
       : [];
 
     return new ReservationRequest(
-      Number(row.id_reservation_request),
+      Number(row.id),
       row.folio,
-      Number(row.id_client),
-      row.id_user === null ? null : Number(row.id_user),
+      Number(row.client_id),
+      row.reviewed_by_user_id === null ? null : Number(row.reviewed_by_user_id),
       new Date(row.event_date_time),
       new Date(row.event_end_time),
       row.guest_count,
       row.event_address,
-      row.status,
+      fromDatabaseStatus(row.status),
       new Date(row.request_date),
       serviceIds,
       row.logistic_user_id === null ? null : Number(row.logistic_user_id),
