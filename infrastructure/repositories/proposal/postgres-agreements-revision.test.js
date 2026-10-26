@@ -91,11 +91,14 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
         client_observations text, created_by_user_id bigint, created_at timestamptz);
       CREATE TABLE proposal_resources (proposal_id bigint, resource_id bigint, quantity integer, unit_cost numeric);
     `);
-      const assignmentMigration = await fs.readFile(
-        path.join(__dirname, "../../../database/increment-2/assigned-resources.sql"),
-        "utf8"
-      );
-      await pool.query(assignmentMigration);
+      for (const migration of [
+        "increment-2/assigned-resources.sql",
+        "increment-3/00-align-schema-dad-v3.sql",
+      ]) {
+        await pool.query(
+          await fs.readFile(path.join(__dirname, "../../../database", migration), "utf8")
+        );
+      }
       await pool.query("INSERT INTO users (id_user) VALUES (9)");
       await pool.query("INSERT INTO resources (id) VALUES (7)");
       await pool.query(

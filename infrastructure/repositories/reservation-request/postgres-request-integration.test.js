@@ -86,19 +86,24 @@ const {
   ListCalendarEventsUseCase,
 } = require("../../../application/use-cases/calendar/list-calendar-events-use-case");
 
-// Opt-in: TEST_PGDATABASE must name a database with the request migration installed.
-// All fixtures roll back. Transaction boundaries are suppressed only in this adapter
-// so repositories share the outer test transaction; commit semantics are not tested here.
+// Opt-in: TEST_PGDATABASE must name a database with the versioned migrations installed.
+// All fixtures roll back. Repository transactions become savepoints inside the outer test
+// transaction, so their rollbacks still apply; commit semantics are not tested here.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against PostgreSQL", () => {
   it("creates, reads, filters and approves a request using the installed schema", async () => {
     const pool = new Pool({ database: process.env.TEST_PGDATABASE });
     const connection = await pool.connect();
     await connection.query("BEGIN");
     const adapter = {
-      query: (sql, values) => {
-        if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return Promise.resolve({ rows: [] });
-        return connection.query(sql, values);
-      },
+      query: (sql, values) =>
+        connection.query(
+          {
+            BEGIN: "SAVEPOINT repository_transaction",
+            COMMIT: "RELEASE SAVEPOINT repository_transaction",
+            ROLLBACK: "ROLLBACK TO SAVEPOINT repository_transaction",
+          }[sql] ?? sql,
+          values
+        ),
       release() {},
     };
     adapter.connect = async () => adapter;
@@ -163,8 +168,12 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       expect((await requests.findById(created.requestId)).status).toBe(
         ReservationRequestStatus.APPROVED
       );
-      const admin = (await connection.query("SELECT id_user FROM users WHERE role='ADMIN' LIMIT 1"))
-        .rows[0];
+      const admin = (
+        await connection.query(
+          "INSERT INTO users (id_employee,full_name,email,password_hash,role,status) VALUES ($1,'Prueba Admin',$2,'unused-test-hash','ADMIN','ACTIVE') RETURNING id_user",
+          [`A${Date.now()}`, `admin-${Date.now()}@example.invalid`]
+        )
+      ).rows[0];
       const logistic = (
         await connection.query(
           "INSERT INTO users (id_employee,full_name,email,password_hash,role,status) VALUES ($1,'Prueba Logistica',$2,'unused-test-hash','LOGISTICS','ACTIVE') RETURNING id_user",
@@ -340,6 +349,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         requests,
         agreementResources,
         {
+          lockRequest: (...args) => derived.lockRequest(...args),
           create: async () => {
             throw new Error("Simulated save failure");
           },

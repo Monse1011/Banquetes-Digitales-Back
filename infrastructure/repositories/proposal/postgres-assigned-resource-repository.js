@@ -26,11 +26,11 @@ class PostgresAssignedResourceRepository {
 
   async findActiveByRequestId(requestId) {
     const result = await this.pool.query(
-      `SELECT ar.id, ar.reservation_request_id, ar.resource_id, ar.quantity,
+      `SELECT ar.id, ar.request_id, ar.resource_id, ar.quantity,
         ar.usage_start, ar.usage_end, ar.status, r.name, r.type, r.unit_cost
        FROM assigned_resources ar
        JOIN resources r ON r.id = ar.resource_id
-       WHERE ar.reservation_request_id = $1 AND ar.status = ANY($2)
+       WHERE ar.request_id = $1 AND ar.status = ANY($2)
        ORDER BY r.name`,
       [requestId, ActiveAssignedResourceStatuses]
     );
@@ -49,7 +49,7 @@ class PostgresAssignedResourceRepository {
        LEFT JOIN assigned_resources ar
          ON ar.resource_id = r.id
         AND ar.status = ANY($1)
-        AND ar.reservation_request_id <> $2
+        AND ar.request_id <> $2
         AND ar.usage_start < $3
         AND $4 < ar.usage_end + INTERVAL '3 hours'
        WHERE r.id = ANY($5)
@@ -84,7 +84,7 @@ class PostgresAssignedResourceRepository {
       const activeResult = await connection.query(
         `SELECT id, resource_id, quantity
          FROM assigned_resources
-         WHERE reservation_request_id = $1 AND status = ANY($2)
+         WHERE request_id = $1 AND status = ANY($2)
          FOR UPDATE`,
         [requestId, ActiveAssignedResourceStatuses]
       );
@@ -102,7 +102,7 @@ class PostgresAssignedResourceRepository {
           if (existing) {
             await connection.query(
               `UPDATE assigned_resources
-               SET status = $1, updated_at = NOW()
+               SET status = $1, updated_at = NOW(), released_at = NOW()
                WHERE id = $2`,
               [AssignedResourceStatus.RELEASED, existing.id]
             );
@@ -118,7 +118,7 @@ class PostgresAssignedResourceRepository {
       await connection.query(
         `UPDATE assigned_resources
          SET usage_start = $2, usage_end = $3, updated_at = NOW()
-         WHERE reservation_request_id = $1 AND status = ANY($4)`,
+         WHERE request_id = $1 AND status = ANY($4)`,
         [requestId, usageStart, usageEnd, ActiveAssignedResourceStatuses]
       );
 
@@ -134,7 +134,7 @@ class PostgresAssignedResourceRepository {
   async insertAssignment(connection, requestId, adjustment, usageStart, usageEnd) {
     await connection.query(
       `INSERT INTO assigned_resources
-        (reservation_request_id, resource_id, quantity, usage_start, usage_end, status)
+        (request_id, resource_id, quantity, usage_start, usage_end, status)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         requestId,
@@ -150,7 +150,7 @@ class PostgresAssignedResourceRepository {
   toEntity(row) {
     return new AssignedResource(
       Number(row.id),
-      Number(row.reservation_request_id),
+      Number(row.request_id),
       Number(row.resource_id),
       Number(row.quantity),
       new Date(row.usage_start),
