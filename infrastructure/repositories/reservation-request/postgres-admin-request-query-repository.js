@@ -41,6 +41,24 @@ const COMMON_COLUMNS = `r.id, r.folio, r.status, r.client_name, r.client_email, 
   ${dateTime("r.status_changed_at")} AS status_changed_at,
   ${dateTime("r.actual_start_at")} AS actual_start_at, ${dateTime("r.actual_end_at")} AS actual_end_at`;
 
+// Filtros de GET /api/admin/requests ($1 a $5), compartidos por la página y el conteo.
+function requestFilter(filters) {
+  return {
+    where: `WHERE ($1::text[] IS NULL OR r.status = ANY($1))
+       AND ($2::text IS NULL OR r.folio ILIKE $2 OR r.client_name ILIKE $2)
+       AND ($3::bigint IS NULL OR r.logistic_user_id = $3)
+       AND ($4::date IS NULL OR ${local("r.current_start")}::date >= $4::date)
+       AND ($5::date IS NULL OR ${local("r.current_start")}::date <= $5::date)`,
+    values: [
+      filters.statuses ? filters.statuses.map(toDatabaseStatus) : null,
+      filters.search ? `%${filters.search}%` : null,
+      filters.logisticUserId ?? null,
+      filters.eventDateFrom ?? null,
+      filters.eventDateTo ?? null,
+    ],
+  };
+}
+
 function toLogisticUser(row) {
   return row.logistic_user_id === null
     ? null
@@ -58,34 +76,27 @@ class PostgresAdminRequestQueryRepository {
   }
 
   async findAll(filters, page, perPage) {
-    const result = await this.pool.query(
-      `SELECT ${COMMON_COLUMNS},
-         TO_CHAR(${local("r.current_start")}, 'YYYY-MM-DD') AS event_date,
-         TO_CHAR(${local("r.current_start")}, 'HH24:MI') AS start_time,
-         TO_CHAR(${local("r.current_end")}, 'HH24:MI') AS end_time,
-         COUNT(*) OVER()::int AS total_records
-       FROM ${CURRENT_REQUESTS}
-       WHERE ($1::text[] IS NULL OR r.status = ANY($1))
-         AND ($2::text IS NULL OR r.folio ILIKE $2 OR r.client_name ILIKE $2)
-         AND ($3::bigint IS NULL OR r.logistic_user_id = $3)
-         AND ($4::date IS NULL OR ${local("r.current_start")}::date >= $4::date)
-         AND ($5::date IS NULL OR ${local("r.current_start")}::date <= $5::date)
-       ORDER BY r.current_start ASC, r.folio ASC
-       LIMIT $6 OFFSET $7`,
-      [
-        filters.statuses ? filters.statuses.map(toDatabaseStatus) : null,
-        filters.search ? `%${filters.search}%` : null,
-        filters.logisticUserId ?? null,
-        filters.eventDateFrom ?? null,
-        filters.eventDateTo ?? null,
-        perPage,
-        (page - 1) * perPage,
-      ]
-    );
+    const { where, values } = requestFilter(filters);
+    const [result, count] = await Promise.all([
+      this.pool.query(
+        `SELECT ${COMMON_COLUMNS},
+           TO_CHAR(${local("r.current_start")}, 'YYYY-MM-DD') AS event_date,
+           TO_CHAR(${local("r.current_start")}, 'HH24:MI') AS start_time,
+           TO_CHAR(${local("r.current_end")}, 'HH24:MI') AS end_time
+         FROM ${CURRENT_REQUESTS}
+         ${where}
+         ORDER BY r.current_start ASC, r.folio ASC
+         LIMIT $6 OFFSET $7`,
+        [...values, perPage, (page - 1) * perPage]
+      ),
+      this.pool.query(
+        `SELECT COUNT(*)::int AS total_records FROM ${CURRENT_REQUESTS} ${where}`,
+        values
+      ),
+    ]);
 
     return {
-      // shortcut: total_records sale de la ventana, así que es 0 si se pide una página vacía.
-      totalRecords: result.rows[0]?.total_records ?? 0,
+      totalRecords: count.rows[0].total_records,
       requests: result.rows.map((row) => ({
         request_id: Number(row.id),
         folio: row.folio,

@@ -844,6 +844,26 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       expect(response.body.metadata.pagination).toEqual({ total_records: 3, page: 2, per_page: 2 });
     });
 
+    it("NC-05 reports the real total_records on a page after the last one", async () => {
+      const users = await seedUsers();
+      const clientId = await insertClient("Zafiro Fuera de Rango");
+      for (const day of ["01", "02", "03"]) {
+        await insertRequest({ clientId, status: "ASSIGNED", date: `2025-03-${day}`, users });
+      }
+
+      const response = await get(LIST, {
+        search: "Zafiro Fuera de Rango",
+        page: "3",
+        per_page: "2",
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        data: [],
+        metadata: { pagination: { total_records: 3, page: 3, per_page: 2 } },
+      });
+    });
+
     it("keeps the Función 2.4 uses: approved requests without responsible", async () => {
       const clientId = await insertClient("Zafiro Aprobada");
       const approved = await insertRequest({ clientId, status: "APPROVED", date: "2025-03-01" });
