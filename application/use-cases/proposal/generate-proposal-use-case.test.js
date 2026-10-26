@@ -28,6 +28,7 @@ const ProposalAlreadyGeneratedException = require("../../../domain/exceptions/pr
 const ProposalGenerationNotAllowedException = require("../../../domain/exceptions/proposal/proposal-generation-not-allowed-exception");
 const ProposalGenerationFailedException = require("../../../domain/exceptions/proposal/proposal-generation-failed-exception");
 const DerivedInformationNotFoundException = require("../../../domain/exceptions/proposal/derived-information-not-found-exception");
+const AgreementsValidationException = require("../../../domain/exceptions/proposal/agreements-validation-exception");
 
 const LOGISTIC_USER_ID = 7;
 const DAY = 24 * 60 * 60 * 1000;
@@ -277,5 +278,55 @@ describe("GenerateProposalUseCase", () => {
       ReservationRequestStatus.COORDINATION_READY
     );
     expect(proposalRepository.proposals).toHaveLength(0);
+  });
+
+  it("genera una versión nueva desde 'Ajustes Solicitados' (RF-3.4.4.5.7)", async () => {
+    const { request, information } = await setup(ReservationRequestStatus.ADJUSTMENTS_REQUESTED);
+
+    const result = await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      new GenerateProposalRequestDto({ derived_information_id: information.id })
+    );
+
+    expect(result.data.version).toBe(1);
+    expect((await reservationRequestRepository.findById(request.requestId)).status).toBe(
+      ReservationRequestStatus.PROPOSAL_GENERATED
+    );
+  });
+
+  it("congela subtotal, descuento y total al generar (RF-3.4.4.3)", async () => {
+    const { request, information } = await setup();
+
+    const result = await useCase.execute(
+      request.requestId,
+      LOGISTIC_USER_ID,
+      new GenerateProposalRequestDto({
+        derived_information_id: information.id,
+        discount_amount: 100,
+      })
+    );
+
+    const stored = await proposalRepository.findCurrentByRequestId(request.requestId);
+    expect(stored.subtotal).toBe(300);
+    expect(stored.discountAmount).toBe(100);
+    expect(stored.totalAmount).toBe(200);
+    expect(stored.currency).toBe("MXN");
+    expect(result.data.version).toBe(1);
+  });
+
+  it("rechaza un descuento mayor que el subtotal (RF-3.4.4.3)", async () => {
+    const { request, information } = await setup();
+
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({
+          derived_information_id: information.id,
+          discount_amount: 99999,
+        })
+      )
+    ).rejects.toBeInstanceOf(AgreementsValidationException);
   });
 });

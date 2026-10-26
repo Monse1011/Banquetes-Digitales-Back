@@ -1,13 +1,28 @@
 const CONFIRMED_STATUSES = ["Confirmado", "CONFIRMED", "Finalizado", "COMPLETED"];
 
+// RF-3.4.4.5.7: "Registrar acuerdos" sigue habilitado en "Ajustes Solicitados" además de
+// los estados de coordinación. Se comparan las formas en español y en código de BD.
+const AGREEMENTS_EDITABLE_STATUSES = [
+  "COORDINATION_READY",
+  "COORDINATION_INCOMPLETE",
+  "ADJUSTMENTS_REQUESTED",
+];
+
 function valueOrFallback(value, fallback = "Sin registrar") {
   return value || fallback;
 }
 
 class GetAssignedRequestDetailUseCase {
-  constructor({ reservationRequestRepository, serviceRepository } = {}) {
+  constructor({
+    reservationRequestRepository,
+    serviceRepository,
+    proposalRepository,
+    proposalAdjustmentRepository,
+  } = {}) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.serviceRepository = serviceRepository;
+    this.proposalRepository = proposalRepository ?? null;
+    this.proposalAdjustmentRepository = proposalAdjustmentRepository ?? null;
   }
 
   determineScheduleType(status) {
@@ -61,7 +76,7 @@ class GetAssignedRequestDetailUseCase {
     };
   }
 
-  buildDetailDto(request, services) {
+  buildDetailDto(request, services, proposal = null, adjustments = []) {
     return {
       request_id: request.id || request.requestId,
       folio: request.folio,
@@ -74,6 +89,18 @@ class GetAssignedRequestDetailUseCase {
       guest_count: request.guest_count || request.guestCount,
       selected_services: this.mapServices(services),
       status: request.status,
+      // Incremento 3 (RF-3.4.4.2 / RF-3.4.4.5.6 / RF-3.4.4.5.7).
+      proposal_viewed_at: proposal?.viewedAt ? new Date(proposal.viewedAt).toISOString() : null,
+      can_register_agreements: AGREEMENTS_EDITABLE_STATUSES.includes(
+        (request.status || "").toUpperCase()
+      ),
+      adjustments: adjustments.map((adjustment) => ({
+        id: adjustment.id,
+        proposals_code: proposal?.proposalsCode ?? null,
+        version: proposal?.version ?? null,
+        observations: adjustment.observations,
+        requested_at: adjustment.createdAt ? new Date(adjustment.createdAt).toISOString() : null,
+      })),
     };
   }
 
@@ -92,8 +119,15 @@ class GetAssignedRequestDetailUseCase {
       services = await this.serviceRepository.findByIds(request.servicesIds);
     }
 
+    const proposal = this.proposalRepository
+      ? await this.proposalRepository.findCurrentByRequestId(request.requestId)
+      : null;
+    const adjustments = this.proposalAdjustmentRepository
+      ? await this.proposalAdjustmentRepository.findByRequestId(request.requestId)
+      : [];
+
     return {
-      data: this.buildDetailDto(request, services),
+      data: this.buildDetailDto(request, services, proposal, adjustments),
     };
   }
 }

@@ -52,6 +52,63 @@ class PdfkitPdfGenerator {
     return { fileName, buffer };
   }
 
+  // Incremento 3 (RF-3.4.4.4.3): PDF de aceptación con la misma fuente de datos que el
+  // detalle de la propuesta y los importes congelados; se almacena y queda inalterable.
+  async generateAccepted({ fileName, proposal, client, request, information, resources }) {
+    const buffer = await new Promise((resolve, reject) => {
+      const document = new PDFDocument({ size: "Letter", margin: 50 });
+      const chunks = [];
+
+      document.on("data", (chunk) => chunks.push(chunk));
+      document.on("end", () => resolve(Buffer.concat(chunks)));
+      document.on("error", reject);
+
+      this.renderHeader(document, proposal.proposalsCode);
+      this.renderAcceptedStamp(document);
+      this.renderClient(document, client);
+      this.renderEvent(document, request, information);
+      this.renderGroupedResources(document, resources);
+      this.renderProposalTotal(document, proposal);
+
+      document.end();
+    });
+
+    return { fileName, buffer };
+  }
+
+  renderAcceptedStamp(document) {
+    document
+      .moveDown(0.5)
+      .fontSize(13)
+      .fillColor("#1f7a3d")
+      .text("PROPUESTA ACEPTADA — Aprobada", { align: "center" })
+      .fillColor("black")
+      .moveDown(1);
+  }
+
+  renderGroupedResources(document, resources) {
+    document.fontSize(14).text("Desglose de recursos").moveDown(0.5);
+    document.fontSize(10);
+    ["human", "material", "logistic"].forEach((section) => {
+      (resources?.[section] ?? []).forEach((line) => {
+        document.text(
+          `${line.description}: ${line.quantity} x $${Number(line.unit_cost).toFixed(2)} ` +
+            `= $${Number(line.subtotal).toFixed(2)}`
+        );
+      });
+    });
+    document.moveDown(1);
+  }
+
+  renderProposalTotal(document, proposal) {
+    document
+      .fontSize(10)
+      .text(`Subtotal: $${Number(proposal.subtotal ?? 0).toFixed(2)}`)
+      .text(`Descuento: $${Number(proposal.discountAmount ?? 0).toFixed(2)}`)
+      .fontSize(12)
+      .text(`Total a pagar: $${Number(proposal.totalAmount ?? 0).toFixed(2)} ${proposal.currency}`);
+  }
+
   async store(fileName, buffer) {
     await fs.promises.mkdir(this.storageDir, { recursive: true });
     await fs.promises.writeFile(path.join(this.storageDir, fileName), buffer);

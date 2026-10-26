@@ -126,6 +126,58 @@ class PostgresCalendarEventRepository {
     });
   }
 
+  // Incremento 3 (RF-3.4.4.4.3): se invoca dentro de la transacción de aceptación. Crea el
+  // evento y encola la sincronización, y revalida disponibilidad sin contar la propia
+  // solicitud; NO cambia el estado de la solicitud ni de la propuesta (lo hace el caso de uso).
+  // connection es la conexión de la transacción del accept.
+  async scheduleForAcceptance({ requestId, title, now, connection }) {
+    const request = await this.lockRequest(connection, requestId);
+
+    if (!request) {
+      return { status: "not_found" };
+    }
+
+    const agreements = await connection.query(
+      `SELECT d.start_datetime, d.end_datetime, d.location
+       FROM proposals p JOIN derived_information d ON d.id = p.derived_information_id
+       WHERE p.request_id = $1 AND d.request_id = $1
+       ORDER BY p.version DESC NULLS LAST, p.id DESC
+       LIMIT 1`,
+      [requestId]
+    );
+
+    if (!agreements.rows[0]) {
+      return { status: "not_found" };
+    }
+
+    const agreed = agreements.rows[0];
+    const startAt = new Date(agreed.start_datetime);
+    const endAt = new Date(agreed.end_datetime);
+    const conflicts = await this.findConflicts(connection, {
+      requestId,
+      logisticUserId: request.logistic_user_id,
+      startAt,
+      endAt,
+    });
+
+    if (conflicts.length > 0) {
+      return { status: "unavailable", conflicts };
+    }
+
+    const inserted = await connection.query(
+      `INSERT INTO calendar_events
+         (id_request, title, start_at, end_at, location, sync_status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+       RETURNING id AS id_event`,
+      [requestId, title.slice(0, 200), startAt, endAt, agreed.location, "PENDING", now]
+    );
+    const eventId = Number(inserted.rows[0].id_event);
+
+    await this.enqueue(connection, eventId, CalendarSyncOperation.CREATE, now);
+
+    return { status: "scheduled", event: await this.fetchEvent(connection, eventId) };
+  }
+
   async reschedule({ eventId, startAt, endAt, location, now }) {
     return this.runInTransaction(async (connection) => {
       const locked = await this.lockEventAndRequest(connection, eventId);

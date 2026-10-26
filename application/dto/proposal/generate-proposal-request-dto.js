@@ -9,6 +9,8 @@ class GenerateProposalRequestDto {
   constructor(data = {}) {
     this.derivedInformationId = data.derived_information_id;
     this.clientObservations = data.client_observations;
+    // Incremento 3 (RF-3.4.4.3): descuento opcional, por defecto 0.
+    this.discountAmount = data.discount_amount;
   }
 
   validate() {

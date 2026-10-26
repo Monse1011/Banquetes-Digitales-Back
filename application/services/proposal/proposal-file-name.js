@@ -30,4 +30,18 @@ function buildProposalFileName(clientName, eventDate, folio) {
   return `Propuesta_${sanitizeClientName(clientName)}_${date}_${folio}.pdf`;
 }
 
-module.exports = { buildProposalFileName, sanitizeClientName };
+// Incremento 3 (RF-3.4.4.4.3): PropuestaAceptada_NombreCliente_Fecha_Folio.pdf. La fecha
+// corresponde a la fecha del evento de la propuesta aceptada.
+function buildAcceptedProposalFileName(clientName, eventDate, folio) {
+  const date = `${eventDate.getFullYear()}${pad(eventDate.getMonth() + 1)}${pad(
+    eventDate.getDate()
+  )}`;
+
+  return `PropuestaAceptada_${sanitizeClientName(clientName)}_${date}_${folio}.pdf`;
+}
+
+module.exports = {
+  buildProposalFileName,
+  buildAcceptedProposalFileName,
+  sanitizeClientName,
+};

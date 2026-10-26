@@ -41,6 +41,19 @@ class InMemoryAssignedResourceRepository {
       .map((assignment) => this.withResourceSnapshot(assignment));
   }
 
+  // RF-3.4.4.6: al rechazar, las asignaciones activas pasan a "Liberada".
+  async releaseByRequestId(requestId) {
+    this.assignments.forEach((assignment, index) => {
+      const active =
+        assignment.reservationRequestId === requestId &&
+        ActiveAssignedResourceStatuses.includes(assignment.status);
+
+      if (active) {
+        this.assignments[index] = { ...assignment, status: AssignedResourceStatus.RELEASED };
+      }
+    });
+  }
+
   async findResourcesByIds(resourceIds) {
     return this.resources.filter((resource) => resourceIds.includes(resource.id));
   }

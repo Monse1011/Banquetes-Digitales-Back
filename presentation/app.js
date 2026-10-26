@@ -68,7 +68,62 @@ const ProposalSendFailedException = require("../domain/exceptions/proposal/propo
 const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
 const { AgreementsController } = require("./controller/proposal/agreements-controller");
 const { ProposalController } = require("./controller/proposal/proposal-controller");
+const {
+  ClientProposalController,
+} = require("./controller/client-proposal/client-proposal-controller");
+const InvalidFolioFormatException = require("../domain/exceptions/client-proposal/invalid-folio-format-exception");
+const ClientRequestNotFoundException = require("../domain/exceptions/client-proposal/client-request-not-found-exception");
+const AcceptedTermsRequiredException = require("../domain/exceptions/client-proposal/accepted-terms-required-exception");
+const RejectionConfirmationRequiredException = require("../domain/exceptions/client-proposal/rejection-confirmation-required-exception");
+const ObservationsValidationException = require("../domain/exceptions/client-proposal/observations-validation-exception");
+const ClientProposalNotAvailableException = require("../domain/exceptions/client-proposal/client-proposal-not-available-exception");
+const ProposalActionConflictException = require("../domain/exceptions/client-proposal/proposal-action-conflict-exception");
+const ProposalAcceptanceConflictException = require("../domain/exceptions/client-proposal/proposal-acceptance-conflict-exception");
+const ProposalAcceptanceFailedException = require("../domain/exceptions/client-proposal/proposal-acceptance-failed-exception");
 const ErrorMessages = require("./constants/error-messages");
+
+// Incremento 3 (Funciones 4.4 y 4.5): el folio inválido (400) y el inexistente (404)
+// comparten el mensaje del contrato (RF-3.4.5.1.2).
+function handleClientProposalError(error, response) {
+  if (error instanceof InvalidFolioFormatException) {
+    response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ClientRequestNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof AcceptedTermsRequiredException ||
+    error instanceof RejectionConfirmationRequiredException ||
+    error instanceof ObservationsValidationException
+  ) {
+    response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof ClientProposalNotAvailableException ||
+    error instanceof ProposalActionConflictException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ProposalAcceptanceConflictException) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ProposalAcceptanceFailedException) {
+    response.status(500).json({ message: error.message });
+    return true;
+  }
+
+  return false;
+}
 
 function handleOperativeRoleError(error, response) {
   if (error instanceof OperativeRoleNotFoundException) {
@@ -346,6 +401,7 @@ function createApp(dependencies) {
     agreementsController: new AgreementsController(dependencies),
     proposalController: new ProposalController(dependencies),
   };
+  const clientProposalController = new ClientProposalController(dependencies);
 
   app.use(express.json());
 
@@ -371,7 +427,10 @@ function createApp(dependencies) {
     )
   );
 
-  app.use("/api/client", createClientRoutes(reservationRequestController, serviceController));
+  app.use(
+    "/api/client",
+    createClientRoutes(reservationRequestController, serviceController, clientProposalController)
+  );
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
@@ -405,6 +464,7 @@ function createApp(dependencies) {
     }
 
     if (handleAssignmentError(error, response)) return;
+    if (handleClientProposalError(error, response)) return;
     if (handleProposalError(error, response)) return;
     if (handleAuthError(error, response)) return;
 

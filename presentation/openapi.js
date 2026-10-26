@@ -7,6 +7,14 @@ const resourceIdParameter = {
   schema: { type: "integer" },
 };
 
+// Incremento 3: los endpoints públicos de cliente operan únicamente mediante el folio.
+const clientFolioParameter = {
+  name: "folio",
+  in: "path",
+  required: true,
+  schema: { type: "string", pattern: "^BD-\\d{4}-\\d{5}$" },
+};
+
 const resourceListParameters = [
   { name: "status", in: "query", schema: { type: "string", enum: ["active", "inactive"] } },
   { name: "name", in: "query", schema: { type: "string" } },
@@ -709,6 +717,93 @@ const openApiDocument = {
         tags: ["Client"],
         summary: "List available services",
         responses: { 200: { description: "Services list" } },
+      },
+    },
+    "/api/client/requests/{folio}": {
+      get: {
+        tags: ["Client", "Request tracking"],
+        summary: "RF-3.4.5: seguimiento de la solicitud por folio (público, con rate limit)",
+        parameters: [clientFolioParameter],
+        responses: {
+          200: { description: "Datos generales, estado vigente y proposal_access" },
+          400: { description: "Formato de folio inválido" },
+          404: { description: "Folio inexistente" },
+          429: { description: "Demasiadas solicitudes" },
+        },
+      },
+    },
+    "/api/client/requests/{folio}/proposal": {
+      get: {
+        tags: ["Client", "Event confirmation"],
+        summary:
+          "RF-3.4.4: detalle de la propuesta vigente; la primera visualización pasa a IN_REVIEW",
+        parameters: [clientFolioParameter],
+        responses: {
+          200: { description: "Detalle con available_actions" },
+          400: { description: "Formato de folio inválido" },
+          404: { description: "Folio inexistente o estado sin acceso al detalle" },
+          429: { description: "Demasiadas solicitudes" },
+        },
+      },
+    },
+    "/api/client/requests/{folio}/proposal/accept": {
+      post: {
+        tags: ["Client", "Event confirmation"],
+        summary: "RF-3.4.4.4: aceptar la propuesta (PDF inalterable + evento de calendario)",
+        parameters: [clientFolioParameter],
+        responses: {
+          200: { description: "Solicitud CONFIRMED y propuesta ACCEPTED" },
+          400: { description: "accepted_terms distinto de true" },
+          404: { description: "Folio inexistente" },
+          409: { description: "Fuera de IN_REVIEW o conflicto de disponibilidad" },
+          500: { description: "Fallo al generar el PDF o crear el evento" },
+        },
+      },
+    },
+    "/api/client/requests/{folio}/proposal/adjustments": {
+      post: {
+        tags: ["Client", "Event confirmation"],
+        summary: "RF-3.4.4.5: solicitar ajustes con observaciones (1 a 500 caracteres)",
+        parameters: [clientFolioParameter],
+        responses: {
+          200: { description: "Solicitud en ADJUSTMENTS_REQUESTED" },
+          400: { description: "Observaciones vacías o de más de 500 caracteres" },
+          404: { description: "Folio inexistente" },
+          409: { description: "Fuera de IN_REVIEW" },
+        },
+      },
+    },
+    "/api/client/requests/{folio}/proposal/reject": {
+      post: {
+        tags: ["Client", "Event confirmation"],
+        summary: "RF-3.4.4.6: rechazar la propuesta y liberar asignaciones",
+        parameters: [clientFolioParameter],
+        responses: {
+          200: { description: "Solicitud REJECTED" },
+          400: { description: "confirm_rejection distinto de true" },
+          404: { description: "Folio inexistente" },
+          409: { description: "Fuera de IN_REVIEW" },
+        },
+      },
+    },
+    "/api/client/requests/{folio}/proposal/pdf": {
+      get: {
+        tags: ["Client", "Event confirmation"],
+        summary: "RF-3.4.4.4.3 / RF-3.4.5.8-9: ver o descargar el PDF de la propuesta vigente",
+        parameters: [
+          clientFolioParameter,
+          {
+            name: "download",
+            in: "query",
+            required: false,
+            schema: { type: "boolean" },
+          },
+        ],
+        responses: {
+          200: { description: "application/pdf (inline o attachment)" },
+          400: { description: "Formato de folio inválido" },
+          404: { description: "Folio inexistente o propuesta no disponible" },
+        },
       },
     },
     "/api/admin/requests": {

@@ -48,7 +48,8 @@ class ReservationRequest {
     clientPhone = null,
     eventDate = null,
     startTime = null,
-    endTime = null
+    endTime = null,
+    statusChangedAt = null
   ) {
     this.requestId = requestId;
     this.folio = folio;
@@ -83,6 +84,9 @@ class ReservationRequest {
     this.logistic_user_id = this.logisticUserId;
     this.event_address = this.eventAddress;
     this.guest_count = this.guestCount;
+    // Incremento 3 (RF-1.2.5.2 / RF-1.2.5.4): fecha y hora del último cambio de estado.
+    this.statusChangedAt = statusChangedAt ?? null;
+    this.status_changed_at = this.statusChangedAt;
   }
 }
 

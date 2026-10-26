@@ -113,6 +113,70 @@ class PostgresReservationRequestRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
+  // Función 4.5: consulta por folio, único medio de acceso del cliente (RF-3.4.5.12).
+  async findByFolio(folio, transaction = null) {
+    const result = await (transaction?.connection ?? this.pool).query(
+      this.baseSelect() +
+        ` WHERE rr.folio = $1
+          GROUP BY rr.id, c.id, c.full_name, c.email, c.phone`,
+      [folio]
+    );
+
+    return result.rows[0] ? this.toEntity(result.rows[0]) : null;
+  }
+
+  // Incremento 3 (RF-3.4.4.x): cambio de estado atómico con bloqueo de la fila, registro
+  // de status_changed_at e inserción del historial en la misma transacción (RF-1.2.5.4).
+  // Devuelve la solicitud actualizada o null si el estado ya no coincide (concurrencia).
+  async changeStatusAtomic(
+    requestId,
+    { fromStatus, toStatus, changedByUserId = null, changedAt = new Date(), transaction = null }
+  ) {
+    const connection = transaction?.connection ?? (await this.pool.connect());
+    const ownsTransaction = !transaction?.connection;
+    try {
+      if (ownsTransaction) await connection.query("BEGIN");
+
+      const locked = await connection.query(
+        "SELECT status FROM reservations_request WHERE id = $1 FOR UPDATE",
+        [requestId]
+      );
+
+      if (!locked.rows[0] || locked.rows[0].status !== toDatabaseStatus(fromStatus)) {
+        if (ownsTransaction) await connection.query("ROLLBACK");
+        return null;
+      }
+
+      await connection.query(
+        `UPDATE reservations_request
+         SET status = $1, status_changed_at = $2 WHERE id = $3`,
+        [toDatabaseStatus(toStatus), changedAt, requestId]
+      );
+
+      await connection.query(
+        `INSERT INTO request_status_history
+         (request_id, previous_status, new_status, changed_by_user_id, changed_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          requestId,
+          toDatabaseStatus(fromStatus),
+          toDatabaseStatus(toStatus),
+          changedByUserId,
+          changedAt,
+        ]
+      );
+
+      if (ownsTransaction) await connection.query("COMMIT");
+
+      return this.findById(requestId, transaction);
+    } catch (error) {
+      if (ownsTransaction) await connection.query("ROLLBACK");
+      throw error;
+    } finally {
+      if (ownsTransaction) connection.release();
+    }
+  }
+
   // Con transaction, la actualización forma parte de esa transacción (Función 3.2).
   async update(request, transaction = null) {
     if (transaction) {
@@ -354,8 +418,8 @@ class PostgresReservationRequestRepository {
   baseSelect() {
     return `SELECT rr.id, rr.folio, rr.client_id, rr.reviewed_by_user_id,
       rr.event_date_time, rr.event_end_time, rr.guest_count, rr.event_address,
-      rr.status, rr.request_date, rr.logistic_user_id, rr.assigned_by_user_id,
-      rr.assigned_at,
+      rr.status, rr.status_changed_at, rr.request_date, rr.logistic_user_id,
+      rr.assigned_by_user_id, rr.assigned_at,
       c.full_name AS client_name, c.email AS client_email, c.phone AS client_phone,
       COALESCE(
         ARRAY_AGG(rs.service_id) FILTER (WHERE rs.service_id IS NOT NULL),
@@ -416,7 +480,11 @@ class PostgresReservationRequestRepository {
       row.assigned_at === null ? null : new Date(row.assigned_at),
       row.client_name ?? null,
       row.client_email ?? null,
-      row.client_phone ?? null
+      row.client_phone ?? null,
+      null,
+      null,
+      null,
+      row.status_changed_at ? new Date(row.status_changed_at) : null
     );
   }
 
