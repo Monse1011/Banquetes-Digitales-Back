@@ -78,6 +78,10 @@ const {
 const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
+const { AssignmentStatus } = require("../../../domain/enums/resource-assignment/assignment-status");
+const {
+  ResourceSufficiency,
+} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
 
 const {
   ScheduleEventUseCase,
@@ -506,9 +510,16 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         expect(edited.startAt.toISOString()).toBe(editedStart.toISOString());
         expect((await requests.findById(created.requestId)).eventAddress).toBe("Lugar editado");
         await connection.query(
-          `INSERT INTO assigned_resources (request_id,resource_id,requested_quantity,quantity,sufficiency,usage_start,usage_end,status)
-           VALUES ($1,$2,1,1,'SUFFICIENT',$3,$4,'CONFIRMED')`,
-          [created.requestId, resourceIds[0], editedStart, editedEnd]
+          `INSERT INTO assigned_resources (request_id,resource_id,requested_quantity,quantity,sufficiency,usage_start,usage_end,event_start,event_end,status)
+           VALUES ($1,$2,1,1,$5,$3,$4,$3,$4,$6)`,
+          [
+            created.requestId,
+            resourceIds[0],
+            editedStart,
+            editedEnd,
+            ResourceSufficiency.SUFFICIENT,
+            AssignmentStatus.CONFIRMED,
+          ]
         );
         await cancel.execute(scheduled.event.id, actor);
         expect((await calendar.findById(scheduled.event.id)).status).toBe(
@@ -520,9 +531,11 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             [created.requestId]
           )
         ).rows;
-        expect(released).toHaveLength(1);
-        expect(released[0].status).toBe("RELEASED");
-        expect(released[0].released_at).not.toBeNull();
+        // Cancelar libera todas las asignaciones de la solicitud, incluidas las de la Función 3.2.
+        expect(released.length).toBeGreaterThan(1);
+        expect(released).toEqual(
+          released.map(() => ({ status: AssignmentStatus.RELEASED, released_at: expect.any(Date) }))
+        );
         expect((await listCalendar.execute({ actor })).events).toHaveLength(0);
         await expect(
           edit.execute(scheduled.event.id, actor, { location: "No permitido" })

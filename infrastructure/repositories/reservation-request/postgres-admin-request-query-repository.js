@@ -1,4 +1,7 @@
 const { toDatabaseStatus, toApiStatus } = require("./postgres-request-status");
+const {
+  BlockingAssignmentStatuses,
+} = require("../../../domain/enums/resource-assignment/assignment-status");
 
 // DAD v3.0: DateTime con offset fijo -06:00 (convención de hora de Mérida), sin milisegundos.
 const local = (column) => `(${column} AT TIME ZONE INTERVAL '-06:00')`;
@@ -151,9 +154,9 @@ class PostgresAdminRequestQueryRepository {
        FROM assigned_resources ar
        JOIN resources r ON r.id = ar.resource_id
        LEFT JOIN operative_roles op ON op.id = r.operative_role_id
-       WHERE ar.request_id = $1 AND ar.status <> 'RELEASED'
+       WHERE ar.request_id = $1 AND ar.status = ANY($2)
        ORDER BY r.name, r.id`,
-      [requestId]
+      [requestId, BlockingAssignmentStatuses]
     );
 
     return result.rows.map((row) => ({
@@ -168,8 +171,8 @@ class PostgresAdminRequestQueryRepository {
     const result = await this.pool.query(
       `SELECT request_id, resource_id, quantity, usage_start, usage_end
        FROM assigned_resources
-       WHERE resource_id = ANY($1) AND request_id <> $2 AND status <> 'RELEASED'`,
-      [resourceIds, excludeRequestId]
+       WHERE resource_id = ANY($1) AND request_id <> $2 AND status = ANY($3)`,
+      [resourceIds, excludeRequestId, BlockingAssignmentStatuses]
     );
 
     return result.rows.map((row) => ({

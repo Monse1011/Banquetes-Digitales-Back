@@ -1,5 +1,9 @@
 const { GetReservationRequestUseCase } = require("./get-reservation-request-use-case");
 const { AdminRequestMessages } = require("../../../domain/constants/admin-request-messages");
+const { AssignmentStatus } = require("../../../domain/enums/resource-assignment/assignment-status");
+const {
+  ResourceSufficiency,
+} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
 
 function assignment(overrides) {
   return {
@@ -12,8 +16,8 @@ function assignment(overrides) {
     is_active: true,
     requested_quantity: 5,
     quantity: 5,
-    sufficiency: "SUFFICIENT",
-    status: "CONFIRMED",
+    sufficiency: ResourceSufficiency.SUFFICIENT,
+    status: AssignmentStatus.CONFIRMED,
     observation: null,
     ...overrides,
   };

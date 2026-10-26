@@ -402,6 +402,44 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       ]);
     });
 
+    it("NC-03 hides released assignments and ignores them for availability", async () => {
+      const users = await seedUsers();
+      const clientId = await insertClient("Zafiro Liberada");
+      const event = await insertRequest({
+        clientId,
+        status: "CONFIRMED",
+        date: "2025-03-05",
+        users,
+      });
+      const other = await insertRequest({
+        clientId,
+        status: "CONFIRMED",
+        date: "2025-03-05",
+        users,
+      });
+      const cloth = await insertResource("MATERIAL", "Mantel compartido", 10, event.id);
+      await insertResource("LOGISTIC", "Camioneta propia", 1, event.id, AssignmentStatus.RELEASED);
+      // La otra solicitud liberó 40 de los 50 manteles en el mismo horario.
+      await connection.query(
+        `INSERT INTO assigned_resources (request_id, resource_id, requested_quantity, quantity,
+           sufficiency, usage_start, usage_end, event_start, event_end, status, released_at)
+         SELECT $1, resource_id, 40, 40, sufficiency, usage_start, usage_end, event_start,
+           event_end, $3, NOW()
+         FROM assigned_resources WHERE request_id = $2 AND resource_id = $4`,
+        [other.id, event.id, AssignmentStatus.RELEASED, cloth.id]
+      );
+
+      const { resource_assignments: assignments } = (await get(`${LIST}/${event.id}`)).body.data;
+
+      expect(assignments.logistic).toEqual([]);
+      expect(assignments.material).toEqual([
+        expect.objectContaining({
+          id: cloth.id,
+          assignment: expect.objectContaining({ assigned_quantity: 10, available_quantity: 50 }),
+        }),
+      ]);
+    });
+
     it("RF-1.2.5.3 responds 404 with the DAD message for an unknown request", async () => {
       const response = await get(`${LIST}/999999999`);
       expect(response.status).toBe(404);

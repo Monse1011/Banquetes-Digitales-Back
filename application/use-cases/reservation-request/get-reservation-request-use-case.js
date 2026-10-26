@@ -2,12 +2,6 @@ const {
   availableQuantity,
   blockingPeriod,
 } = require("../../services/resource-assignment/resource-availability");
-const {
-  ResourceSufficiency,
-} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
-const {
-  AssignedResourceStatus,
-} = require("../../../domain/enums/proposal/assigned-resource-status");
 const { AdminRequestMessages } = require("../../../domain/constants/admin-request-messages");
 
 // GET /api/admin/requests/{request_id} (DAD v3.0): ficha de solo lectura de una solicitud
@@ -57,8 +51,8 @@ class GetReservationRequestUseCase {
             blocking,
             period
           ),
-          sufficiency: ResourceSufficiency[assignment.sufficiency],
-          status: AssignedResourceStatus[assignment.status],
+          sufficiency: assignment.sufficiency,
+          status: assignment.status,
           observation: assignment.observation,
         },
       });
