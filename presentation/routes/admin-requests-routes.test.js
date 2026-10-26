@@ -646,6 +646,49 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       expect(data.resource_assignments.material[0].assignment.status).toBe("Confirmada");
     });
 
+    it("NC-01 returns the real hours and event_observation once registered, null before", async () => {
+      const users = await seedUsers();
+      const clientId = await insertClient("Zafiro Horas Reales");
+      const closed = await insertRequest({
+        clientId,
+        status: "FINISHED",
+        date: "2025-03-05",
+        users,
+      });
+      const pending = await insertRequest({
+        clientId,
+        status: "FINISHED",
+        date: "2025-03-06",
+        users,
+      });
+      await connection.query(
+        `UPDATE reservations_request
+         SET actual_start_at = '2025-03-05T18:20:00-06:00', actual_end_at = '2025-03-06T00:10:00-06:00',
+           event_observation = 'Se extendió el servicio de barra'
+         WHERE id = $1`,
+        [closed.id]
+      );
+      const registered = {
+        actual_start_at: "2025-03-05T18:20:00-06:00",
+        actual_end_at: "2025-03-06T00:10:00-06:00",
+      };
+      const empty = { actual_start_at: null, actual_end_at: null };
+
+      const list = (await get(LIST, { status: "FINALIZED", search: "Zafiro Horas Reales" })).body;
+      const closedDetail = (await get(`${LIST}/${closed.id}`)).body.data;
+      const pendingDetail = (await get(`${LIST}/${pending.id}`)).body.data;
+
+      expect(list.data).toEqual([
+        expect.objectContaining({ request_id: closed.id, ...registered }),
+        expect.objectContaining({ request_id: pending.id, ...empty }),
+      ]);
+      expect(closedDetail).toMatchObject({
+        ...registered,
+        event_observation: "Se extendió el servicio de barra",
+      });
+      expect(pendingDetail).toMatchObject({ ...empty, event_observation: null });
+    });
+
     it("RF-1.2.11.3 combines search and the event date range over the current date", async () => {
       const users = await seedUsers();
       const ana = await insertClient("Zafiro Ana Filtro");

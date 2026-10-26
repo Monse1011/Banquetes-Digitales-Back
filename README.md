@@ -53,7 +53,8 @@ de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
 createdb -U postgres banquetes_db
 for f in docs/estructura.sql docs/catalogos-iniciales.sql \
   database/increment-3/00-align-schema-dad-v3.sql \
-  database/increment-3/request-status-history.sql; do
+  database/increment-3/request-status-history.sql \
+  database/increment-3/07-event-closure.sql; do
   psql -U postgres -d banquetes_db -v ON_ERROR_STOP=1 -f "$f" || break
 done
 ```

@@ -13,6 +13,7 @@ const dateTime = (column) => `TO_CHAR(${local(column)}, 'YYYY-MM-DD"T"HH24:MI:SS
 // Función 3.4 agregue la columna.
 const CURRENT_REQUESTS = `(
   SELECT rr.id, rr.folio, rr.status, rr.request_date, rr.status_changed_at, rr.guest_count,
+    rr.actual_start_at, rr.actual_end_at, rr.event_observation,
     rr.logistic_user_id, c.full_name AS client_name, c.email AS client_email,
     c.phone AS client_phone, u.full_name AS logistic_user_name, u.email AS logistic_user_email,
     COALESCE(di.start_datetime, rr.event_date_time) AS current_start,
@@ -37,7 +38,8 @@ const CURRENT_REQUESTS = `(
 const COMMON_COLUMNS = `r.id, r.folio, r.status, r.client_name, r.client_email, r.guest_count,
   r.selected_services, r.logistic_user_id, r.logistic_user_name, r.logistic_user_email,
   r.current_address, ${dateTime("r.request_date")} AS requested_date,
-  ${dateTime("r.status_changed_at")} AS status_changed_at`;
+  ${dateTime("r.status_changed_at")} AS status_changed_at,
+  ${dateTime("r.actual_start_at")} AS actual_start_at, ${dateTime("r.actual_end_at")} AS actual_end_at`;
 
 function toLogisticUser(row) {
   return row.logistic_user_id === null
@@ -96,9 +98,9 @@ class PostgresAdminRequestQueryRepository {
         event_date: row.event_date,
         start_time: row.start_time,
         end_time: row.end_time,
-        // shortcut: la Función 3.6 aún no guarda horas reales; leerlas cuando agregue columnas.
-        actual_start_at: null,
-        actual_end_at: null,
+        // Función 3.6: null mientras no se registren (DAD v3.0).
+        actual_start_at: row.actual_start_at,
+        actual_end_at: row.actual_end_at,
         event_address: row.current_address,
         guest_count: row.guest_count,
         logistic_user: toLogisticUser(row),
@@ -108,7 +110,7 @@ class PostgresAdminRequestQueryRepository {
 
   async findById(id) {
     const result = await this.pool.query(
-      `SELECT ${COMMON_COLUMNS}, r.client_phone, r.current_start, r.current_end,
+      `SELECT ${COMMON_COLUMNS}, r.client_phone, r.event_observation, r.current_start, r.current_end,
          ${dateTime("r.current_start")} AS event_date_time,
          ${dateTime("r.current_end")} AS event_end_time
        FROM ${CURRENT_REQUESTS}
@@ -132,14 +134,14 @@ class PostgresAdminRequestQueryRepository {
         event_date_time: row.event_date_time,
         event_end_time: row.event_end_time,
         requested_date: row.requested_date,
-        // shortcut: la Función 3.6 aún no guarda horas reales ni observaciones del evento.
-        actual_start_at: null,
-        actual_end_at: null,
+        // Función 3.6: null mientras no se registren (DAD v3.0).
+        actual_start_at: row.actual_start_at,
+        actual_end_at: row.actual_end_at,
         status: toApiStatus(row.status),
         status_changed_at: row.status_changed_at,
         selected_services: row.selected_services,
         logistic_user: toLogisticUser(row),
-        event_observation: null,
+        event_observation: row.event_observation,
       },
       assignments: await this.findAssignments(id),
     };
