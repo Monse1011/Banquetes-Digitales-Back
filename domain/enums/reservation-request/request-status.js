@@ -1,7 +1,6 @@
 // Estados de la solicitud, excluyentes entre sí y en el orden de su ciclo de vida. Las claves
 // siguen el enum RequestStatus del DAD v3.0 y se usan en la API (?status=); los valores son los
-// nombres del ERS. La BD guarda FINALIZED y CANCELED como FINISHED y CANCELLED; la traducción
-// vive en postgres-request-status.js.
+// nombres del ERS. La BD guarda las mismas claves (01-reservation-request-status-v3.sql).
 const ReservationRequestStatus = Object.freeze({
   PENDING: "Pendiente",
   APPROVED: "Aprobada",
@@ -12,7 +11,7 @@ const ReservationRequestStatus = Object.freeze({
   COORDINATION_INCOMPLETE: "Coordinación Incompleta",
   // Función 3.4: ya existe una propuesta asociada (RF-2.3.4.5).
   PROPOSAL_GENERATED: "Propuesta generada",
-  // Función 4.4 (RF-3.4.4.2 / RF-3.4.4.5.2). La BD aún no los admite; los define el DAD v3.0.
+  // Función 4.4 (RF-3.4.4.2 / RF-3.4.4.5.2).
   IN_REVIEW: "En revisión",
   ADJUSTMENTS_REQUESTED: "Ajustes Solicitados",
   // Función 3.3: evento agendado (RF-2.3.3.1), concluido (RF-2.3.3.9) o cancelado (RF-2.3.3.3.2).

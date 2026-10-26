@@ -551,7 +551,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       } finally {
         await fs.rm(pdfDirectory, { recursive: true, force: true });
       }
-      await connection.query("UPDATE reservations_request SET status='FINISHED' WHERE id=$1", [
+      await connection.query("UPDATE reservations_request SET status='FINALIZED' WHERE id=$1", [
         created.requestId,
       ]);
       const history = new GetAssignedRequestsHistoryUseCase({

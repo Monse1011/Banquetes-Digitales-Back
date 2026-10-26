@@ -97,9 +97,9 @@ describe("GET /api/admin/requests: access and validation (Funciones 2.5 y 2.11)"
   });
 });
 
-// Opt-in: TEST_PGDATABASE debe nombrar la base de pruebas, con la migración
-// database/increment-3/request-status-history.sql aplicada. Cada prueba inserta sus datos dentro
-// de una transacción que se revierte al terminar.
+// Opt-in: TEST_PGDATABASE debe nombrar una base de pruebas creada solo con las migraciones
+// versionadas (ver README). Cada prueba inserta sus datos dentro de una transacción que se
+// revierte al terminar.
 describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against PostgreSQL", () => {
   let pool;
   let connection;
@@ -253,7 +253,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
         "PROPOSAL_GENERATED",
         "CONFIRMED",
       ];
-      const inactive = ["PENDING", "APPROVED", "REJECTED", "FINISHED", "CANCELLED"];
+      const inactive = ["PENDING", "APPROVED", "REJECTED", "FINALIZED", "CANCELED"];
       const created = {};
       for (const [index, status] of [...active, ...inactive].entries()) {
         created[status] = await insertRequest({
@@ -494,6 +494,35 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       ]);
     });
 
+    it("NC-04 persists IN_REVIEW and ADJUSTMENTS_REQUESTED and lists them as active", async () => {
+      const users = await seedUsers();
+      const clientId = await insertClient("Zafiro Revisión");
+      const inReview = await insertRequest({
+        clientId,
+        status: "IN_REVIEW",
+        date: "2025-03-01",
+        users,
+      });
+      const adjustments = await insertRequest({
+        clientId,
+        status: "ADJUSTMENTS_REQUESTED",
+        date: "2025-03-02",
+        users,
+      });
+
+      const { rows } = await connection.query(
+        "SELECT status FROM reservations_request WHERE id = ANY($1) ORDER BY id",
+        [[inReview.id, adjustments.id]]
+      );
+      const response = await get(LIST, { active: "true", search: "Zafiro Revisión" });
+
+      expect(rows.map((row) => row.status)).toEqual(["IN_REVIEW", "ADJUSTMENTS_REQUESTED"]);
+      expect(response.body.data.map((row) => [row.request_id, row.status])).toEqual([
+        [inReview.id, "IN_REVIEW"],
+        [adjustments.id, "ADJUSTMENTS_REQUESTED"],
+      ]);
+    });
+
     it("RF-1.2.5.6 orders by current start date and time, then by folio", async () => {
       const users = await seedUsers();
       const clientId = await insertClient("Zafiro Orden");
@@ -601,7 +630,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       const clientId = await insertClient("Zafiro Finalizado");
       const finished = await insertRequest({
         clientId,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-01",
         users,
       });
@@ -625,7 +654,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       const clientId = await insertClient("Zafiro Ficha Final");
       const event = await insertRequest({
         clientId,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-05",
         users,
       });
@@ -651,13 +680,13 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       const clientId = await insertClient("Zafiro Horas Reales");
       const closed = await insertRequest({
         clientId,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-05",
         users,
       });
       const pending = await insertRequest({
         clientId,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-06",
         users,
       });
@@ -695,21 +724,21 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       const beto = await insertClient("Zafiro Beto Filtro");
       const anaMarch = await insertRequest({
         clientId: ana,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-10",
         users,
       });
-      await insertRequest({ clientId: ana, status: "FINISHED", date: "2025-06-10", users });
+      await insertRequest({ clientId: ana, status: "FINALIZED", date: "2025-06-10", users });
       const betoMarch = await insertRequest({
         clientId: beto,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-15",
         users,
       });
       // Registrada en marzo, pero el acuerdo vigente la movió a abril.
       const anaMoved = await insertRequest({
         clientId: ana,
-        status: "FINISHED",
+        status: "FINALIZED",
         date: "2025-03-20",
         users,
       });
@@ -736,7 +765,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
     it("RF-1.2.11.4 returns 200 with empty data and zero total when filters match nothing", async () => {
       const users = await seedUsers();
       const clientId = await insertClient("Zafiro Sin Resultados");
-      await insertRequest({ clientId, status: "FINISHED", date: "2025-03-01", users });
+      await insertRequest({ clientId, status: "FINALIZED", date: "2025-03-01", users });
 
       const response = await get(LIST, {
         status: "FINALIZED",
