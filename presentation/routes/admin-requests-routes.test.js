@@ -12,6 +12,10 @@ const {
 } = require("../../application/use-cases/reservation-request/get-reservation-request-use-case");
 const { AdminRequestMessages } = require("../../domain/constants/admin-request-messages");
 const UserRole = require("../../domain/enums/auth/user-role");
+const { AssignmentStatus } = require("../../domain/enums/resource-assignment/assignment-status");
+const {
+  ResourceSufficiency,
+} = require("../../domain/enums/resource-assignment/resource-sufficiency");
 
 const AUTH_COOKIE = "auth_token=valid-token";
 const notUsed = (_req, res) => res.sendStatus(501);
@@ -196,7 +200,13 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
     return Number(rows[0].id);
   }
 
-  async function insertResource(type, name, quantity, requestId, status = "CONFIRMED") {
+  async function insertResource(
+    type,
+    name,
+    quantity,
+    requestId,
+    status = AssignmentStatus.CONFIRMED
+  ) {
     const role =
       type === "HUMAN"
         ? (await connection.query("SELECT id, name FROM operative_roles ORDER BY id LIMIT 1"))
@@ -209,11 +219,20 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
     );
     await connection.query(
       `INSERT INTO assigned_resources (request_id, resource_id, requested_quantity, quantity,
-         sufficiency, usage_start, usage_end, status, observation, released_at)
-       VALUES ($1, $2, $3, $3, 'SUFFICIENT', '2025-03-05T18:00:00-06:00',
-         '2025-03-05T23:00:00-06:00', $4::varchar, $5,
-         CASE WHEN $4::varchar = 'RELEASED' THEN NOW() END)`,
-      [requestId, rows[0].id, quantity, status, type === "MATERIAL" ? "Revisar manteles" : null]
+         sufficiency, usage_start, usage_end, event_start, event_end, status, observation,
+         released_at)
+       VALUES ($1, $2, $3, $3, $4, '2025-03-05T18:00:00-06:00', '2025-03-05T23:00:00-06:00',
+         '2025-03-05T18:00:00-06:00', '2025-03-05T23:00:00-06:00', $5::varchar, $6,
+         CASE WHEN $5::varchar = $7 THEN NOW() END)`,
+      [
+        requestId,
+        rows[0].id,
+        quantity,
+        ResourceSufficiency.SUFFICIENT,
+        status,
+        type === "MATERIAL" ? "Revisar manteles" : null,
+        AssignmentStatus.RELEASED,
+      ]
     );
     return { id: Number(rows[0].id), role: role && { id: Number(role.id), name: role.name } };
   }
@@ -293,7 +312,13 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
       });
       const waiter = await insertResource("HUMAN", "Mesero Prueba", 1, event.id);
       const cloth = await insertResource("MATERIAL", "Mantel Prueba", 20, event.id);
-      await insertResource("LOGISTIC", "Camioneta liberada", 1, event.id, "RELEASED");
+      await insertResource(
+        "LOGISTIC",
+        "Camioneta liberada",
+        1,
+        event.id,
+        AssignmentStatus.RELEASED
+      );
 
       const response = await get(`${LIST}/${event.id}`);
 
@@ -351,6 +376,30 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
         ],
         logistic: [],
       });
+    });
+
+    it("NC-02 returns 200 with every resource type assigned through request_id", async () => {
+      const users = await seedUsers();
+      const clientId = await insertClient("Zafiro Recursos request_id");
+      const event = await insertRequest({
+        clientId,
+        status: "CONFIRMED",
+        date: "2025-03-05",
+        users,
+      });
+      await insertResource("HUMAN", "Mesero request_id", 1, event.id);
+      await insertResource("MATERIAL", "Mantel request_id", 4, event.id);
+      await insertResource("LOGISTIC", "Camioneta request_id", 1, event.id);
+
+      const response = await get(`${LIST}/${event.id}`);
+
+      expect(response.status).toBe(200);
+      const { human, material, logistic } = response.body.data.resource_assignments;
+      expect([human, material, logistic].map((items) => items.map((item) => item.name))).toEqual([
+        ["Mesero request_id"],
+        ["Mantel request_id"],
+        ["Camioneta request_id"],
+      ]);
     });
 
     it("RF-1.2.5.3 responds 404 with the DAD message for an unknown request", async () => {
