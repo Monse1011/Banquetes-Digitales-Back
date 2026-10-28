@@ -157,6 +157,21 @@ class PostgresResourceAssignmentRepository {
     });
   }
 
+  // RF-3.4.4.6: al rechazar la propuesta, todas las asignaciones activas de la
+  // solicitud pasan a "Liberada" dentro de la misma transacción.
+  async releaseByRequestId(requestId, transaction = null) {
+    return this.withTransaction(transaction, async (activeTransaction) => {
+      const result = await this.executor(activeTransaction).query(
+        `UPDATE assigned_resources
+         SET status = $1, updated_at = NOW()
+         WHERE reservation_request_id = $2 AND status = ANY($3)
+         RETURNING ${ASSIGNMENT_COLUMNS}`,
+        [AssignmentStatus.RELEASED, requestId, BlockingAssignmentStatuses]
+      );
+      return result.rows.map((row) => this.toEntity(row));
+    });
+  }
+
   assignmentValues(assignment) {
     return [
       assignment.requestId,

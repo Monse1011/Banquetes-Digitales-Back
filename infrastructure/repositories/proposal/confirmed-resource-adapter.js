@@ -71,6 +71,12 @@ class ConfirmedResourceAdapter {
     }));
   }
 
+  // El rechazo libera las asignaciones activas (Provisional/Confirmada)
+  // de la solicitud dentro de la transacción del caso de uso.
+  async releaseByRequestId(requestId, transaction = null) {
+    return this.assignments.releaseByRequestId(requestId, transaction);
+  }
+
   async syncAssignments(requestId, adjustments, start, end, transaction = null, userId = null) {
     const rows = (await this.assignments.findByRequest(requestId, transaction)).filter(
       (row) => row.status === AssignmentStatus.CONFIRMED

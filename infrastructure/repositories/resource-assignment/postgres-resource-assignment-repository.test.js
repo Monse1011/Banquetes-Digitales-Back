@@ -112,6 +112,21 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("PostgreSQL resource-assignment re
     ]);
   });
 
+  it("releaseByRequestId libera las asignaciones activas dentro de la transacción (NC-01)", async () => {
+    await assignments.saveProvisional([assignment(10), assignment(11)], []);
+    const [confirmed] = await assignments.findByRequest(1);
+    confirmed.confirm(2, 7, new Date());
+    await assignments.confirm([confirmed], [], []);
+
+    const released = await assignments.releaseByRequestId(1);
+    expect(released).toHaveLength(2);
+    const history = await pool.query("SELECT status FROM assigned_resources ORDER BY id");
+    expect(history.rows.map((row) => row.status)).toEqual([
+      AssignmentStatus.RELEASED,
+      AssignmentStatus.RELEASED,
+    ]);
+  });
+
   it("rolls back assignment writes with their surrounding transaction", async () => {
     await expect(
       transactions.run(async (transaction) => {

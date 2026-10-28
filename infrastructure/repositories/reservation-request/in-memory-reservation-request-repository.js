@@ -101,6 +101,54 @@ class InMemoryReservationRequestRepository {
     return this.requests.find((request) => request.requestId === id) ?? null;
   }
 
+  // Función 4.5: consulta por folio (único medio de acceso del cliente).
+  async findByFolio(folio) {
+    return this.requests.find((request) => request.folio === folio) ?? null;
+  }
+
+  // Incremento 3 (RF-3.4.4.x): cambio de estado atómico con historial y status_changed_at.
+  // Devuelve null si el estado actual ya no coincide con el esperado (concurrencia).
+  async changeStatusAtomic(
+    requestId,
+    { fromStatus, toStatus, changedByUserId = null, changedAt = new Date(), transaction = null }
+  ) {
+    const request = this.requests.find((candidate) => candidate.requestId === requestId);
+
+    if (!request || request.status !== fromStatus) {
+      return null;
+    }
+
+    const previousStatus = request.status;
+    const previousChangedAt = request.statusChangedAt;
+
+    request.status = toStatus;
+    request.statusChangedAt = changedAt;
+    request.status_changed_at = changedAt;
+    this.history = this.history || [];
+    const historyEntry = {
+      requestId,
+      previousStatus: fromStatus,
+      newStatus: toStatus,
+      changedByUserId,
+      changedAt,
+    };
+    this.history.push(historyEntry);
+
+    transaction?.afterRollback(() => {
+      request.status = previousStatus;
+      request.statusChangedAt = previousChangedAt;
+      request.status_changed_at = previousChangedAt;
+      const index = this.history.indexOf(historyEntry);
+      if (index !== -1) this.history.splice(index, 1);
+    });
+
+    return request;
+  }
+
+  async findHistoryByRequestId(requestId) {
+    return (this.history || []).filter((entry) => entry.requestId === requestId);
+  }
+
   async update(request) {
     const index = this.requests.findIndex(
       (existingRequest) => existingRequest.requestId === request.requestId

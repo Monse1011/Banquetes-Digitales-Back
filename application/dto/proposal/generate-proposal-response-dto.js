@@ -6,6 +6,7 @@ class GenerateProposalResponseDto {
     this.data = {
       proposal_id: proposal.id,
       proposals_code: proposal.proposalsCode,
+      version: proposal.version,
       name: proposal.name,
       creation_date: formatDate(proposal.creationDate),
       status: proposal.status,
