@@ -726,8 +726,7 @@ const openApiDocument = {
         parameters: [clientFolioParameter],
         responses: {
           200: { description: "Datos generales, estado vigente y proposal_access" },
-          400: { description: "Formato de folio inválido" },
-          404: { description: "Folio inexistente" },
+          400: { description: "Formato de folio inválido o folio inexistente (DAD Función 4.5)" },
           429: { description: "Demasiadas solicitudes" },
         },
       },

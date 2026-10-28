@@ -84,13 +84,26 @@ const ErrorMessages = require("./constants/error-messages");
 
 // Incremento 3 (Funciones 4.4 y 4.5): el folio inválido (400) y el inexistente (404)
 // comparten el mensaje del contrato (RF-3.4.5.1.2).
-function handleClientProposalError(error, response) {
+const TRACKING_ENDPOINT_PATH = /^\/api\/client\/requests\/[^/]+\/?$/;
+
+function isTrackingEndpointRequest(request) {
+  const url = (request?.originalUrl ?? request?.url ?? "").split("?")[0];
+
+  return TRACKING_ENDPOINT_PATH.test(url);
+}
+
+function handleClientProposalError(error, request, response) {
   if (error instanceof InvalidFolioFormatException) {
     response.status(400).json({ message: error.message });
     return true;
   }
 
   if (error instanceof ClientRequestNotFoundException) {
+    if (isTrackingEndpointRequest(request)) {
+      response.status(400).json({ error: { message: error.message } });
+      return true;
+    }
+
     response.status(404).json({ message: error.message });
     return true;
   }
@@ -449,7 +462,7 @@ function createApp(dependencies) {
   );
 
   // Error handler
-  app.use((error, _request, response, _next) => {
+  app.use((error, request, response, _next) => {
     if (handleCommonError(error, response)) return;
     if (handleCalendarError(error, response)) return;
     if (handleResourceError(error, response)) return;
@@ -464,7 +477,7 @@ function createApp(dependencies) {
     }
 
     if (handleAssignmentError(error, response)) return;
-    if (handleClientProposalError(error, response)) return;
+    if (handleClientProposalError(error, request, response)) return;
     if (handleProposalError(error, response)) return;
     if (handleAuthError(error, response)) return;
 

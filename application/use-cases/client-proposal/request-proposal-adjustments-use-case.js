@@ -73,12 +73,20 @@ class RequestProposalAdjustmentsUseCase {
         );
       }
 
-      await this.proposalRepository.updateStatusAtomic(
+      // Si la propuesta ya no está en IN_REVIEW se rechaza con
+      // conflicto y se revierte la solicitud y la observación registrada.
+      const proposalChanged = await this.proposalRepository.updateStatusAtomic(
         proposal.id,
         ProposalStatus.IN_REVIEW,
         ProposalStatus.ADJUSTMENTS_REQUESTED,
         transaction
       );
+
+      if (!proposalChanged) {
+        throw new ProposalActionConflictException(
+          ClientProposalMessages.NOT_AVAILABLE_FOR_ADJUSTMENTS
+        );
+      }
 
       await this.proposalAdjustmentRepository.create(
         new ProposalAdjustment(null, proposal.id, observations, now),

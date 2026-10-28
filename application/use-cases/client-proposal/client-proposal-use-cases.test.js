@@ -1,6 +1,12 @@
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const {
   InMemoryReservationRequestRepository,
 } = require("../../../infrastructure/repositories/reservation-request/in-memory-reservation-request-repository");
+const {
+  PdfkitPdfGenerator,
+} = require("../../../infrastructure/services/proposal/pdfkit-pdf-generator");
 const {
   InMemoryClientRepository,
 } = require("../../../infrastructure/repositories/client/in-memory-client-repository");
@@ -11,14 +17,27 @@ const {
   InMemoryProposalRepository,
 } = require("../../../infrastructure/repositories/proposal/in-memory-proposal-repository");
 const {
-  InMemoryAssignedResourceRepository,
-} = require("../../../infrastructure/repositories/proposal/in-memory-assigned-resource-repository");
+  InMemoryResourceAssignmentRepository,
+} = require("../../../infrastructure/repositories/resource-assignment/in-memory-resource-assignment-repository");
+const {
+  ConfirmedResourceAdapter,
+} = require("../../../infrastructure/repositories/proposal/confirmed-resource-adapter");
+const {
+  ResourceAssignment,
+} = require("../../../domain/entities/resource-assignment/resource-assignment");
+const { AssignmentStatus } = require("../../../domain/enums/resource-assignment/assignment-status");
+const {
+  ResourceSufficiency,
+} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
 const {
   InMemoryProposalAdjustmentRepository,
 } = require("../../../infrastructure/repositories/client-proposal/in-memory-proposal-adjustment-repository");
 const {
   InMemoryAcceptanceScheduler,
 } = require("../../../infrastructure/services/proposal/in-memory-acceptance-scheduler");
+const {
+  InMemoryTransactionManager,
+} = require("../../../infrastructure/services/transaction/in-memory-transaction-manager");
 const { Client } = require("../../../domain/entities/client/client");
 const {
   ReservationRequest,
@@ -38,6 +57,7 @@ const ClientRequestNotFoundException = require("../../../domain/exceptions/clien
 const ClientProposalNotAvailableException = require("../../../domain/exceptions/client-proposal/client-proposal-not-available-exception");
 const ProposalAcceptanceConflictException = require("../../../domain/exceptions/client-proposal/proposal-acceptance-conflict-exception");
 const ProposalAcceptanceFailedException = require("../../../domain/exceptions/client-proposal/proposal-acceptance-failed-exception");
+const ProposalActionConflictException = require("../../../domain/exceptions/client-proposal/proposal-action-conflict-exception");
 
 const { GetClientRequestTrackingUseCase } = require("./get-client-request-tracking-use-case");
 const { GetClientProposalDetailUseCase } = require("./get-client-proposal-detail-use-case");
@@ -66,11 +86,44 @@ function buildHarness({
     reservationRequestRepository,
     derivedInformationRepository
   );
-  const assignedResourceRepository = new InMemoryAssignedResourceRepository([
+  // Composición real de producción (src/app.js), no un repositorio con el
+  // método agregado a mano. El adaptador opera sobre las asignaciones confirmadas.
+  const resourceRows = [
     { id: 1, name: "Ana López", type: ResourceType.HUMAN, unitCost: 800 },
     { id: 2, name: "Luis Pérez", type: ResourceType.HUMAN, unitCost: 800 },
     { id: 3, name: "Vajilla completa", type: ResourceType.MATERIAL, unitCost: 25 },
-  ]);
+  ];
+  const assignmentRepository = new InMemoryResourceAssignmentRepository();
+  const assignedResourceRepository = new ConfirmedResourceAdapter(assignmentRepository, {
+    findByIds: async (ids) => resourceRows.filter((resource) => ids.includes(resource.id)),
+  });
+
+  async function seedAssignment(request, resourceId, quantity) {
+    const usageStart = request.eventDateTime ?? futureDate(10, 18);
+    const usageEnd = futureDate(10, 23);
+    const assignment = new ResourceAssignment(
+      assignmentRepository.nextId++,
+      request.requestId,
+      resourceId,
+      quantity,
+      quantity,
+      quantity,
+      ResourceSufficiency.SUFFICIENT,
+      AssignmentStatus.CONFIRMED,
+      usageStart,
+      usageEnd,
+      usageStart,
+      usageEnd,
+      null,
+      7,
+      new Date(),
+      7,
+      new Date()
+    );
+    assignmentRepository.assignments.push(assignment);
+
+    return assignment;
+  }
   const proposalAdjustmentRepository = new InMemoryProposalAdjustmentRepository(proposalRepository);
   const acceptanceScheduler = new InMemoryAcceptanceScheduler({ conflicts });
   const stored = [];
@@ -79,8 +132,20 @@ function buildHarness({
     async generateAccepted({ fileName }) {
       return { fileName, buffer: Buffer.from("%PDF-1.4 aceptada") };
     },
-    async store(fileName, buffer) {
+    // El temporal se escribe con nombre único y solo se publica al confirmar.
+    async storeTemp(fileName, buffer) {
       stored.push({ fileName, buffer });
+    },
+    async publishAccepted(tempFileName, fileName) {
+      const temp = stored.find((item) => item.fileName === tempFileName);
+      if (!temp) throw new Error("missing temp file");
+      if (stored.some((item) => item.fileName === fileName)) return false;
+      stored.splice(stored.indexOf(temp), 1, { fileName, buffer: temp.buffer });
+      return true;
+    },
+    async discardTemp(fileName) {
+      const index = stored.findIndex((item) => item.fileName === fileName);
+      if (index !== -1) stored.splice(index, 1);
     },
     async read(fileName) {
       if (fileName.startsWith("MISSING")) {
@@ -172,10 +237,12 @@ function buildHarness({
     derivedInformationRepository,
     proposalRepository,
     assignedResourceRepository,
+    assignmentRepository,
     proposalAdjustmentRepository,
     acceptanceScheduler,
     pdfGenerator,
     seed,
+    seedAssignment,
   };
 }
 
@@ -303,6 +370,42 @@ describe("Función 4.4 - Detalle de la propuesta vigente", () => {
     expect(harness.reservationRequestRepository.history).toHaveLength(1);
   });
 
+  it("dos primeras visualizaciones concurrentes responden el estado definitivo (NC-05)", async () => {
+    const harness = buildHarness({ status: ReservationRequestStatus.PROPOSAL_GENERATED });
+    await harness.seed();
+    const repository = harness.reservationRequestRepository;
+    const findByFolio = repository.findByFolio.bind(repository);
+    // Como PostgreSQL, cada lectura devuelve una copia independiente; la perdedora de la
+    // transición no puede responder con la copia anterior al IN_REVIEW persistido.
+    repository.findByFolio = async (folio) => {
+      const stored = await findByFolio(folio);
+
+      return stored ? { ...stored } : stored;
+    };
+    const buildUseCase = () =>
+      new GetClientProposalDetailUseCase(
+        repository,
+        harness.clientRepository,
+        harness.derivedInformationRepository,
+        harness.proposalRepository
+      );
+
+    const results = await Promise.all([
+      buildUseCase().execute(FOLIO),
+      buildUseCase().execute(FOLIO),
+    ]);
+
+    results.forEach((result) => {
+      expect(result.data.request_status).toBe("IN_REVIEW");
+      expect(result.data.available_actions).toEqual([
+        ProposalAction.ACCEPT,
+        ProposalAction.REQUEST_ADJUSTMENTS,
+        ProposalAction.REJECT,
+      ]);
+    });
+    expect(repository.history).toHaveLength(1);
+  });
+
   it("agrupa humanos por rol y costo, y lee importes congelados sin recalcular (RF-3.4.4.3)", async () => {
     const harness = buildHarness({ status: ReservationRequestStatus.IN_REVIEW });
     await harness.seed();
@@ -421,6 +524,45 @@ describe("Función 4.4 - Aceptar propuesta", () => {
 
     await expect(useCase.execute(FOLIO)).rejects.toBeInstanceOf(ProposalAcceptanceFailedException);
   });
+
+  it("una segunda aceptación concurrente no modifica el PDF confirmado (NC-02)", async () => {
+    const storageDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "aceptadas-"));
+    try {
+      const harness = buildHarness({ status: ReservationRequestStatus.IN_REVIEW });
+      const { request, proposal } = await harness.seed();
+      const pdfGenerator = new PdfkitPdfGenerator({ storageDir });
+      const buildUseCase = () =>
+        new AcceptProposalUseCase(
+          harness.reservationRequestRepository,
+          harness.clientRepository,
+          harness.derivedInformationRepository,
+          harness.proposalRepository,
+          pdfGenerator,
+          new InMemoryAcceptanceScheduler()
+        );
+
+      const outcomes = await Promise.allSettled([
+        buildUseCase().execute(FOLIO),
+        buildUseCase().execute(FOLIO),
+      ]);
+      const fulfilled = outcomes.filter((outcome) => outcome.status === "fulfilled");
+      const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ProposalActionConflictException);
+      expect(request.status).toBe(ReservationRequestStatus.CONFIRMED);
+      expect(proposal.status).toBe(ProposalStatus.ACCEPTED);
+
+      const files = await fs.promises.readdir(storageDir);
+      expect(files.filter((name) => name.endsWith(".tmp"))).toEqual([]);
+      expect(files).toEqual([proposal.acceptedPdfPath]);
+      const content = await pdfGenerator.read(proposal.acceptedPdfPath);
+      expect(content.subarray(0, 5).toString()).toBe("%PDF-");
+    } finally {
+      await fs.promises.rm(storageDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("Función 4.4 - Solicitar ajustes", () => {
@@ -458,16 +600,37 @@ describe("Función 4.4 - Solicitar ajustes", () => {
       ClientProposalNotAvailableException
     );
   });
+
+  it("revierte todo si la propuesta ya no está en IN_REVIEW (NC-04)", async () => {
+    const harness = buildHarness({ status: ReservationRequestStatus.IN_REVIEW });
+    const { request, proposal } = await harness.seed();
+    proposal.status = ProposalStatus.ACCEPTED;
+    const useCase = new RequestProposalAdjustmentsUseCase(
+      harness.reservationRequestRepository,
+      harness.proposalRepository,
+      harness.proposalAdjustmentRepository,
+      new InMemoryTransactionManager()
+    );
+
+    await expect(useCase.execute(FOLIO, "Cambiar hora a 19:00")).rejects.toBeInstanceOf(
+      ProposalActionConflictException
+    );
+    expect(request.status).toBe(ReservationRequestStatus.IN_REVIEW);
+    expect(proposal.status).toBe(ProposalStatus.ACCEPTED);
+    expect(await harness.proposalAdjustmentRepository.findByRequestId(request.requestId)).toEqual(
+      []
+    );
+    expect(
+      await harness.reservationRequestRepository.findHistoryByRequestId(request.requestId)
+    ).toEqual([]);
+  });
 });
 
 describe("Función 4.4 - Rechazar propuesta", () => {
   it("rechaza la solicitud y propuesta y libera asignaciones (RF-3.4.4.6.4)", async () => {
     const harness = buildHarness({ status: ReservationRequestStatus.IN_REVIEW });
     const { request, proposal } = await harness.seed();
-    const releaseCalls = [];
-    harness.assignedResourceRepository.releaseByRequestId = async (requestId, transaction) => {
-      releaseCalls.push({ requestId, transaction });
-    };
+    const assignment = await harness.seedAssignment(request, 1, 2);
     const useCase = new RejectProposalUseCase(
       harness.reservationRequestRepository,
       harness.proposalRepository,
@@ -478,11 +641,34 @@ describe("Función 4.4 - Rechazar propuesta", () => {
 
     expect(request.status).toBe(ReservationRequestStatus.REJECTED);
     expect(proposal.status).toBe(ProposalStatus.REJECTED);
-    expect(releaseCalls).toEqual([{ requestId: request.requestId, transaction: null }]);
+    expect(assignment.status).toBe(AssignmentStatus.CONFIRMED);
+    expect(harness.assignmentRepository.assignments[0].status).toBe(AssignmentStatus.RELEASED);
+    expect(
+      await harness.assignedResourceRepository.findActiveByRequestId(request.requestId)
+    ).toEqual([]);
     expect(result.data).toMatchObject({
       current_status: "REJECTED",
       previous_status: "IN_REVIEW",
     });
+  });
+
+  it("revierte todo y no libera recursos si la propuesta ya no está en IN_REVIEW (NC-04)", async () => {
+    const harness = buildHarness({ status: ReservationRequestStatus.IN_REVIEW });
+    const { request, proposal } = await harness.seed();
+    const assignment = await harness.seedAssignment(request, 1, 2);
+    proposal.status = ProposalStatus.ACCEPTED;
+    const useCase = new RejectProposalUseCase(
+      harness.reservationRequestRepository,
+      harness.proposalRepository,
+      harness.assignedResourceRepository,
+      new InMemoryTransactionManager()
+    );
+
+    await expect(useCase.execute(FOLIO)).rejects.toBeInstanceOf(ProposalActionConflictException);
+    expect(request.status).toBe(ReservationRequestStatus.IN_REVIEW);
+    expect(proposal.status).toBe(ProposalStatus.ACCEPTED);
+    expect(harness.assignmentRepository.assignments[0].status).toBe(AssignmentStatus.CONFIRMED);
+    expect(assignment.status).toBe(AssignmentStatus.CONFIRMED);
   });
 
   it("tras rechazar, el detalle ya no ofrece acciones (RF-3.4.4.6.5)", async () => {

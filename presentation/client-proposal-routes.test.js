@@ -84,6 +84,11 @@ describe("Rutas públicas de cliente - Funciones 4.4 y 4.5", () => {
         return { fileName, buffer: Buffer.from("%PDF-1.4 ok") };
       },
       async store() {},
+      async storeTemp() {},
+      async publishAccepted() {
+        return true;
+      },
+      async discardTemp() {},
       async read(fileName) {
         return Buffer.from(`%PDF-1.4 ${fileName}`);
       },
@@ -227,10 +232,19 @@ describe("Rutas públicas de cliente - Funciones 4.4 y 4.5", () => {
     expect(response.body.message).toBe(ClientProposalMessages.FOLIO_NOT_FOUND);
   });
 
-  it("GET seguimiento responde 404 con el mensaje del folio inexistente", async () => {
-    const response = await request(app).get("/api/client/requests/BD-2026-99999").expect(404);
+  it("GET seguimiento responde 400 con { error: { message } } para folio inexistente (NC-03)", async () => {
+    const response = await request(app).get("/api/client/requests/BD-2026-99999").expect(400);
 
-    expect(response.body.message).toBe(ClientProposalMessages.FOLIO_NOT_FOUND);
+    expect(response.body).toEqual({ error: { message: ClientProposalMessages.FOLIO_NOT_FOUND } });
+    expect(response.body.message).toBeUndefined();
+  });
+
+  it("los demás endpoints conservan 404 con { message } para folio inexistente (NC-03)", async () => {
+    const response = await request(app)
+      .get("/api/client/requests/BD-2026-99999/proposal")
+      .expect(404);
+
+    expect(response.body).toEqual({ message: ClientProposalMessages.FOLIO_NOT_FOUND });
   });
 
   it("GET detalle transiciona a IN_REVIEW y expone las tres acciones", async () => {

@@ -1,3 +1,4 @@
+const { randomUUID } = require("crypto");
 const ClientRequestNotFoundException = require("../../../domain/exceptions/client-proposal/client-request-not-found-exception");
 const InvalidFolioFormatException = require("../../../domain/exceptions/client-proposal/invalid-folio-format-exception");
 const ClientProposalNotAvailableException = require("../../../domain/exceptions/client-proposal/client-proposal-not-available-exception");
@@ -64,12 +65,25 @@ class AcceptProposalUseCase {
       throw new ProposalNotFoundException();
     }
 
-    const fileName = await this.renderAcceptedPdf(request, proposal);
+    const pdf = await this.renderAcceptedPdf(request, proposal);
 
-    return this.commitAcceptance(request, proposal, fileName, now);
+    try {
+      const response = await this.commitAcceptance(request, proposal, pdf.fileName, now);
+
+      // Se publica solo si la aceptación se confirmó, y nunca se
+      // sustituye un PDF ya aceptado. Si algo falla, se limpia el archivo temporal.
+      await this.publishAcceptedPdf(pdf);
+
+      return response;
+    } catch (error) {
+      await this.discardPdf(pdf);
+      throw error;
+    }
   }
 
   // RF-3.4.4.4.3: el PDF de aceptación se genera con la misma fuente que el detalle.
+  // Se escribe en un temporal único; el nombre definitivo queda reservado para
+  // la publicación atómica posterior a la confirmación de la aceptación.
   async renderAcceptedPdf(request, proposal) {
     const information = await this.derivedInformationRepository.findByIdAndRequestId(
       proposal.derivedInformationId,
@@ -82,6 +96,7 @@ class AcceptProposalUseCase {
       information?.startDatetime ?? request.eventDateTime,
       request.folio
     );
+    const tempFileName = `${fileName}.${randomUUID()}.tmp`;
 
     try {
       const document = await this.pdfGenerator.generateAccepted({
@@ -93,15 +108,37 @@ class AcceptProposalUseCase {
         resources: groupProposalResources(resourceLines),
       });
 
-      await this.pdfGenerator.store(fileName, document.buffer);
+      await this.pdfGenerator.storeTemp(tempFileName, document.buffer);
 
-      return fileName;
+      return { fileName, tempFileName };
+    } catch (error) {
+      await this.discardPdf({ tempFileName });
+
+      if (error instanceof ProposalAcceptanceFailedException) {
+        throw error;
+      }
+
+      throw new ProposalAcceptanceFailedException();
+    }
+  }
+
+  async publishAcceptedPdf(pdf) {
+    try {
+      await this.pdfGenerator.publishAccepted(pdf.tempFileName, pdf.fileName);
     } catch (error) {
       if (error instanceof ProposalAcceptanceFailedException) {
         throw error;
       }
 
       throw new ProposalAcceptanceFailedException();
+    }
+  }
+
+  async discardPdf(pdf) {
+    try {
+      await this.pdfGenerator.discardTemp?.(pdf.tempFileName);
+    } catch {
+      // La limpieza del temporal no debe enmascarar el error de aceptación.
     }
   }
 

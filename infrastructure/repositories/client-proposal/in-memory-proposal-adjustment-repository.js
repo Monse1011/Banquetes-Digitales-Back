@@ -8,7 +8,7 @@ class InMemoryProposalAdjustmentRepository {
     this.nextId = 1;
   }
 
-  async create(adjustment) {
+  async create(adjustment, transaction = null) {
     const created = new ProposalAdjustment(
       this.nextId++,
       adjustment.proposalId,
@@ -17,6 +17,11 @@ class InMemoryProposalAdjustmentRepository {
     );
 
     this.adjustments.push(created);
+
+    transaction?.afterRollback(() => {
+      const index = this.adjustments.indexOf(created);
+      if (index !== -1) this.adjustments.splice(index, 1);
+    });
 
     return created;
   }

@@ -114,6 +114,34 @@ class PdfkitPdfGenerator {
     await fs.promises.writeFile(path.join(this.storageDir, fileName), buffer);
   }
 
+  // RF-3.4.4.4.3: el PDF de aceptación se escribe primero en un temporal único y
+  // solo se publica de forma atómica cuando la aceptación se confirma. link falla con
+  // EEXIST si ya existe un PDF aceptado, de modo que nunca se sustituye la evidencia.
+  async storeTemp(fileName, buffer) {
+    await this.store(fileName, buffer);
+  }
+
+  async publishAccepted(tempFileName, fileName) {
+    await fs.promises.mkdir(this.storageDir, { recursive: true });
+    const tempPath = path.join(this.storageDir, tempFileName);
+    const finalPath = path.join(this.storageDir, fileName);
+    try {
+      await fs.promises.link(tempPath, finalPath);
+    } catch (error) {
+      if (error.code === "EEXIST") {
+        await this.discardTemp(tempFileName);
+        return false;
+      }
+      throw error;
+    }
+    await fs.promises.unlink(tempPath);
+    return true;
+  }
+
+  async discardTemp(fileName) {
+    await fs.promises.rm(path.join(this.storageDir, fileName), { force: true });
+  }
+
   async read(fileName) {
     return fs.promises.readFile(path.join(this.storageDir, fileName));
   }

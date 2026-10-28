@@ -110,7 +110,7 @@ class InMemoryReservationRequestRepository {
   // Devuelve null si el estado actual ya no coincide con el esperado (concurrencia).
   async changeStatusAtomic(
     requestId,
-    { fromStatus, toStatus, changedByUserId = null, changedAt = new Date() }
+    { fromStatus, toStatus, changedByUserId = null, changedAt = new Date(), transaction = null }
   ) {
     const request = this.requests.find((candidate) => candidate.requestId === requestId);
 
@@ -118,16 +118,28 @@ class InMemoryReservationRequestRepository {
       return null;
     }
 
+    const previousStatus = request.status;
+    const previousChangedAt = request.statusChangedAt;
+
     request.status = toStatus;
     request.statusChangedAt = changedAt;
     request.status_changed_at = changedAt;
     this.history = this.history || [];
-    this.history.push({
+    const historyEntry = {
       requestId,
       previousStatus: fromStatus,
       newStatus: toStatus,
       changedByUserId,
       changedAt,
+    };
+    this.history.push(historyEntry);
+
+    transaction?.afterRollback(() => {
+      request.status = previousStatus;
+      request.statusChangedAt = previousChangedAt;
+      request.status_changed_at = previousChangedAt;
+      const index = this.history.indexOf(historyEntry);
+      if (index !== -1) this.history.splice(index, 1);
     });
 
     return request;

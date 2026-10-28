@@ -75,7 +75,12 @@ class GetClientProposalDetailUseCase {
       );
 
       if (!changed) {
-        return null;
+        // Otra primera visualización ganó la transición. Se
+        // re-consulta la solicitud para responder con el estado persistido actual,
+        // nunca con la copia obsoleta leída antes de la carrera.
+        const current = await this.reservationRequestRepository.findById(request.requestId);
+
+        return current ?? request;
       }
 
       await this.proposalRepository.markViewed(proposal.id, now, transaction);

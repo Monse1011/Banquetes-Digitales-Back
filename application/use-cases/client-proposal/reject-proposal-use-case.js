@@ -74,12 +74,20 @@ class RejectProposalUseCase {
         );
       }
 
-      await this.proposalRepository.updateStatusAtomic(
+      // Si la propuesta ya no está en IN_REVIEW se rechaza con
+      // conflicto y se revierte también el cambio de estado de la solicitud.
+      const proposalChanged = await this.proposalRepository.updateStatusAtomic(
         proposal.id,
         ProposalStatus.IN_REVIEW,
         ProposalStatus.REJECTED,
         transaction
       );
+
+      if (!proposalChanged) {
+        throw new ProposalActionConflictException(
+          ClientProposalMessages.NOT_AVAILABLE_FOR_REJECTION
+        );
+      }
 
       // RF-3.4.4.6: se retira el bloqueo de disponibilidad del responsable y los recursos.
       await this.assignedResourceRepository.releaseByRequestId(request.requestId, transaction);
