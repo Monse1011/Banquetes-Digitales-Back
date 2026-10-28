@@ -134,6 +134,16 @@ class InMemoryResourceAssignmentRepository {
     return released ?? null;
   }
 
+  // RF-3.4.4.6: al rechazar la propuesta, todas las asignaciones activas de la
+  // solicitud pasan a "Liberada" dentro de la misma transacción.
+  async releaseByRequestId(requestId, transaction = null) {
+    return this.release(
+      transaction,
+      (existing) =>
+        existing.requestId === requestId && BlockingAssignmentStatuses.includes(existing.status)
+    );
+  }
+
   release(transaction, isReleased) {
     const released = [];
 

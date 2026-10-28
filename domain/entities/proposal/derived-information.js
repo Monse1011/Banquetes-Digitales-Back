@@ -1,4 +1,6 @@
 // DAD 010 §7.2: acuerdos registrados tras el contacto con el cliente.
+// Incremento 3: guest_count forma parte de los datos vigentes del evento (DAD §7); viaja
+// como último parámetro opcional para no romper las llamadas del incremento 2.
 class DerivedInformation {
   constructor(
     id,
@@ -8,7 +10,8 @@ class DerivedInformation {
     endDatetime,
     observations,
     createdByUserId,
-    createdAt
+    createdAt,
+    guestCount = null
   ) {
     this.id = id;
     this.eventRequestId = eventRequestId;
@@ -18,6 +21,7 @@ class DerivedInformation {
     this.observations = observations ?? null;
     this.createdByUserId = createdByUserId ?? null;
     this.createdAt = createdAt ?? null;
+    this.guestCount = guestCount;
   }
 }
 

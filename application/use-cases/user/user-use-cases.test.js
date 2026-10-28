@@ -196,6 +196,8 @@ describe("User Management Use Cases (Función 2.12)", () => {
         "COORDINATION_READY",
         "COORDINATION_INCOMPLETE",
         "PROPOSAL_GENERATED",
+        "IN_REVIEW",
+        "ADJUSTMENTS_REQUESTED",
         "CONFIRMED",
       ]);
     });

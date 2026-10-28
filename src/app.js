@@ -206,6 +206,31 @@ const { SendProposalUseCase } = require("../application/use-cases/proposal/send-
 const {
   PostgresAdminRequestQueryRepository,
 } = require("../infrastructure/repositories/reservation-request/postgres-admin-request-query-repository");
+// Incremento 3 - Funciones 4.4 y 4.5: casos de uso de cliente y adaptadores.
+const {
+  GetClientRequestTrackingUseCase,
+} = require("../application/use-cases/client-proposal/get-client-request-tracking-use-case");
+const {
+  GetClientProposalDetailUseCase,
+} = require("../application/use-cases/client-proposal/get-client-proposal-detail-use-case");
+const {
+  AcceptProposalUseCase,
+} = require("../application/use-cases/client-proposal/accept-proposal-use-case");
+const {
+  RequestProposalAdjustmentsUseCase,
+} = require("../application/use-cases/client-proposal/request-proposal-adjustments-use-case");
+const {
+  RejectProposalUseCase,
+} = require("../application/use-cases/client-proposal/reject-proposal-use-case");
+const {
+  GetClientProposalPdfUseCase,
+} = require("../application/use-cases/client-proposal/get-client-proposal-pdf-use-case");
+const {
+  PostgresProposalAdjustmentRepository,
+} = require("../infrastructure/repositories/client-proposal/postgres-proposal-adjustment-repository");
+const {
+  PostgresProposalAcceptanceScheduler,
+} = require("../infrastructure/services/proposal/postgres-proposal-acceptance-scheduler");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -362,7 +387,7 @@ async function main() {
     auditLogRepository
   );
 
-  // Calendar
+  // Calendar (necesario para la aceptación de la propuesta, Función 4.4).
   const calendarEventRepository = new PostgresCalendarEventRepository(pool);
   const calendarSyncRepository = new PostgresCalendarSyncRepository(pool);
   const externalCalendarGateway = new GoogleCalendarGateway();
@@ -370,6 +395,52 @@ async function main() {
     calendarEventRepository,
     calendarSyncRepository,
     externalCalendarGateway
+  );
+  const acceptanceScheduler = new PostgresProposalAcceptanceScheduler(
+    calendarEventRepository,
+    processPendingCalendarSyncUseCase
+  );
+
+  // Incremento 3 - Funciones 4.4 y 4.5: seguimiento por folio y confirmación de evento.
+  const proposalAdjustmentRepository = new PostgresProposalAdjustmentRepository(pool);
+  const clientTransactionManager = new PostgresTransactionManager(pool);
+  const getClientRequestTrackingUseCase = new GetClientRequestTrackingUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository
+  );
+  const getClientProposalDetailUseCase = new GetClientProposalDetailUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    clientTransactionManager
+  );
+  const acceptProposalUseCase = new AcceptProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    pdfGenerator,
+    acceptanceScheduler,
+    clientTransactionManager
+  );
+  const requestProposalAdjustmentsUseCase = new RequestProposalAdjustmentsUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    proposalAdjustmentRepository,
+    clientTransactionManager
+  );
+  const rejectProposalUseCase = new RejectProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    assignedResourceRepository,
+    clientTransactionManager
+  );
+  const getClientProposalPdfUseCase = new GetClientProposalPdfUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    pdfGenerator
   );
 
   const scheduleEventUseCase = new ScheduleEventUseCase(
@@ -427,6 +498,14 @@ async function main() {
     getProposalUseCase,
     downloadProposalUseCase,
     sendProposalUseCase,
+    // Incremento 3 - Funciones 4.4 y 4.5
+    proposalAdjustmentRepository,
+    getClientRequestTrackingUseCase,
+    getClientProposalDetailUseCase,
+    acceptProposalUseCase,
+    requestProposalAdjustmentsUseCase,
+    rejectProposalUseCase,
+    getClientProposalPdfUseCase,
   });
 
   // Start background jobs for calendar sync and finalization
