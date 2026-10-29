@@ -81,7 +81,7 @@ const ProposalAlreadyGeneratedStatuses = Object.freeze([
   ReservationRequestStatus.PROPOSAL_GENERATED,
   ReservationRequestStatus.IN_REVIEW,
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Incremento 3 (RF-3.4.5.6 / RF-3.4.5.7): el cliente interactúa con la propuesta vigente.
@@ -93,7 +93,7 @@ const ClientProposalInteractiveStatuses = Object.freeze([
 // Incremento 3 (RF-3.4.5.8 / RF-3.4.5.9): el cliente solo ve o descarga el PDF.
 const ClientProposalPdfOnlyStatuses = Object.freeze([
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Incremento 3: estados con algún acceso a la propuesta (detalle o PDF).
