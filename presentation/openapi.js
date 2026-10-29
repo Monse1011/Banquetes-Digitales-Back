@@ -807,22 +807,49 @@ const openApiDocument = {
     },
     "/api/admin/requests": {
       get: {
-        tags: ["Admin", "Event assignment"],
-        summary: "List reservation requests (RF-1.2.4.8 pending assignment with status=APPROVED)",
+        tags: ["Admin", "Event assignment", "Event tracking"],
+        summary:
+          "List requests ordered by current start and folio: 2.4 (status=APPROVED), 2.5 (active=true), 2.11 (status=FINALIZED)",
         security: [{ CookieAuth: [] }],
         parameters: [
+          { name: "active", in: "query", required: false, schema: { type: "boolean" } },
           {
             name: "status",
             in: "query",
             required: false,
             schema: { type: "string", enum: Object.keys(ReservationRequestStatus) },
           },
-          { name: "page", in: "query", required: false, schema: { type: "integer" } },
-          { name: "per_page", in: "query", required: false, schema: { type: "integer" } },
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            description: "Folio or client name (partial match)",
+            schema: { type: "string" },
+          },
+          { name: "logistic_user_id", in: "query", required: false, schema: { type: "integer" } },
+          {
+            name: "event_date_from",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date" },
+          },
+          {
+            name: "event_date_to",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date" },
+          },
+          { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+          {
+            name: "per_page",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 100 },
+          },
         ],
         responses: {
-          200: { description: "Requests list" },
-          400: { description: "Invalid status filter" },
+          200: { description: "Requests list (data: [] and total_records: 0 when empty)" },
+          400: { description: "Invalid pagination, status, responsible id, date or date range" },
           403: { description: "Forbidden" },
         },
       },
@@ -830,10 +857,15 @@ const openApiDocument = {
     "/api/admin/requests/{id}": {
       get: {
         tags: ["Admin", "Event assignment"],
-        summary: "Get a reservation request with its assigned logistic user (RF-1.2.4.2/9)",
+        summary:
+          "Read-only request detail with current event data and resource assignments (RF-1.2.4.2, RF-1.2.5.3, RF-1.2.11.2)",
         security: [{ CookieAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
-        responses: { 200: { description: "Request details" }, 404: { description: "Not found" } },
+        responses: {
+          200: { description: "Request details" },
+          400: { description: "Invalid id" },
+          404: { description: "Not found" },
+        },
       },
       patch: {
         tags: ["Admin"],

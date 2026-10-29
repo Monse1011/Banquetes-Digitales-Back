@@ -11,8 +11,8 @@ describe("Códigos del contrato RequestStatus (DAD §3)", () => {
       "ADJUSTMENTS_REQUESTED"
     );
     expect(toApiRequestStatus(ReservationRequestStatus.REJECTED)).toBe("REJECTED");
-    expect(toApiRequestStatus(ReservationRequestStatus.FINISHED)).toBe("FINALIZED");
-    expect(toApiRequestStatus(ReservationRequestStatus.CANCELLED)).toBe("CANCELED");
+    expect(toApiRequestStatus(ReservationRequestStatus.FINALIZED)).toBe("FINALIZED");
+    expect(toApiRequestStatus(ReservationRequestStatus.CANCELED)).toBe("CANCELED");
   });
 });
 
@@ -28,7 +28,7 @@ describe("ProposalAccess (RF-3.4.5.6 a RF-3.4.5.14)", () => {
 
   it("es PDF_ONLY en confirmado y finalizado", () => {
     expect(resolveProposalAccess(ReservationRequestStatus.CONFIRMED)).toBe(ProposalAccess.PDF_ONLY);
-    expect(resolveProposalAccess(ReservationRequestStatus.FINISHED)).toBe(ProposalAccess.PDF_ONLY);
+    expect(resolveProposalAccess(ReservationRequestStatus.FINALIZED)).toBe(ProposalAccess.PDF_ONLY);
   });
 
   it("es NONE en ajustes solicitados y rechazada (RF-3.4.5.13/14)", () => {

@@ -25,12 +25,6 @@ const {
   ApproveReservationRequestUseCase,
 } = require("../application/use-cases/reservation-request/approve-reservation-request-use-case");
 const {
-  GetReservationRequestUseCase,
-} = require("../application/use-cases/reservation-request/get-reservation-request-use-case");
-const {
-  GetReservationRequestsUseCase,
-} = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
-const {
   AssignReservationRequestUseCase,
 } = require("../application/use-cases/reservation-request/assign-reservation-request-use-case");
 const {
@@ -92,18 +86,6 @@ describe("App", () => {
     const approveReservationRequestUseCase = new ApproveReservationRequestUseCase(
       reservationRequestRepository
     );
-    const getReservationRequestUseCase = new GetReservationRequestUseCase(
-      reservationRequestRepository,
-      clientRepository,
-      serviceRepository,
-      userRepository
-    );
-    const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
-      reservationRequestRepository,
-      clientRepository,
-      serviceRepository,
-      userRepository
-    );
     const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
       reservationRequestRepository,
       userRepository
@@ -132,8 +114,6 @@ describe("App", () => {
       upsertClientByEmailUseCase,
       createReservationRequestUseCase,
       approveReservationRequestUseCase,
-      getReservationRequestUseCase,
-      getReservationRequestsUseCase,
       assignReservationRequestUseCase,
       getAvailableLogisticsUsersUseCase,
     });
@@ -384,71 +364,6 @@ describe("App", () => {
         .send({ data: {} });
 
       expect(response.status).toBe(400);
-    });
-
-    it("lists only approved requests pending assignment ordered by date (RF-1.2.4.8)", async () => {
-      const requestId = await createApprovedRequest();
-      await request(app)
-        .post("/api/client/request")
-        .send({
-          client_full_name: "Jane Roe",
-          email: "jane@example.com",
-          phone: "0987654321",
-          event_date_time: new Date().toISOString(),
-          event_end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          guest_count: 50,
-          event_address: "456 Other St",
-          services_ids: [1],
-        });
-
-      const response = await request(app)
-        .get("/api/admin/requests?status=APPROVED&page=1&per_page=10")
-        .set("Cookie", "auth_token=valid-token");
-
-      expect(response.status).toBe(200);
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].request_id).toBe(requestId);
-      expect(response.body.data[0]).toHaveProperty("start_time");
-      expect(response.body.data[0]).toHaveProperty("end_time");
-      expect(response.body.data[0].logistic_user).toBeNull();
-    });
-
-    it("shows the assigned user in the list and details (RF-1.2.4.2)", async () => {
-      const requestId = await createApprovedRequest();
-      await request(app)
-        .patch(`/api/admin/requests/${requestId}/assignment`)
-        .set("Cookie", "auth_token=valid-token")
-        .send({ data: { user_id: 7 } });
-
-      const list = await request(app)
-        .get("/api/admin/requests?status=ASSIGNED&page=1&per_page=10")
-        .set("Cookie", "auth_token=valid-token");
-      const detail = await request(app)
-        .get(`/api/admin/requests/${requestId}`)
-        .set("Cookie", "auth_token=valid-token");
-
-      expect(list.body.data[0].logistic_user).toEqual({
-        id: 7,
-        full_name: "David Torres",
-        email: "david@example.com",
-      });
-      expect(detail.body.data[0].logistic_user.id).toBe(7);
-    });
-
-    it("filters by any RequestStatus key of the DAD and rejects unknown ones", async () => {
-      const requestId = await createApprovedRequest();
-      (await reservationRequestRepository.findById(requestId)).status = "Coordinación Incompleta";
-
-      const list = await request(app)
-        .get("/api/admin/requests?status=coordination_incomplete")
-        .set("Cookie", "auth_token=valid-token");
-      const invalid = await request(app)
-        .get("/api/admin/requests?status=Asignada")
-        .set("Cookie", "auth_token=valid-token");
-
-      expect(list.status).toBe(200);
-      expect(list.body.data.map((item) => item.request_id)).toEqual([requestId]);
-      expect(invalid.status).toBe(400);
     });
 
     it("lists active logistics users for assignment (RF-1.2.4.10/12)", async () => {

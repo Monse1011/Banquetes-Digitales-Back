@@ -1,6 +1,6 @@
 // Estados de la solicitud, excluyentes entre sí y en el orden de su ciclo de vida. Las claves
-// siguen el enum RequestStatus del DAD (sección 3) y se usan en la API (?status=); los valores
-// son los nombres del ERS y son los que se guardan. El DAD llama COMPLETED a "Finalizado".
+// siguen el enum RequestStatus del DAD v3.0 y se usan en la API (?status=); los valores son los
+// nombres del ERS. La BD guarda las mismas claves (01-reservation-request-status-v3.sql).
 const ReservationRequestStatus = Object.freeze({
   PENDING: "Pendiente",
   APPROVED: "Aprobada",
@@ -11,15 +11,25 @@ const ReservationRequestStatus = Object.freeze({
   COORDINATION_INCOMPLETE: "Coordinación Incompleta",
   // Función 3.4: ya existe una propuesta asociada (RF-2.3.4.5).
   PROPOSAL_GENERATED: "Propuesta generada",
-  // Incremento 3 (RF-3.4.4.2): el cliente visualizó la propuesta vigente.
+  // Función 4.4 (RF-3.4.4.2 / RF-3.4.4.5.2).
   IN_REVIEW: "En revisión",
-  // Incremento 3 (RF-3.4.4.5.2): el cliente pidió cambios sobre la propuesta.
   ADJUSTMENTS_REQUESTED: "Ajustes Solicitados",
   // Función 3.3: evento agendado (RF-2.3.3.1), concluido (RF-2.3.3.9) o cancelado (RF-2.3.3.3.2).
   CONFIRMED: "Confirmado",
-  FINISHED: "Finalizado",
-  CANCELLED: "Cancelado",
+  FINALIZED: "Finalizado",
+  CANCELED: "Cancelado",
 });
+
+// Función 2.5 (RF-1.2.5.2): solicitudes activas en seguimiento (?active=true).
+const TrackedReservationRequestStatuses = Object.freeze([
+  ReservationRequestStatus.ASSIGNED,
+  ReservationRequestStatus.COORDINATION_INCOMPLETE,
+  ReservationRequestStatus.COORDINATION_READY,
+  ReservationRequestStatus.PROPOSAL_GENERATED,
+  ReservationRequestStatus.IN_REVIEW,
+  ReservationRequestStatus.ADJUSTMENTS_REQUESTED,
+  ReservationRequestStatus.CONFIRMED,
+]);
 
 // RF-1.2.4.4 / RF-1.2.12.10: estados que ocupan la agenda de un empleado. Función 3.3: se incluyen
 // los posteriores a "Confirmado" que siguen ocupando el horario ("Finalizado").
@@ -32,20 +42,20 @@ const ActiveReservationRequestStatuses = Object.freeze([
   ReservationRequestStatus.IN_REVIEW,
   ReservationRequestStatus.ADJUSTMENTS_REQUESTED,
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Función 3.3: estados de una solicitud que ya tiene evento en el calendario interno.
 const CalendarEventStatuses = Object.freeze([
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
-  ReservationRequestStatus.CANCELLED,
+  ReservationRequestStatus.FINALIZED,
+  ReservationRequestStatus.CANCELED,
 ]);
 
 // Función 3.3: estados cuyos recursos permanecen bloqueados (los cancelados los liberan).
 const ResourceBlockingEventStatuses = Object.freeze([
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Función 3.4 (RF-2.3.4.1) + RF-3.4.4.5.7: estados que habilitan el registro de acuerdos.
@@ -62,7 +72,7 @@ const ProposalVisibleReservationRequestStatuses = Object.freeze([
   ReservationRequestStatus.IN_REVIEW,
   ReservationRequestStatus.ADJUSTMENTS_REQUESTED,
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Incremento 3 (RF-3.4.4.12): estados en los que ya existe una propuesta vigente y no se
@@ -71,7 +81,7 @@ const ProposalAlreadyGeneratedStatuses = Object.freeze([
   ReservationRequestStatus.PROPOSAL_GENERATED,
   ReservationRequestStatus.IN_REVIEW,
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Incremento 3 (RF-3.4.5.6 / RF-3.4.5.7): el cliente interactúa con la propuesta vigente.
@@ -83,7 +93,7 @@ const ClientProposalInteractiveStatuses = Object.freeze([
 // Incremento 3 (RF-3.4.5.8 / RF-3.4.5.9): el cliente solo ve o descarga el PDF.
 const ClientProposalPdfOnlyStatuses = Object.freeze([
   ReservationRequestStatus.CONFIRMED,
-  ReservationRequestStatus.FINISHED,
+  ReservationRequestStatus.FINALIZED,
 ]);
 
 // Incremento 3: estados con algún acceso a la propuesta (detalle o PDF).
@@ -121,6 +131,7 @@ const ResourceConfirmableStatuses = Object.freeze([
 
 module.exports = {
   ReservationRequestStatus,
+  TrackedReservationRequestStatuses,
   ActiveReservationRequestStatuses,
   CalendarEventStatuses,
   ResourceBlockingEventStatuses,

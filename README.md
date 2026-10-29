@@ -46,32 +46,31 @@ PROPOSAL_STORAGE_DIR=storage/proposals
 `PROPOSAL_STORAGE_DIR` es opcional e indica el directorio donde se guardan los PDF
 de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
 
-4. Crear y ejecutar migraciones de base de datos:
+4. Crear la base de datos solo con las migraciones versionadas, en este orden (requiere
+   `psql` 16.10 o superior por el `\restrict` del dump):
 
 ```bash
-psql -U postgres -d banquetes_db -f database.sql
+createdb -U postgres banquetes_db
+for f in docs/estructura.sql docs/catalogos-iniciales.sql \
+  database/increment-3/00-align-schema-dad-v3.sql \
+  database/increment-3/01-reservation-request-status-v3.sql \
+  database/increment-3/06-request-status-history.sql \
+  database/increment-3/07-event-closure.sql; do
+  psql -U postgres -d banquetes_db -v ON_ERROR_STOP=1 -f "$f" || break
+done
 ```
 
-5. Aplicar los cambios de esquema del Incremento 2 (Función 2.4 - Asignación de eventos):
+Las migraciones de `database/increment-3/` son idempotentes. `00-align-schema-dad-v3.sql`
+alinea el esquema con el DAD v3.0 (llaves `request_id`, estados de asignación en español) y
+también sirve para una BD heredada creada con los scripts de `database/increment-2/`: en ese
+caso aplica primero esos scripts y luego los de `database/increment-3/` en el mismo orden.
+
+5. Pruebas de integración: crea una BD vacía con el paso 4 y define `TEST_PGDATABASE` con su
+   nombre (distinto de `PGDATABASE`). Las pruebas insertan sus datos y los revierten; no hace
+   falta crear tablas, columnas ni usuarios a mano.
 
 ```bash
-psql -U postgres -d banquetes_db -f database/increment-2/assignment.sql
-```
-
-6. Aplicar los cambios de esquema del Incremento 2 (Función 3.4 - Contacto con el
-   cliente), en el siguiente orden (`derived_information` antes de `proposals`):
-
-```bash
-psql -U postgres -d banquetes_db -f database/increment-2/derived-information.sql
-psql -U postgres -d banquetes_db -f database/increment-2/proposals.sql
-psql -U postgres -d banquetes_db -f database/increment-2/assigned-resources.sql
-psql -U postgres -d banquetes_db -f database/increment-2/audit-logs.sql
-```
-
-Opcional: cargar datos de prueba de la Función 3.4:
-
-```bash
-psql -U postgres -d banquetes_db -f database/increment-2/mock-data-3.4.sql
+TEST_PGDATABASE=banquetes_test npm run test:run
 ```
 
 ## Desarrollo

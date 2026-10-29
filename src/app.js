@@ -202,6 +202,10 @@ const {
 } = require("../application/use-cases/proposal/download-proposal-use-case");
 const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
 
+// Funciones 2.4, 2.5 y 2.11: consultas de GET /api/admin/requests (DAD v3.0)
+const {
+  PostgresAdminRequestQueryRepository,
+} = require("../infrastructure/repositories/reservation-request/postgres-admin-request-query-repository");
 // Incremento 3 - Funciones 4.4 y 4.5: casos de uso de cliente y adaptadores.
 const {
   GetClientRequestTrackingUseCase,
@@ -308,6 +312,7 @@ async function main() {
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
+  const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
   const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
   const createReservationRequestUseCase = new CreateReservationRequestUseCase(
@@ -319,16 +324,10 @@ async function main() {
     reservationRequestRepository
   );
   const getReservationRequestUseCase = new GetReservationRequestUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository,
-    userRepository
+    adminRequestQueryRepository
   );
   const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository,
-    userRepository
+    adminRequestQueryRepository
   );
   const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
     reservationRequestRepository,

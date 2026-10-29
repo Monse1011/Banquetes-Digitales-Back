@@ -12,6 +12,10 @@ const {
 const { CalendarSyncStatus } = require("../../../domain/enums/calendar/calendar-sync-status");
 const { CalendarSyncOperation } = require("../../../domain/enums/calendar/calendar-sync-operation");
 const { CalendarRules } = require("../../../domain/constants/calendar-rules");
+const {
+  AssignmentStatus,
+  BlockingAssignmentStatuses,
+} = require("../../../domain/enums/resource-assignment/assignment-status");
 const UserRole = require("../../../domain/enums/auth/user-role");
 const UserStatus = require("../../../domain/enums/auth/user-status");
 const { resourceBlockEnd } = require("../../../application/services/calendar/availability-rules");
@@ -256,15 +260,15 @@ class PostgresCalendarEventRepository {
       }
 
       await connection.query("UPDATE reservations_request SET status = $1 WHERE id = $2", [
-        toDatabaseStatus(ReservationRequestStatus.CANCELLED),
+        toDatabaseStatus(ReservationRequestStatus.CANCELED),
         request.id_reservation_request,
       ]);
       // D.5 / D.6: libera de inmediato los recursos (y con ellos el bloqueo de tres horas).
       await connection.query(
         `UPDATE assigned_resources
-         SET status = 'RELEASED', released_at = $2, updated_at = $2
-         WHERE request_id = $1 AND status <> 'RELEASED'`,
-        [request.id_reservation_request, now]
+         SET status = $3, released_at = $2, updated_at = $2
+         WHERE request_id = $1 AND status = ANY($4)`,
+        [request.id_reservation_request, now, AssignmentStatus.RELEASED, BlockingAssignmentStatuses]
       );
       await connection.query(
         "UPDATE calendar_events SET sync_status = $2, updated_at = $3 WHERE id = $1",
@@ -285,7 +289,7 @@ class PostgresCalendarEventRepository {
   async findAll(filters, page, perPage) {
     const statuses = filters.includeCancelled
       ? CalendarEventStatuses
-      : CalendarEventStatuses.filter((status) => status !== ReservationRequestStatus.CANCELLED);
+      : CalendarEventStatuses.filter((status) => status !== ReservationRequestStatus.CANCELED);
     const parameters = [statuses.map(toDatabaseStatus)];
     const conditions = ["r.status = ANY($1)"];
 
@@ -338,7 +342,7 @@ class PostgresCalendarEventRepository {
          FOR UPDATE OF r SKIP LOCKED
        )`,
       [
-        toDatabaseStatus(ReservationRequestStatus.FINISHED),
+        toDatabaseStatus(ReservationRequestStatus.FINALIZED),
         toDatabaseStatus(ReservationRequestStatus.CONFIRMED),
         now,
       ]

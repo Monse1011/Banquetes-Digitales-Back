@@ -12,7 +12,7 @@ const {
   blockingPeriod,
 } = require("../../../application/services/resource-assignment/resource-availability");
 
-const ASSIGNMENT_COLUMNS = `id, reservation_request_id, resource_id, quantity,
+const ASSIGNMENT_COLUMNS = `id, request_id, resource_id, quantity,
   requested_quantity, available_quantity, sufficiency, status, usage_start, usage_end,
   event_start, event_end, observation, created_by_user_id, created_at,
   confirmed_by_user_id, confirmed_at`;
@@ -26,7 +26,7 @@ class PostgresResourceAssignmentRepository {
     const result = await this.executor(transaction).query(
       `SELECT ${ASSIGNMENT_COLUMNS}
        FROM assigned_resources
-       WHERE reservation_request_id = $1 AND status = ANY($2)
+       WHERE request_id = $1 AND status = ANY($2)
        ORDER BY id`,
       [requestId, BlockingAssignmentStatuses]
     );
@@ -40,7 +40,7 @@ class PostgresResourceAssignmentRepository {
       `SELECT ${ASSIGNMENT_COLUMNS}
        FROM assigned_resources
        WHERE resource_id = ANY($1)
-         AND reservation_request_id <> $2
+         AND request_id <> $2
          AND status = ANY($3)
          AND event_start < $4
          AND $5 < event_end + INTERVAL '3 hours'
@@ -62,8 +62,8 @@ class PostgresResourceAssignmentRepository {
 
       await connection.query(
         `UPDATE assigned_resources
-         SET status = $1, updated_at = NOW()
-         WHERE reservation_request_id = $2
+         SET status = $1, updated_at = NOW(), released_at = NOW()
+         WHERE request_id = $2
            AND resource_id = ANY($3)
            AND status = $4`,
         [AssignmentStatus.RELEASED, requestId, resourceIds, AssignmentStatus.PROVISIONAL]
@@ -73,7 +73,7 @@ class PostgresResourceAssignmentRepository {
       for (const assignment of assignments) {
         const result = await connection.query(
           `INSERT INTO assigned_resources
-            (reservation_request_id, resource_id, quantity, requested_quantity,
+            (request_id, resource_id, quantity, requested_quantity,
              available_quantity, sufficiency, status, usage_start, usage_end,
              event_start, event_end, observation, created_by_user_id, created_at,
              confirmed_by_user_id, confirmed_at, updated_at)
@@ -122,7 +122,7 @@ class PostgresResourceAssignmentRepository {
       if (releasedIds.length > 0) {
         await connection.query(
           `UPDATE assigned_resources
-           SET status = $1, updated_at = NOW()
+           SET status = $1, updated_at = NOW(), released_at = NOW()
            WHERE id = ANY($2)`,
           [AssignmentStatus.RELEASED, releasedIds]
         );
@@ -135,8 +135,8 @@ class PostgresResourceAssignmentRepository {
     return this.withTransaction(transaction, async (activeTransaction) => {
       const result = await this.executor(activeTransaction).query(
         `UPDATE assigned_resources
-         SET status = $1, updated_at = NOW()
-         WHERE reservation_request_id = $2 AND status = $3
+         SET status = $1, updated_at = NOW(), released_at = NOW()
+         WHERE request_id = $2 AND status = $3
          RETURNING ${ASSIGNMENT_COLUMNS}`,
         [AssignmentStatus.RELEASED, requestId, AssignmentStatus.PROVISIONAL]
       );
@@ -148,8 +148,8 @@ class PostgresResourceAssignmentRepository {
     return this.withTransaction(transaction, async (activeTransaction) => {
       const result = await this.executor(activeTransaction).query(
         `UPDATE assigned_resources
-         SET status = $1, updated_at = NOW()
-         WHERE reservation_request_id = $2 AND resource_id = $3 AND status = $4
+         SET status = $1, updated_at = NOW(), released_at = NOW()
+         WHERE request_id = $2 AND resource_id = $3 AND status = $4
          RETURNING ${ASSIGNMENT_COLUMNS}`,
         [AssignmentStatus.RELEASED, requestId, resourceId, AssignmentStatus.PROVISIONAL]
       );
@@ -196,7 +196,7 @@ class PostgresResourceAssignmentRepository {
   async insertConfirmedAssignment(connection, assignment) {
     const result = await connection.query(
       `INSERT INTO assigned_resources
-        (reservation_request_id, resource_id, quantity, requested_quantity,
+        (request_id, resource_id, quantity, requested_quantity,
          available_quantity, sufficiency, status, usage_start, usage_end,
          event_start, event_end, observation, created_by_user_id, created_at,
          confirmed_by_user_id, confirmed_at, updated_at)
@@ -215,7 +215,7 @@ class PostgresResourceAssignmentRepository {
            event_start = $8, event_end = $9, observation = $10,
            created_by_user_id = $11, created_at = $12, confirmed_by_user_id = $13,
            confirmed_at = $14, updated_at = NOW()
-       WHERE id = $15 AND reservation_request_id = $16
+       WHERE id = $15 AND request_id = $16
        RETURNING ${ASSIGNMENT_COLUMNS}`,
       [
         assignment.quantity,
@@ -256,7 +256,7 @@ class PostgresResourceAssignmentRepository {
       `SELECT id
        FROM assigned_resources
        WHERE resource_id = ANY($1)
-         AND reservation_request_id <> $2
+         AND request_id <> $2
          AND status = ANY($3)
          AND event_start < $4
          AND $5 < event_end + INTERVAL '3 hours'
@@ -295,7 +295,7 @@ class PostgresResourceAssignmentRepository {
   toEntity(row) {
     return new ResourceAssignment(
       Number(row.id),
-      Number(row.reservation_request_id),
+      Number(row.request_id),
       Number(row.resource_id),
       Number(row.quantity),
       Number(row.requested_quantity),

@@ -65,6 +65,9 @@ const {
   PostgresReservationRequestRepository,
 } = require("./postgres-reservation-request-repository");
 const {
+  PostgresAdminRequestQueryRepository,
+} = require("./postgres-admin-request-query-repository");
+const {
   PostgresCalendarEventRepository,
 } = require("../calendar/postgres-calendar-event-repository");
 const PostgresFolioGenerator = require("../../services/reservation-request/postgres-folio-generator");
@@ -75,6 +78,10 @@ const {
 const {
   ReservationRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status");
+const { AssignmentStatus } = require("../../../domain/enums/resource-assignment/assignment-status");
+const {
+  ResourceSufficiency,
+} = require("../../../domain/enums/resource-assignment/resource-sufficiency");
 
 const {
   ScheduleEventUseCase,
@@ -83,19 +90,24 @@ const {
   ListCalendarEventsUseCase,
 } = require("../../../application/use-cases/calendar/list-calendar-events-use-case");
 
-// Opt-in: TEST_PGDATABASE must name a database with the request migration installed.
-// All fixtures roll back. Transaction boundaries are suppressed only in this adapter
-// so repositories share the outer test transaction; commit semantics are not tested here.
+// Opt-in: TEST_PGDATABASE must name a database with the versioned migrations installed.
+// All fixtures roll back. Repository transactions become savepoints inside the outer test
+// transaction, so their rollbacks still apply; commit semantics are not tested here.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against PostgreSQL", () => {
   it("creates, reads, filters and approves a request using the installed schema", async () => {
     const pool = new Pool({ database: process.env.TEST_PGDATABASE });
     const connection = await pool.connect();
     await connection.query("BEGIN");
     const adapter = {
-      query: (sql, values) => {
-        if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return Promise.resolve({ rows: [] });
-        return connection.query(sql, values);
-      },
+      query: (sql, values) =>
+        connection.query(
+          {
+            BEGIN: "SAVEPOINT repository_transaction",
+            COMMIT: "RELEASE SAVEPOINT repository_transaction",
+            ROLLBACK: "ROLLBACK TO SAVEPOINT repository_transaction",
+          }[sql] ?? sql,
+          values
+        ),
       release() {},
     };
     adapter.connect = async () => adapter;
@@ -148,12 +160,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       });
       expect(listed.requests.some((r) => r.requestId === created.requestId)).toBe(true);
       const summary = await new GetReservationRequestsUseCase(
-        requests,
-        clients,
-        services,
-        new PostgresUserRepository(adapter)
+        new PostgresAdminRequestQueryRepository(adapter)
       ).execute({
-        filters: { clientName: "Prueba Integracion", status: ReservationRequestStatus.PENDING },
+        filters: { search: "Prueba Integracion", statuses: [ReservationRequestStatus.PENDING] },
       });
       expect(
         summary.data.find((row) => row.request_id === created.requestId).selected_services
@@ -163,8 +172,12 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       expect((await requests.findById(created.requestId)).status).toBe(
         ReservationRequestStatus.APPROVED
       );
-      const admin = (await connection.query("SELECT id_user FROM users WHERE role='ADMIN' LIMIT 1"))
-        .rows[0];
+      const admin = (
+        await connection.query(
+          "INSERT INTO users (id_employee,full_name,email,password_hash,role,status) VALUES ($1,'Prueba Admin',$2,'unused-test-hash','ADMIN','ACTIVE') RETURNING id_user",
+          [`A${Date.now()}`, `admin-${Date.now()}@example.invalid`]
+        )
+      ).rows[0];
       const logistic = (
         await connection.query(
           "INSERT INTO users (id_employee,full_name,email,password_hash,role,status) VALUES ($1,'Prueba Logistica',$2,'unused-test-hash','LOGISTICS','ACTIVE') RETURNING id_user",
@@ -340,6 +353,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         requests,
         agreementResources,
         {
+          lockRequest: (...args) => derived.lockRequest(...args),
           create: async () => {
             throw new Error("Simulated save failure");
           },
@@ -496,13 +510,20 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         expect(edited.startAt.toISOString()).toBe(editedStart.toISOString());
         expect((await requests.findById(created.requestId)).eventAddress).toBe("Lugar editado");
         await connection.query(
-          `INSERT INTO assigned_resources (request_id,resource_id,requested_quantity,quantity,sufficiency,usage_start,usage_end,status)
-           VALUES ($1,$2,1,1,'SUFFICIENT',$3,$4,'CONFIRMED')`,
-          [created.requestId, resourceIds[0], editedStart, editedEnd]
+          `INSERT INTO assigned_resources (request_id,resource_id,requested_quantity,quantity,sufficiency,usage_start,usage_end,event_start,event_end,status)
+           VALUES ($1,$2,1,1,$5,$3,$4,$3,$4,$6)`,
+          [
+            created.requestId,
+            resourceIds[0],
+            editedStart,
+            editedEnd,
+            ResourceSufficiency.SUFFICIENT,
+            AssignmentStatus.CONFIRMED,
+          ]
         );
         await cancel.execute(scheduled.event.id, actor);
         expect((await calendar.findById(scheduled.event.id)).status).toBe(
-          ReservationRequestStatus.CANCELLED
+          ReservationRequestStatus.CANCELED
         );
         const released = (
           await connection.query(
@@ -510,9 +531,11 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             [created.requestId]
           )
         ).rows;
-        expect(released).toHaveLength(1);
-        expect(released[0].status).toBe("RELEASED");
-        expect(released[0].released_at).not.toBeNull();
+        // Cancelar libera todas las asignaciones de la solicitud, incluidas las de la Función 3.2.
+        expect(released.length).toBeGreaterThan(1);
+        expect(released).toEqual(
+          released.map(() => ({ status: AssignmentStatus.RELEASED, released_at: expect.any(Date) }))
+        );
         expect((await listCalendar.execute({ actor })).events).toHaveLength(0);
         await expect(
           edit.execute(scheduled.event.id, actor, { location: "No permitido" })
@@ -528,7 +551,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       } finally {
         await fs.rm(pdfDirectory, { recursive: true, force: true });
       }
-      await connection.query("UPDATE reservations_request SET status='FINISHED' WHERE id=$1", [
+      await connection.query("UPDATE reservations_request SET status='FINALIZED' WHERE id=$1", [
         created.requestId,
       ]);
       const history = new GetAssignedRequestsHistoryUseCase({

@@ -176,8 +176,8 @@ describe("InMemoryReservationRequestRepository", () => {
     it.each([
       [ReservationRequestStatus.COORDINATION_INCOMPLETE, "overlap"],
       [ReservationRequestStatus.PROPOSAL_GENERATED, "overlap"],
-      [ReservationRequestStatus.FINISHED, "overlap"],
-      [ReservationRequestStatus.CANCELLED, "assigned"],
+      [ReservationRequestStatus.FINALIZED, "overlap"],
+      [ReservationRequestStatus.CANCELED, "assigned"],
     ])("should treat an overlapping %s request as %s", async (status, expected) => {
       const first = await repository.create(
         buildRequest({ status: ReservationRequestStatus.APPROVED })

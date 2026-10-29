@@ -62,7 +62,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Calendar closing scenarios on Pos
     expect(await new FinalizeElapsedEventsUseCase(repository, () => end).execute()).toBe(0);
     expect(
       (await connection.query("SELECT status FROM reservations_request WHERE id=1")).rows[0].status
-    ).toBe("FINISHED");
+    ).toBe("FINALIZED");
     expect(await conflicts(new Date(end.getTime() + 10800000 - 1))).toHaveLength(1);
     expect(await conflicts(new Date(end.getTime() + 10800000))).toEqual([]);
   });
@@ -107,7 +107,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Calendar closing scenarios on Pos
   });
   it("excludes cancelled events immediately, including the extra three-hour margin", async () => {
     expect(await conflicts(end)).toHaveLength(1);
-    await connection.query("UPDATE reservations_request SET status='CANCELLED' WHERE id=1");
+    await connection.query("UPDATE reservations_request SET status='CANCELED' WHERE id=1");
     expect(await conflicts(end)).toEqual([]);
     expect(await new FinalizeElapsedEventsUseCase(repository, () => end).execute()).toBe(0);
   });

@@ -57,7 +57,7 @@ class GetRequestAgreementsUseCase {
 
     const confirmedStatuses = [
       ReservationRequestStatus.CONFIRMED,
-      ReservationRequestStatus.FINISHED,
+      ReservationRequestStatus.FINALIZED,
     ];
     const scheduleType =
       latestAgreements || confirmedStatuses.includes(request.status) ? "confirmado" : "propuesto";

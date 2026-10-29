@@ -52,11 +52,15 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("PostgreSQL resource-assignment re
       INSERT INTO resources VALUES (10), (11);
       INSERT INTO reservations_request VALUES (1, '2035-06-01 20:00:00', '2035-06-01 23:00:00');
     `);
-    const migration = await fs.readFile(
-      path.join(__dirname, "../../../database/increment-2/assigned-resources.sql"),
-      "utf8"
-    );
-    await pool.query(migration);
+    // Esquema heredado de increment-2 y luego la alineación al DAD v3.0, que renombra sus columnas.
+    for (const migration of [
+      "increment-2/assigned-resources.sql",
+      "increment-3/00-align-schema-dad-v3.sql",
+    ]) {
+      await pool.query(
+        await fs.readFile(path.join(__dirname, "../../../database", migration), "utf8")
+      );
+    }
     assignments = new PostgresResourceAssignmentRepository(pool);
     confirmations = new PostgresResourceConfirmationRepository(pool);
     transactions = new PostgresTransactionManager(pool);
