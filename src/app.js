@@ -499,6 +499,7 @@ async function main() {
     downloadProposalUseCase,
     sendProposalUseCase,
     // Incremento 3 - Funciones 4.4 y 4.5
+    proposalRepository,
     proposalAdjustmentRepository,
     getClientRequestTrackingUseCase,
     getClientProposalDetailUseCase,

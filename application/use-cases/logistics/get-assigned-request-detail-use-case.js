@@ -1,7 +1,12 @@
+const {
+  toApiRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status-api-code");
+
 const CONFIRMED_STATUSES = ["Confirmado", "CONFIRMED", "Finalizado", "COMPLETED"];
 
 // RF-3.4.4.5.7: "Registrar acuerdos" sigue habilitado en "Ajustes Solicitados" además de
-// los estados de coordinación. Se comparan las formas en español y en código de BD.
+// los estados de coordinación. El estado se normaliza al código de la API antes de comparar
+// (el repositorio entrega la etiqueta en español del dominio).
 const AGREEMENTS_EDITABLE_STATUSES = [
   "COORDINATION_READY",
   "COORDINATION_INCOMPLETE",
@@ -92,7 +97,7 @@ class GetAssignedRequestDetailUseCase {
       // Incremento 3 (RF-3.4.4.2 / RF-3.4.4.5.6 / RF-3.4.4.5.7).
       proposal_viewed_at: proposal?.viewedAt ? new Date(proposal.viewedAt).toISOString() : null,
       can_register_agreements: AGREEMENTS_EDITABLE_STATUSES.includes(
-        (request.status || "").toUpperCase()
+        toApiRequestStatus(request.status || "")
       ),
       adjustments: adjustments.map((adjustment) => ({
         id: adjustment.id,

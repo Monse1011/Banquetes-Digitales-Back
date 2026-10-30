@@ -88,6 +88,57 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
     expect(result.data.schedule_type).toBe("confirmado");
   });
 
+  it.each([
+    ["Coordinación Lista", true],
+    ["Coordinación Incompleta", true],
+    ["Ajustes Solicitados", true],
+    ["Asignada", false],
+    ["En revisión", false],
+  ])("enables agreements for the domain status %s → %s (RF-3.4.4.5.7)", async (status, expected) => {
+    const useCase = new GetAssignedRequestDetailUseCase({
+      reservationRequestRepository: {
+        findById: vi.fn().mockResolvedValue(makeRequest({ status })),
+      },
+    });
+
+    const { data } = await useCase.execute({ requestId: 1, userId: 10 });
+
+    expect(data.can_register_agreements).toBe(expected);
+  });
+
+  it("lists the client's adjustment requests with the current proposal (RF-3.4.4.5.6)", async () => {
+    const useCase = new GetAssignedRequestDetailUseCase({
+      reservationRequestRepository: {
+        findById: vi.fn().mockResolvedValue(makeRequest({ status: "Ajustes Solicitados" })),
+      },
+      proposalRepository: {
+        findCurrentByRequestId: vi.fn().mockResolvedValue({
+          proposalsCode: "PROP-2026-0001",
+          version: 1,
+          viewedAt: new Date("2026-10-29T20:00:00Z"),
+        }),
+      },
+      proposalAdjustmentRepository: {
+        findByRequestId: vi.fn().mockResolvedValue([
+          { id: 7, observations: "Agregar 2 meseros", createdAt: new Date("2026-10-29T21:00:00Z") },
+        ]),
+      },
+    });
+
+    const { data } = await useCase.execute({ requestId: 1, userId: 10 });
+
+    expect(data.proposal_viewed_at).toBe("2026-10-29T20:00:00.000Z");
+    expect(data.adjustments).toEqual([
+      {
+        id: 7,
+        proposals_code: "PROP-2026-0001",
+        version: 1,
+        observations: "Agregar 2 meseros",
+        requested_at: "2026-10-29T21:00:00.000Z",
+      },
+    ]);
+  });
+
   it("defaults unrecorded optional fields to 'Sin registrar' (RF-2.3.1.4)", async () => {
     const request = makeRequest({
       id: 3,
