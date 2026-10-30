@@ -22,6 +22,7 @@ FILES=(
   "$HERE/05b-pre-status-history.sql"
   "$BACK/database/increment-3/06-request-status-history.sql"
   "$BACK/database/increment-3/07-event-closure.sql"
+  "$BACK/database/increment-3/08-widen-status-columns.sql"
   "$HERE/10-dev-compat.sql"
 )
 [ -f "$HERE/20-seed.sql" ] && [ "${SEED:-1}" = "1" ] && FILES+=("$HERE/20-seed.sql")

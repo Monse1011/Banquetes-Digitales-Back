@@ -6,7 +6,7 @@ aplica las migraciones y cierra los huecos sobre una BD **vacía**:
 
 | Archivo                      | Qué hace                                                                                                                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `05b-pre-status-history.sql` | Agrega `reservations_request.updated_at` y amplía `status` a varchar(30) antes de la 06.                                                                                                                                                                |
+| `05b-pre-status-history.sql` | Agrega `reservations_request.updated_at`, que la 06 usa para el backfill.                                                                                                                                                                               |
 | `10-dev-compat.sql`          | Renombra columnas a lo que usa el código (`clients.id`, `services.id`, `client_id`, `event_date`/`event_time`, `proposal_code`…), corrige enums (`ADMIN`/`LOGISTICS`, `HUMAN`/`MATERIAL`/`LOGISTIC`) y crea `calendar_events` / `calendar_sync_outbox`. |
 | `20-seed.sql`                | Servicios, roles operativos, recursos de ejemplo y el admin `001` / `Admin123!` (pide cambio de contraseña en el primer acceso).                                                                                                                        |
 
