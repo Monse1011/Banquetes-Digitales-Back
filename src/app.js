@@ -42,6 +42,9 @@ const {
   PostgresAuditLogRepository,
 } = require("../infrastructure/repositories/proposal/postgres-audit-log-repository");
 const { PdfkitPdfGenerator } = require("../infrastructure/services/proposal/pdfkit-pdf-generator");
+const {
+  PostgresEventClosureRepository,
+} = require("../infrastructure/repositories/event-closure/postgres-event-closure-repository");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -166,9 +169,6 @@ const {
   ProcessPendingCalendarSyncUseCase,
 } = require("../application/use-cases/calendar/process-pending-calendar-sync-use-case");
 const {
-  FinalizeElapsedEventsUseCase,
-} = require("../application/use-cases/calendar/finalize-elapsed-events-use-case");
-const {
   PostgresCalendarEventRepository,
 } = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
 const {
@@ -231,6 +231,11 @@ const {
 const {
   PostgresProposalAcceptanceScheduler,
 } = require("../infrastructure/services/proposal/postgres-proposal-acceptance-scheduler");
+
+// Event closure use case (Función 3.6)
+const {
+  FinalizeEventUseCase,
+} = require("../application/use-cases/event-closure/finalize-event-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
@@ -463,7 +468,12 @@ async function main() {
     processPendingCalendarSyncUseCase
   );
   const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
-  const finalizeElapsedEventsUseCase = new FinalizeElapsedEventsUseCase(calendarEventRepository);
+
+  // Función 3.6 - Seguimiento y cierre del evento.
+  const finalizeEventUseCase = new FinalizeEventUseCase(
+    new PostgresEventClosureRepository(),
+    new PostgresTransactionManager(pool)
+  );
 
   const app = createApp({
     // Authentication
@@ -506,16 +516,15 @@ async function main() {
     requestProposalAdjustmentsUseCase,
     rejectProposalUseCase,
     getClientProposalPdfUseCase,
+    // Event closure (Función 3.6)
+    finalizeEventUseCase,
   });
 
-  // Start background jobs for calendar sync and finalization
+  // Start background job for calendar sync. Función 3.6: la finalización ya no es automática
+  // al transcurrir la hora de fin; el Personal de Logística cierra el evento (RF-2.3.6.3).
   setInterval(() => {
     processPendingCalendarSyncUseCase.execute().catch((err) => console.error("Sync error:", err));
   }, 15000); // every 15 seconds
-
-  setInterval(() => {
-    finalizeElapsedEventsUseCase.execute().catch((err) => console.error("Finalize error:", err));
-  }, 60000); // every minute
 
   app.listen(config.port, () => {
     console.log(`Server running on port ${config.port}`);

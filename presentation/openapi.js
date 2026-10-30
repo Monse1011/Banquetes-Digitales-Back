@@ -892,6 +892,37 @@ const openApiDocument = {
         },
       },
     },
+    "/api/logistics/requests/{id}/ending": {
+      patch: {
+        tags: ["Event closure"],
+        summary: "Register actual times and observations and finalize the event (RF-2.3.6.1/5)",
+        description:
+          "Solo el responsable de logística asignado, solo con la solicitud en «Confirmado» y " +
+          "únicamente el día programado vigente (hora de Mérida). Los DateTime usan el offset " +
+          "fijo -06:00 sin milisegundos.",
+        security: [{ CookieAuth: [] }],
+        parameters: [resourceIdParameter],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["actual_start_at", "actual_end_at", "status"],
+          properties: {
+            actual_start_at: { type: "string", example: "2026-11-15T18:10:00-06:00" },
+            actual_end_at: { type: "string", example: "2026-11-15T23:20:00-06:00" },
+            event_observation: { type: "string", maxLength: 1000, nullable: true },
+            status: { type: "string", enum: ["FINALIZED"] },
+          },
+        }),
+        responses: {
+          200: { description: "Event finalized" },
+          400: { description: "Invalid hours, format, observations or status" },
+          401: { description: "Invalid or expired session" },
+          403: { description: "Insufficient permissions or user not assigned" },
+          404: { description: "Request not found" },
+          409: { description: "Not confirmed, outside the scheduled day or already finalized" },
+          500: { description: "Unexpected error" },
+        },
+      },
+    },
     "/api/logistics/requests/{id}/derived-information": {
       post: {
         tags: ["Proposals"],
