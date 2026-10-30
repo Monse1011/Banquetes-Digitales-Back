@@ -7,16 +7,30 @@ const {
 // Las columnas de fecha son timestamptz, por lo que el driver entrega instantes reales.
 class PostgresEventClosureRepository {
   // Usa la conexión de la transacción (transaction.connection). Bloquea la solicitud y
-  // devuelve su horario vigente: la fila más reciente de derived_information (mayor
-  // created_at; en empate, mayor id) o, si no existe, los datos de la solicitud. Inicio y fin
-  // proceden siempre de la misma fila.
+  // devuelve su horario vigente. Una solicitud en «Confirmado» ya tiene su evento en el
+  // calendario (la Función 3.3 lo crea a partir de los acuerdos) y reprogramar desde el
+  // calendario solo actualiza ese evento y la solicitud, no derived_information; por eso el
+  // evento del calendario es la fuente más reciente (NC-01 de la RTF). Si no existe, se usa
+  // la fila más reciente de derived_information (mayor created_at; en empate, mayor id) y,
+  // si tampoco hay, los datos de la solicitud. Inicio y fin proceden siempre de la misma
+  // fuente: nunca se combinan valores de filas distintas.
   async findForUpdate(requestId, transaction) {
     const result = await transaction.connection.query(
       `SELECT rr.id, rr.status, rr.logistic_user_id,
-              COALESCE(di.start_datetime, rr.event_date_time) AS scheduled_start_at,
-              CASE WHEN di.id IS NULL THEN rr.event_end_time ELSE di.end_datetime END
-                AS scheduled_end_at
+              CASE WHEN ce.id IS NOT NULL THEN ce.start_at
+                   WHEN di.id IS NOT NULL THEN di.start_datetime
+                   ELSE rr.event_date_time END AS scheduled_start_at,
+              CASE WHEN ce.id IS NOT NULL THEN ce.end_at
+                   WHEN di.id IS NOT NULL THEN di.end_datetime
+                   ELSE rr.event_end_time END AS scheduled_end_at
        FROM reservations_request rr
+       LEFT JOIN LATERAL (
+         SELECT c.id, c.start_at, c.end_at
+         FROM calendar_events c
+         WHERE c.id_request = rr.id
+         ORDER BY c.id DESC
+         LIMIT 1
+       ) ce ON TRUE
        LEFT JOIN LATERAL (
          SELECT d.id, d.start_datetime, d.end_datetime
          FROM derived_information d

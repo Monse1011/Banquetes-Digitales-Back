@@ -161,6 +161,42 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", 
     );
   });
 
+  // NC-01 (RTF): al reprogramar desde el calendario (Función 3.3) solo se actualizan
+  // calendar_events y la solicitud; derived_information conserva el horario original.
+  describe("evento reprogramado desde el calendario (NC-01)", () => {
+    async function rescheduleFromCalendar(oldDay, newDay) {
+      await connection.query(
+        `INSERT INTO derived_information (request_id, location, start_datetime, end_datetime, created_by_user_id)
+         VALUES ($1, 'Salón T', $2, $3, $4)`,
+        [ids.request, `${oldDay}T18:00:00-06:00`, `${oldDay}T23:00:00-06:00`, ids.logistic]
+      );
+      await connection.query(
+        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location, sync_status)
+         VALUES ($1, 'Evento T', $2, $3, 'Salón T', 'SYNCED')`,
+        [ids.request, `${newDay}T18:00:00-06:00`, `${newDay}T23:00:00-06:00`]
+      );
+      // Lo mismo que hace reschedule() de la Función 3.3 sobre la solicitud.
+      await connection.query(
+        "UPDATE reservations_request SET event_date = $2, event_time = '18:00', event_end_time = $3 WHERE id = $1",
+        [ids.request, newDay, `${newDay}T23:00:00-06:00`]
+      );
+    }
+
+    it("permite finalizar el día nuevo y no el original", async () => {
+      await rescheduleFromCalendar("2035-05-31", "2035-06-01");
+
+      await expect(useCase.execute(ids.request, ids.logistic, body())).resolves.toBeDefined();
+    });
+
+    it("rechaza el día original, que ya no es el programado", async () => {
+      await rescheduleFromCalendar("2035-06-01", "2035-06-02");
+
+      await expect(useCase.execute(ids.request, ids.logistic, body())).rejects.toBeInstanceOf(
+        EventClosureConflictException
+      );
+    });
+  });
+
   it("acepta una solicitud sin hora de fin (event_end_time NULL)", async () => {
     await connection.query("UPDATE reservations_request SET event_end_time = NULL WHERE id = $1", [
       ids.request,
