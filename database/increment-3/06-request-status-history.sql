@@ -20,17 +20,9 @@ BEGIN
   END IF;
 END $$;
 
-CREATE TABLE IF NOT EXISTS request_status_history (
-  id bigserial PRIMARY KEY,
-  request_id bigint NOT NULL REFERENCES reservations_request (id),
-  previous_status varchar(30),
-  new_status varchar(30) NOT NULL,
-  changed_at timestamptz NOT NULL DEFAULT now(),
-  changed_by_user_id bigint REFERENCES users (id_user)
 -- Incremento 3 - RF-1.2.5.4: historial de cambios de estado de cada solicitud.
 -- DAD 010 §7 (Request_status_history, tabla nueva). changed_by_user_id es NULL cuando
 -- el cambio lo realiza el cliente o el sistema.
-
 CREATE TABLE IF NOT EXISTS request_status_history (
   id BIGSERIAL PRIMARY KEY,
   request_id BIGINT NOT NULL REFERENCES reservations_request (id) ON DELETE CASCADE,
@@ -89,8 +81,3 @@ CREATE TRIGGER trg_request_status_history
   FOR EACH ROW EXECUTE FUNCTION record_request_status_history();
 
 COMMIT;
--- Backfill: cada solicitud existente deja constancia de su estado actual.
-INSERT INTO request_status_history (request_id, previous_status, new_status, changed_at)
-SELECT id, NULL, status, status_changed_at
-FROM reservations_request
-WHERE NOT EXISTS (SELECT 1 FROM request_status_history h WHERE h.request_id = reservations_request.id);
