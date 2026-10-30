@@ -97,6 +97,8 @@ class ReservationRequestController {
         ? new GetAssignedRequestDetailUseCase({
             reservationRequestRepository: repo,
             serviceRepository: dependencies.serviceRepository,
+            proposalRepository: dependencies.proposalRepository,
+            proposalAdjustmentRepository: dependencies.proposalAdjustmentRepository,
           })
         : null);
   }
