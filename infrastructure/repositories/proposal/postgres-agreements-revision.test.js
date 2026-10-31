@@ -79,6 +79,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
         id bigint PRIMARY KEY,
         id_reservation_request bigint UNIQUE,
         status text,
+        status_changed_at timestamptz,
         event_date_time timestamp NOT NULL,
         event_end_time timestamp NOT NULL
       );
@@ -88,7 +89,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
       CREATE TABLE document_counters (kind text, year integer, last_number integer, PRIMARY KEY(kind, year));
       CREATE TABLE proposals (id bigserial PRIMARY KEY, request_id bigint UNIQUE, derived_information_id bigint,
         proposal_code text, file_name text, status text, subtotal numeric, discount_amount numeric,
-        client_observations text, created_by_user_id bigint, created_at timestamptz);
+        client_observations text, created_by_user_id bigint, created_at timestamptz,
+        version integer, viewed_at timestamp, accepted_at timestamptz, accepted_pdf_path text,
+        pdf_path text, total_amount numeric, currency char(3));
       CREATE TABLE proposal_resources (proposal_id bigint, resource_id bigint, quantity integer, unit_cost numeric);
     `);
       for (const migration of [

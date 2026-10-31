@@ -163,8 +163,8 @@ class PostgresResourceAssignmentRepository {
     return this.withTransaction(transaction, async (activeTransaction) => {
       const result = await this.executor(activeTransaction).query(
         `UPDATE assigned_resources
-         SET status = $1, updated_at = NOW()
-         WHERE reservation_request_id = $2 AND status = ANY($3)
+         SET status = $1, updated_at = NOW(), released_at = NOW()
+         WHERE request_id = $2 AND status = ANY($3)
          RETURNING ${ASSIGNMENT_COLUMNS}`,
         [AssignmentStatus.RELEASED, requestId, BlockingAssignmentStatuses]
       );
