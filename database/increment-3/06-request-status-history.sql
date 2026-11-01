@@ -20,6 +20,9 @@ BEGIN
   END IF;
 END $$;
 
+-- Incremento 3 - RF-1.2.5.4: historial de cambios de estado de cada solicitud.
+-- DAD 010 §7 (Request_status_history, tabla nueva). changed_by_user_id es NULL cuando
+-- el cambio lo realiza el cliente o el sistema.
 CREATE TABLE IF NOT EXISTS request_status_history (
   id bigserial PRIMARY KEY,
   request_id bigint NOT NULL REFERENCES reservations_request (id),

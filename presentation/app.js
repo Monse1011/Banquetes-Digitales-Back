@@ -6,6 +6,7 @@ const createClientRoutes = require("./routes/client-routes");
 const createAdminRoutes = require("./routes/admin-routes");
 const createAdminResourceRoutes = require("./routes/admin-resource-routes");
 const createLogisticsRoutes = require("./routes/logistics-routes");
+const createEventClosureRoutes = require("./routes/event-closure-routes");
 const { openApiDocument } = require("./openapi");
 const {
   ReservationRequestController,
@@ -66,7 +67,12 @@ const ScheduleConflictException = require("../domain/exceptions/proposal/schedul
 const ProposalGenerationFailedException = require("../domain/exceptions/proposal/proposal-generation-failed-exception");
 const ProposalSendFailedException = require("../domain/exceptions/proposal/proposal-send-failed-exception");
 const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
+const EventClosureValidationException = require("../domain/exceptions/event-closure/event-closure-validation-exception");
+const EventClosureConflictException = require("../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureNotFoundException = require("../domain/exceptions/event-closure/event-closure-not-found-exception");
+const EventClosureAccessDeniedException = require("../domain/exceptions/event-closure/event-closure-access-denied-exception");
 const { AgreementsController } = require("./controller/proposal/agreements-controller");
+const { EventClosureController } = require("./controller/event-closure/event-closure-controller");
 const { ProposalController } = require("./controller/proposal/proposal-controller");
 const {
   ClientProposalController,
@@ -347,14 +353,31 @@ function handleProposalError(error, response) {
   );
 }
 
-// Estándares de Código 2.4: los ids inválidos de la URL responden 400.
+// Función 3.6: errores del seguimiento y cierre del evento; los mensajes son los del DAD.
+function handleEventClosureError(error, response) {
+  const statusByException = [
+    [EventClosureValidationException, 400],
+    [EventClosureAccessDeniedException, 403],
+    [EventClosureNotFoundException, 404],
+    [EventClosureConflictException, 409],
+  ];
+  const match = statusByException.find(([exception]) => error instanceof exception);
+
+  if (!match) return false;
+
+  response.status(match[1]).json({ message: error.message });
+  return true;
+}
+
+// Estándares de Código 2.4: los ids inválidos de la URL responden 400. Después, los errores
+// de la Función 3.6.
 function handleCommonError(error, response) {
   if (error instanceof InvalidIdException) {
     response.status(400).json({ message: error.message });
     return true;
   }
 
-  return false;
+  return handleEventClosureError(error, response);
 }
 
 // Funciones 2.1 a 2.3: errores de autenticación y recuperación de contraseña.
@@ -415,6 +438,7 @@ function createApp(dependencies) {
     proposalController: new ProposalController(dependencies),
   };
   const clientProposalController = new ClientProposalController(dependencies);
+  const eventClosureController = new EventClosureController(dependencies);
 
   app.use(express.json());
 
@@ -451,6 +475,7 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
+  app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(
     "/api/logistics",
     createLogisticsRoutes(
