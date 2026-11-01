@@ -194,6 +194,51 @@ describe("App", () => {
     });
   });
 
+  describe("PATCH /api/admin/requests/:id", () => {
+    async function createPendingRequest() {
+      await request(app)
+        .post("/api/client/request")
+        .send({
+          client_full_name: "John Doe",
+          email: "john@example.com",
+          phone: "1234567890",
+          event_date_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          event_end_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
+          guest_count: 100,
+          event_address: "123 Main St",
+          services_ids: [1, 2],
+        });
+      const { requests } = await reservationRequestRepository.findAll({}, {}, 1, 10);
+      return requests[0].requestId;
+    }
+
+    const approve = (requestId, status) =>
+      request(app)
+        .patch(`/api/admin/requests/${requestId}`)
+        .set("Cookie", "auth_token=valid-token")
+        .send({ status });
+
+    it("approves with the contract code APPROVED", async () => {
+      const response = await approve(await createPendingRequest(), "APPROVED");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data[0].status).toBe("Aprobada");
+    });
+
+    it("keeps accepting the legacy label Aprobada", async () => {
+      const response = await approve(await createPendingRequest(), "Aprobada");
+
+      expect(response.status).toBe(200);
+    });
+
+    it("rejects any other status", async () => {
+      const response = await approve(await createPendingRequest(), "ASSIGNED");
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe("Status must be APPROVED");
+    });
+  });
+
   it("checks first access through the authentication cookie", async () => {
     const response = await request(app)
       .get("/api/auth/first-access")

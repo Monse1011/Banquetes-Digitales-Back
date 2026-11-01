@@ -97,6 +97,8 @@ class ReservationRequestController {
         ? new GetAssignedRequestDetailUseCase({
             reservationRequestRepository: repo,
             serviceRepository: dependencies.serviceRepository,
+            proposalRepository: dependencies.proposalRepository,
+            proposalAdjustmentRepository: dependencies.proposalAdjustmentRepository,
           })
         : null);
   }
@@ -128,11 +130,13 @@ class ReservationRequestController {
     response.json(result);
   }
 
+  // El contrato publica el código "APPROVED"; se acepta también la etiqueta "Aprobada" por
+  // compatibilidad con clientes anteriores.
   async approve(request, response) {
     const status = request.body?.status;
 
-    if (status !== ReservationRequestStatus.APPROVED) {
-      response.status(400).json({ message: `Status must be ${ReservationRequestStatus.APPROVED}` });
+    if (status !== "APPROVED" && status !== ReservationRequestStatus.APPROVED) {
+      response.status(400).json({ message: "Status must be APPROVED" });
       return;
     }
 
