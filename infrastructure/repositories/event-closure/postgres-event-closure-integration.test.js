@@ -27,8 +27,7 @@ function body(overrides = {}) {
   });
 }
 
-// Opt-in: TEST_PGDATABASE debe nombrar una base con estructura.sql y las migraciones de
-// database/increment-3 (request-status-history.sql y event-closure.sql). Todo se revierte.
+// Opt-in: TEST_PGDATABASE debe nombrar una base creada con database/schema.sql. Todo se revierte.
 // Las fronteras de transacción se suprimen solo en este adaptador para que los repositorios
 // compartan la transacción externa de la prueba.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", () => {

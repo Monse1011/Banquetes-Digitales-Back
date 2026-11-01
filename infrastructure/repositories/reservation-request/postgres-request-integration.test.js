@@ -90,7 +90,7 @@ const {
   ListCalendarEventsUseCase,
 } = require("../../../application/use-cases/calendar/list-calendar-events-use-case");
 
-// Opt-in: TEST_PGDATABASE must name a database with the versioned migrations installed.
+// Opt-in: TEST_PGDATABASE must name a database created with database/schema.sql.
 // All fixtures roll back. Repository transactions become savepoints inside the outer test
 // transaction, so their rollbacks still apply; commit semantics are not tested here.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against PostgreSQL", () => {

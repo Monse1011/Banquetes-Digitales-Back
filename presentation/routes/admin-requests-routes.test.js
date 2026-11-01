@@ -97,8 +97,8 @@ describe("GET /api/admin/requests: access and validation (Funciones 2.5 y 2.11)"
   });
 });
 
-// Opt-in: TEST_PGDATABASE debe nombrar una base de pruebas creada solo con las migraciones
-// versionadas (ver README). Cada prueba inserta sus datos dentro de una transacción que se
+// Opt-in: TEST_PGDATABASE debe nombrar una base de pruebas creada con database/schema.sql
+// (ver README). Cada prueba inserta sus datos dentro de una transacción que se
 // revierte al terminar.
 describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against PostgreSQL", () => {
   let pool;
