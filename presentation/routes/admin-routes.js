@@ -2,7 +2,12 @@ const express = require("express");
 const UserRole = require("../../domain/enums/auth/user-role");
 const requireRole = require("../middleware/auth/role-middleware");
 
-function createAdminRoutes(reservationRequestController, userController, authMiddleware) {
+function createAdminRoutes(
+  reservationRequestController,
+  userController,
+  authMiddleware,
+  serviceController = null
+) {
   const router = express.Router();
   // RF-1.2.4.16: las funciones de la Función 2.4 se restringen a Administrador General.
   router.use(authMiddleware, requireRole(UserRole.ADMIN));
@@ -50,6 +55,32 @@ function createAdminRoutes(reservationRequestController, userController, authMid
   router.put("/users/:id", (request, response, next) => {
     userController.toggleStatus(request, response).catch(next);
   });
+
+  if (serviceController) {
+    router.get("/services", (request, response, next) => {
+      serviceController.listAdmin(request, response).catch(next);
+    });
+
+    router.post("/services", (request, response, next) => {
+      serviceController.create(request, response).catch(next);
+    });
+
+    router.patch("/services/:id", (request, response, next) => {
+      serviceController.update(request, response).catch(next);
+    });
+
+    router.put("/services/:id", (request, response, next) => {
+      serviceController.changeStatus(request, response).catch(next);
+    });
+
+    router.put("/services/:id/status", (request, response, next) => {
+      serviceController.changeStatus(request, response).catch(next);
+    });
+
+    router.delete("/services/:id", (request, response, next) => {
+      serviceController.delete(request, response).catch(next);
+    });
+  }
 
   return router;
 }

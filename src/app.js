@@ -3,6 +3,7 @@ require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
+const { ServicesService } = require("../application/services/service/services-service");
 
 const {
   PostgresClientRepository,
@@ -316,6 +317,7 @@ async function main() {
 
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
+  const servicesService = new ServicesService(serviceRepository);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
   const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
@@ -482,6 +484,7 @@ async function main() {
     tokenService,
     clientRepository,
     serviceRepository,
+    servicesService,
     reservationRequestRepository,
     folioGenerator,
     upsertClientByEmailUseCase,

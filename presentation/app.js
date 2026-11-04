@@ -77,6 +77,12 @@ const { ProposalController } = require("./controller/proposal/proposal-controlle
 const {
   ClientProposalController,
 } = require("./controller/client-proposal/client-proposal-controller");
+const { ServicesService } = require("../application/services/service/services-service");
+const ServiceNotFoundException = require("../domain/exceptions/service/service-not-found-exception");
+const DuplicateServiceNameException = require("../domain/exceptions/service/duplicate-service-name-exception");
+const ServiceValidationException = require("../domain/exceptions/service/service-validation-exception");
+const ServiceConflictException = require("../domain/exceptions/service/service-conflict-exception");
+const InvalidServiceStatusException = require("../domain/exceptions/service/invalid-service-status-exception");
 const InvalidFolioFormatException = require("../domain/exceptions/client-proposal/invalid-folio-format-exception");
 const ClientRequestNotFoundException = require("../domain/exceptions/client-proposal/client-request-not-found-exception");
 const AcceptedTermsRequiredException = require("../domain/exceptions/client-proposal/accepted-terms-required-exception");
@@ -91,6 +97,33 @@ const ErrorMessages = require("./constants/error-messages");
 // Incremento 3 (Funciones 4.4 y 4.5): el folio inválido (400) y el inexistente (404)
 // comparten el mensaje del contrato (RF-3.4.5.1.2).
 const TRACKING_ENDPOINT_PATH = /^\/api\/client\/requests\/[^/]+\/?$/;
+
+function handleServiceError(error, response) {
+  if (error instanceof ServiceNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof DuplicateServiceNameException ||
+    error instanceof ServiceConflictException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof InvalidServiceStatusException) {
+    response.status(422).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ServiceValidationException) {
+    response.status(400).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  return false;
+}
 
 function isTrackingEndpointRequest(request) {
   const url = (request?.originalUrl ?? request?.url ?? "").split("?")[0];
@@ -430,7 +463,10 @@ function createApp(dependencies) {
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
-  const serviceController = new ServiceController(dependencies.serviceRepository);
+  const servicesService =
+    dependencies.servicesService ||
+    (dependencies.serviceRepository ? new ServicesService(dependencies.serviceRepository) : null);
+  const serviceController = new ServiceController(dependencies.serviceRepository, servicesService);
   const calendarController = new CalendarController(dependencies);
   const resourceControllers = createResourceControllers(dependencies);
   const proposalControllers = {
@@ -473,7 +509,7 @@ function createApp(dependencies) {
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
-    createAdminRoutes(reservationRequestController, userController, authMiddleware)
+    createAdminRoutes(reservationRequestController, userController, authMiddleware, serviceController)
   );
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(
@@ -489,6 +525,7 @@ function createApp(dependencies) {
   // Error handler
   app.use((error, request, response, _next) => {
     if (handleCommonError(error, response)) return;
+    if (handleServiceError(error, response)) return;
     if (handleCalendarError(error, response)) return;
     if (handleResourceError(error, response)) return;
     if (handleResourceAssignmentError(error, response)) return;
