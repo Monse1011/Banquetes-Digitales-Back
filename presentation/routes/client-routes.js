@@ -15,7 +15,8 @@ function createClientRateLimit() {
 function createClientRoutes(
   reservationRequestController,
   serviceController,
-  clientProposalController = null
+  clientProposalController = null,
+  promotionController = null
 ) {
   const router = express.Router();
 
@@ -26,6 +27,13 @@ function createClientRoutes(
   router.get("/services", (request, response, next) => {
     serviceController.list(request, response).catch(next);
   });
+
+  if (promotionController) {
+    const rateLimit = createClientRateLimit();
+    router.get("/promotions", rateLimit, (request, response, next) => {
+      promotionController.listClient(request, response).catch(next);
+    });
+  }
 
   if (clientProposalController) {
     const rateLimit = createClientRateLimit();

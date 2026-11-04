@@ -77,6 +77,13 @@ const { ProposalController } = require("./controller/proposal/proposal-controlle
 const {
   ClientProposalController,
 } = require("./controller/client-proposal/client-proposal-controller");
+const { PromotionController } = require("./controller/promotion/promotion-controller");
+const { PromotionsService } = require("../application/services/promotion/promotions-service");
+const PromotionNotFoundException = require("../domain/exceptions/promotion/promotion-not-found-exception");
+const DuplicatePromotionNameException = require("../domain/exceptions/promotion/duplicate-promotion-name-exception");
+const PromotionValidationException = require("../domain/exceptions/promotion/promotion-validation-exception");
+const PromotionConflictException = require("../domain/exceptions/promotion/promotion-conflict-exception");
+const InvalidPromotionStatusException = require("../domain/exceptions/promotion/invalid-promotion-status-exception");
 const InvalidFolioFormatException = require("../domain/exceptions/client-proposal/invalid-folio-format-exception");
 const ClientRequestNotFoundException = require("../domain/exceptions/client-proposal/client-request-not-found-exception");
 const AcceptedTermsRequiredException = require("../domain/exceptions/client-proposal/accepted-terms-required-exception");
@@ -91,6 +98,33 @@ const ErrorMessages = require("./constants/error-messages");
 // Incremento 3 (Funciones 4.4 y 4.5): el folio inválido (400) y el inexistente (404)
 // comparten el mensaje del contrato (RF-3.4.5.1.2).
 const TRACKING_ENDPOINT_PATH = /^\/api\/client\/requests\/[^/]+\/?$/;
+
+function handlePromotionError(error, response) {
+  if (error instanceof PromotionNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof DuplicatePromotionNameException ||
+    error instanceof PromotionConflictException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof InvalidPromotionStatusException) {
+    response.status(422).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof PromotionValidationException) {
+    response.status(400).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  return false;
+}
 
 function isTrackingEndpointRequest(request) {
   const url = (request?.originalUrl ?? request?.url ?? "").split("?")[0];
@@ -439,6 +473,14 @@ function createApp(dependencies) {
   };
   const clientProposalController = new ClientProposalController(dependencies);
   const eventClosureController = new EventClosureController(dependencies);
+  const promotionsService =
+    dependencies.promotionsService ||
+    (dependencies.promotionRepository
+      ? new PromotionsService(dependencies.promotionRepository)
+      : null);
+  const promotionController =
+    dependencies.promotionController ||
+    (promotionsService ? new PromotionController(promotionsService) : null);
 
   app.use(express.json());
 
@@ -466,14 +508,14 @@ function createApp(dependencies) {
 
   app.use(
     "/api/client",
-    createClientRoutes(reservationRequestController, serviceController, clientProposalController)
+    createClientRoutes(reservationRequestController, serviceController, clientProposalController, promotionController)
   );
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
-    createAdminRoutes(reservationRequestController, userController, authMiddleware)
+    createAdminRoutes(reservationRequestController, userController, authMiddleware, promotionController)
   );
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(
@@ -489,6 +531,7 @@ function createApp(dependencies) {
   // Error handler
   app.use((error, request, response, _next) => {
     if (handleCommonError(error, response)) return;
+    if (handlePromotionError(error, response)) return;
     if (handleCalendarError(error, response)) return;
     if (handleResourceError(error, response)) return;
     if (handleResourceAssignmentError(error, response)) return;

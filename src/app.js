@@ -3,6 +3,8 @@ require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
+const { PostgresPromotionRepository } = require("../infrastructure/repositories/promotion/postgres-promotion-repository");
+const { PromotionsService } = require("../application/services/promotion/promotions-service");
 
 const {
   PostgresClientRepository,
@@ -316,6 +318,8 @@ async function main() {
 
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
+  const promotionRepository = new PostgresPromotionRepository(pool);
+  const promotionsService = new PromotionsService(promotionRepository);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
   const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
@@ -482,6 +486,8 @@ async function main() {
     tokenService,
     clientRepository,
     serviceRepository,
+    promotionRepository,
+    promotionsService,
     reservationRequestRepository,
     folioGenerator,
     upsertClientByEmailUseCase,
