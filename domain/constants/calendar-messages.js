@@ -21,11 +21,16 @@ const CalendarMessages = Object.freeze({
   IMMUTABLE_FIELDS:
     "El responsable de logística y los recursos de un evento confirmado no pueden modificarse.",
   UNSUPPORTED_FIELD: "El campo no está definido por el contrato de edición del calendario.",
+  RESCHEDULE_NOT_ALLOWED:
+    "No es posible cambiar la fecha ni la hora de un evento confirmado. Solo se puede modificar la ubicación.",
   EDIT_NO_CHANGES:
     "Indique al menos un dato a modificar: fecha y hora de inicio, fecha y hora de fin o ubicación.",
   INVALID_DATE_TIME: "Indique una fecha y hora válidas.",
   INVALID_LOCATION: "La ubicación del evento no puede estar vacía.",
   END_BEFORE_START: "La hora de fin debe ser posterior a la hora de inicio.",
+  END_NEXT_DAY_INVALID:
+    "Si el evento termina al día siguiente, la hora de fin debe ser menor o igual a la hora de inicio.",
+  END_TOO_FAR: "El evento no puede terminar más de un día después de su inicio.",
   START_IN_PAST: "La fecha y hora de inicio no pueden ser anteriores al momento actual.",
   INVALID_FILTER_DATE: "La fecha de consulta debe tener formato AAAA-MM-DD.",
   INVALID_REQUEST_ID: "El identificador de la solicitud es obligatorio.",

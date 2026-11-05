@@ -498,13 +498,15 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         ).toBe(1);
         const edit = new EditEventUseCase(calendar, null);
         const cancel = new CancelEventUseCase(calendar, null);
-        const editedStart = new Date(start.getTime() + 86400000);
-        const editedEnd = new Date(end.getTime() + 86400000);
-        await edit.execute(scheduled.event.id, actor, {
-          location: "Lugar editado",
-          start_datetime: editedStart.toISOString(),
-          end_datetime: editedEnd.toISOString(),
-        });
+        // Defecto 6: un evento Confirmado solo admite cambiar la ubicación.
+        const editedStart = start;
+        const editedEnd = end;
+        await expect(
+          edit.execute(scheduled.event.id, actor, {
+            start_datetime: new Date(start.getTime() + 86400000).toISOString(),
+          })
+        ).rejects.toMatchObject({ name: "CalendarValidationException" });
+        await edit.execute(scheduled.event.id, actor, { location: "Lugar editado" });
         const edited = await calendar.findById(scheduled.event.id);
         expect(edited.location).toBe("Lugar editado");
         expect(edited.startAt.toISOString()).toBe(editedStart.toISOString());

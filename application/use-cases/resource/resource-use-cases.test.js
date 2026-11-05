@@ -107,6 +107,14 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         ).rejects.toMatchObject({ errors: { name: HumanResourceMessages.NAME_TOO_LONG } });
       });
 
+      it("rejects a name without any letter", async () => {
+        for (const name of ["12345", "123 456", "---"]) {
+          await expect(
+            useCases.humanResourceUseCases.create.execute({ name, operativeRoleId: WAITER_ROLE_ID })
+          ).rejects.toMatchObject({ errors: { name: HumanResourceMessages.NAME_NEEDS_LETTER } });
+        }
+      });
+
       it("rejects inactive or unknown operative roles", async () => {
         for (const operativeRoleId of [INACTIVE_ROLE_ID, 999]) {
           await expect(

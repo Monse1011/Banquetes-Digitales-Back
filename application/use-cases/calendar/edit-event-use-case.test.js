@@ -26,9 +26,7 @@ describe("EditEventUseCase DAD request fields", () => {
     expect(eventRepository.reschedule).not.toHaveBeenCalled();
   });
 
-  it("accepts a PATCH with DAD field names", async () => {
-    const startAt = new Date(2026, 11, 24, 19);
-    const endAt = new Date(2026, 11, 24, 23);
+  it("accepts a PATCH that only changes the location", async () => {
     const event = {
       id: 4,
       logisticUserId: 12,
@@ -38,7 +36,7 @@ describe("EditEventUseCase DAD request fields", () => {
       isConfirmed: () => true,
       hasStarted: () => false,
     };
-    const updatedEvent = { ...event, startAt, endAt, location: "Updated", isSynced: () => true };
+    const updatedEvent = { ...event, location: "Updated", isSynced: () => true };
     const eventRepository = {
       findById: vi.fn().mockResolvedValueOnce(event).mockResolvedValue(updatedEvent),
       reschedule: vi.fn().mockResolvedValue({
@@ -53,22 +51,44 @@ describe("EditEventUseCase DAD request fields", () => {
       () => new Date("2026-01-01T00:00:00.000Z")
     );
 
-    await useCase.execute(
-      4,
-      { id_user: 12, role: UserRole.LOGISTICS },
-      {
-        start_datetime: "2026-12-24 19:00:00",
-        end_datetime: "2026-12-24 23:00:00",
-        location: "Updated",
-      }
-    );
+    await useCase.execute(4, { id_user: 12, role: UserRole.LOGISTICS }, { location: "Updated" });
 
     expect(eventRepository.reschedule).toHaveBeenCalledWith({
       eventId: 4,
-      startAt,
-      endAt,
+      startAt: event.startAt,
+      endAt: event.endAt,
       location: "Updated",
       now: new Date("2026-01-01T00:00:00.000Z"),
     });
+  });
+
+  it("rejects any date or time change on a confirmed event", async () => {
+    const event = {
+      id: 4,
+      logisticUserId: 12,
+      startAt: new Date("2026-12-24T18:00:00.000Z"),
+      endAt: new Date("2026-12-24T22:00:00.000Z"),
+      location: "Original",
+      isConfirmed: () => true,
+      hasStarted: () => false,
+    };
+    const eventRepository = { findById: vi.fn().mockResolvedValue(event), reschedule: vi.fn() };
+    const useCase = new EditEventUseCase(
+      eventRepository,
+      null,
+      () => new Date("2026-01-01T00:00:00.000Z")
+    );
+
+    await expect(
+      useCase.execute(
+        4,
+        { id_user: 12, role: UserRole.LOGISTICS },
+        { start_datetime: "2026-12-24 19:00:00", end_datetime: "2026-12-24 23:00:00" }
+      )
+    ).rejects.toMatchObject({
+      name: "CalendarValidationException",
+      errors: { start_datetime: expect.any(String), end_datetime: expect.any(String) },
+    });
+    expect(eventRepository.reschedule).not.toHaveBeenCalled();
   });
 });

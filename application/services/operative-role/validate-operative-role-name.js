@@ -9,6 +9,10 @@ function validateOperativeRoleName(name) {
     return { name: OperativeRoleMessages.NAME_TOO_LONG };
   }
 
+  if (!/\p{L}/u.test(name)) {
+    return { name: OperativeRoleMessages.NAME_NEEDS_LETTER };
+  }
+
   return {};
 }
 

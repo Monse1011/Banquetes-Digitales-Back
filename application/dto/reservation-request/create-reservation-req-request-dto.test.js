@@ -58,7 +58,9 @@ describe("CreateReservationRequestDto", () => {
   });
 
   it("should accept an event date scheduled for today", () => {
-    const errors = validDto({ event_date_time: new Date().toISOString() }).validate();
+    const errors = validDto({
+      event_date_time: new Date(Date.now() + 60 * 1000).toISOString(),
+    }).validate();
 
     expect(errors.event_date_time).toBeUndefined();
   });
@@ -95,5 +97,24 @@ describe("CreateReservationRequestDto", () => {
     const errors = validDto({ event_address: "   " }).validate();
 
     expect(errors.event_address).toBeDefined();
+  });
+
+  it("should reject a start earlier today (the time already passed)", () => {
+    const errors = validDto({
+      event_date_time: new Date(Date.now() - 60 * 1000).toISOString(),
+      event_end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    }).validate();
+
+    expect(errors.event_date_time).toMatch(/momento actual/);
+  });
+
+  it("should reject an end the next day that is later than the start time", () => {
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const errors = validDto({
+      event_date_time: start.toISOString(),
+      event_end_time: new Date(start.getTime() + 26 * 60 * 60 * 1000).toISOString(),
+    }).validate();
+
+    expect(errors.event_end_time).toBeDefined();
   });
 });

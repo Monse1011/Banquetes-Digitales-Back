@@ -11,9 +11,14 @@ class HumanResourceRequestDto extends ResourceRequestDto {
   // RF-1.2.8.1: nombre completo obligatorio (máximo 100 caracteres) y rol operativo obligatorio.
   fieldValidations() {
     return {
-      name: this.validateName(HumanResourceMessages),
+      name: this.validateName(HumanResourceMessages) ?? this.validateNameHasLetter(),
       operative_role_id: this.validateOperativeRoleId(),
     };
+  }
+
+  // Defecto 3: un nombre solo numérico o de símbolos no es válido.
+  validateNameHasLetter() {
+    return /\p{L}/u.test(this.name) ? undefined : HumanResourceMessages.NAME_NEEDS_LETTER;
   }
 
   validateOperativeRoleId() {
