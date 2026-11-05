@@ -941,7 +941,7 @@ const openApiDocument = {
             adjusted_resources: {
               type: "array",
               description:
-                "Pueden enviarse solo algunas categorías. Un material o recurso logístico omitido conserva su cantidad; cantidad 0 lo libera y, una vez liberado, puede volver a agregarse. Para personal, incluye las personas seleccionadas; se pueden agregar personas humanas activas disponibles, y omitir una persona confirmada la libera. Una persona nueva requiere cantidad 1.",
+                "Solo los recursos que cambian. Omitir un recurso de cualquier tipo (personal, material o logística) lo deja sin cambios, aunque se revalidan su horario y disponibilidad. Cantidad 0 lo libera; un recurso liberado puede volver a agregarse. Se pueden agregar personas activas disponibles con cantidad 1.",
               items: {
                 type: "object",
                 required: ["resource_id", "quantity"],

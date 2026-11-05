@@ -169,7 +169,7 @@ describe("SaveAgreementsUseCase", () => {
     expect(active.find((assignment) => assignment.resourceId === 3).quantity).toBe(1);
   });
 
-  it("releases a human resource omitted from the selected personnel", async () => {
+  it("releases a human resource only when its quantity is explicitly 0", async () => {
     const request = await createRequest();
 
     await useCase.execute(
@@ -177,7 +177,7 @@ describe("SaveAgreementsUseCase", () => {
       LOGISTIC_USER_ID,
       dto({
         adjusted_resources: [
-          { resource_id: 2, quantity: 50 },
+          { resource_id: 1, quantity: 0 },
           { resource_id: 3, quantity: 1 },
         ],
       })
@@ -418,7 +418,7 @@ describe("SaveAgreementsUseCase", () => {
       expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 50 });
     });
 
-    it("guarda acuerdos sin personal (solo materiales)", async () => {
+    it("mandar solo materiales conserva al personal (omitir = sin cambios)", async () => {
       const request = await createRequest();
 
       await useCase.execute(
@@ -427,8 +427,7 @@ describe("SaveAgreementsUseCase", () => {
         dto({ adjusted_resources: [{ resource_id: 2, quantity: 50 }] })
       );
 
-      // Omitir a una persona la libera (contrato documentado de RF-2.3.4.9).
-      expect(await activeOf(request.requestId)).toEqual({ 2: 50 });
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 50 });
     });
 
     it("un material liberado con cantidad 0 puede volver a agregarse", async () => {

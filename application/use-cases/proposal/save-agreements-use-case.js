@@ -8,6 +8,7 @@ const ResourceAvailabilityExceededException = require("../../../domain/exception
 const ScheduleConflictException = require("../../../domain/exceptions/proposal/schedule-conflict-exception");
 const {
   exceededAvailabilityMessage,
+  unchangedUnavailableMessage,
   resourceNotAssignedMessage,
   ProposalMessages,
 } = require("../../../domain/constants/proposal-messages");
@@ -173,11 +174,10 @@ class SaveAgreementsUseCase {
     }
   }
 
-  // RF-2.3.4.9: los ajustes pueden añadir personal humano; omitir a una persona la libera.
-  // Defecto 8: no se exigen todas las categorías. Un recurso material o logístico omitido
-  // conserva su cantidad (se agrega como ajuste sin cambio para que su horario y disponibilidad
-  // se revaliden); para liberarlo se envía cantidad 0. Uno liberado antes en esta solicitud
-  // puede volver a agregarse, así la solicitud no queda sin forma de reasignarlo.
+  // RF-2.3.4.9 / defecto 8: los ajustes pueden añadir personal humano. Omitir un recurso de
+  // cualquier tipo lo deja sin cambios (se agrega como ajuste sin cambio para revalidar su
+  // horario y disponibilidad); liberarlo es explícito con cantidad 0. Uno liberado antes en
+  // esta solicitud puede volver a agregarse, así la solicitud no queda sin forma de reasignarlo.
   async resolveAdjustments(requestId, adjustments, transaction) {
     const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
       requestId,
@@ -217,15 +217,15 @@ class SaveAgreementsUseCase {
     }
 
     const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
-    const omittedNonHuman = assignedResources
-      .filter(
-        (assignment) =>
-          !adjustedIds.has(assignment.resourceId) &&
-          resourcesById.get(assignment.resourceId)?.type !== ResourceType.HUMAN
-      )
-      .map((assignment) => ({ resourceId: assignment.resourceId, quantity: assignment.quantity }));
+    const omitted = assignedResources
+      .filter((assignment) => !adjustedIds.has(assignment.resourceId))
+      .map((assignment) => ({
+        resourceId: assignment.resourceId,
+        quantity: assignment.quantity,
+        unchanged: true,
+      }));
 
-    return [...adjustments, ...omittedNonHuman];
+    return [...adjustments, ...omitted];
   }
 
   validateResourceAdjustment(adjustment, resource, alreadyAssigned, releasedBefore) {
@@ -276,7 +276,13 @@ class SaveAgreementsUseCase {
           name: availability.name,
           quantity: adjustment.quantity,
           available: availability.available,
-          message: exceededAvailabilityMessage(availability.name, availability.available),
+          message: adjustment.unchanged
+            ? unchangedUnavailableMessage(
+                availability.name,
+                adjustment.quantity,
+                availability.available
+              )
+            : exceededAvailabilityMessage(availability.name, availability.available),
         });
       }
     }

@@ -15,6 +15,11 @@ function exceededAvailabilityMessage(resourceName, available) {
   return `La cantidad ajustada de ${resourceName} excede la disponibilidad (${available}) para el horario indicado.`;
 }
 
+// Defecto 8: un recurso omitido (sin cambios) que ya no alcanza con el horario indicado.
+function unchangedUnavailableMessage(resourceName, quantity, available) {
+  return `${resourceName} no se modificó, pero su cantidad asignada (${quantity}) ya no está disponible para el horario indicado (disponible: ${available}).`;
+}
+
 // RF-2.3.4.2: los recursos ajustados deben estar asignados a la solicitud. Defecto 8: se nombra
 // el recurso cuando se conoce.
 function resourceNotAssignedMessage(resourceId, resourceName = null) {
@@ -54,5 +59,6 @@ module.exports = {
   ProposalFieldNames,
   requiredFieldMessage,
   exceededAvailabilityMessage,
+  unchangedUnavailableMessage,
   resourceNotAssignedMessage,
 };

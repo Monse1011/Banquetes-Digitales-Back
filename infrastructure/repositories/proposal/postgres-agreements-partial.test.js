@@ -35,7 +35,8 @@ const {
 const AgreementsValidationException = require("../../../domain/exceptions/proposal/agreements-validation-exception");
 
 // Defecto 8 con el cableado de producción (ConfirmedResourceAdapter sobre PostgreSQL): una
-// solicitud sin personal, solo material y logística. Todo se revierte al terminar.
+// solicitud con una persona, material y logística. Omitir un recurso lo deja sin cambios y
+// liberarlo es explícito con cantidad 0. Todo se revierte al terminar.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (defecto 8)", () => {
   let pool;
   let connection;
@@ -84,6 +85,12 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
       quantity: 10,
       unitCost: 5,
     });
+    const [role] = await roleRepo.findActive();
+    const person = await catalog.humanResourceUseCases.create.execute({
+      name: `Mesera ${tag}`,
+      operativeRoleId: role.id,
+      precio: 50,
+    });
     const vehicle = await catalog.logisticResourceUseCases.create.execute({
       name: `Camioneta ${tag}`,
       quantity: 2,
@@ -105,6 +112,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
 
     await operations.assignResources.execute(requestId, actor, {
       data: [
+        { resource_id: person.id, quantity: 1 },
         { resource_id: material.id, quantity: 3 },
         { resource_id: vehicle.id, quantity: 1 },
       ],
@@ -115,8 +123,11 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
     ctx = {
       requestId,
       actor,
+      person,
       material,
       vehicle,
+      vehicleName: `Camioneta ${tag}`,
+      catalog,
       agreementResources,
       save: (adjusted) =>
         new SaveAgreementsUseCase(
@@ -150,18 +161,52 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
     await pool.end();
   });
 
-  it("guarda solo con material: la logística omitida conserva su cantidad", async () => {
-    await ctx.save([{ resource_id: ctx.material.id, quantity: 4 }]);
-
-    expect(await ctx.active()).toEqual({ [ctx.material.id]: 4, [ctx.vehicle.id]: 1 });
+  const all = (overrides = {}) => ({
+    [ctx.person.id]: 1,
+    [ctx.material.id]: 3,
+    [ctx.vehicle.id]: 1,
+    ...overrides,
   });
 
-  it("la logística liberada con 0 puede volver a agregarse desde acuerdos", async () => {
-    await ctx.save([{ resource_id: ctx.vehicle.id, quantity: 0 }]);
+  it("mandar solo materiales conserva al personal y la logística", async () => {
+    await ctx.save([{ resource_id: ctx.material.id, quantity: 4 }]);
+
+    expect(await ctx.active()).toEqual(all({ [ctx.material.id]: 4 }));
+  });
+
+  it("liberar a una persona explícitamente con cantidad 0 funciona", async () => {
+    await ctx.save([{ resource_id: ctx.person.id, quantity: 0 }]);
+
+    expect(await ctx.active()).toEqual({ [ctx.material.id]: 3, [ctx.vehicle.id]: 1 });
+  });
+
+  it("liberar y volver a agregar funciona (persona y logística)", async () => {
+    await ctx.save([
+      { resource_id: ctx.person.id, quantity: 0 },
+      { resource_id: ctx.vehicle.id, quantity: 0 },
+    ]);
     expect(await ctx.active()).toEqual({ [ctx.material.id]: 3 });
 
-    await ctx.save([{ resource_id: ctx.vehicle.id, quantity: 1 }]);
-    expect(await ctx.active()).toEqual({ [ctx.material.id]: 3, [ctx.vehicle.id]: 1 });
+    await ctx.save([
+      { resource_id: ctx.person.id, quantity: 1 },
+      { resource_id: ctx.vehicle.id, quantity: 1 },
+    ]);
+    expect(await ctx.active()).toEqual(all());
+  });
+
+  it("un recurso omitido se revalida y el error lo nombra con el motivo", async () => {
+    await ctx.catalog.logisticResourceUseCases.changeStatus.execute(ctx.vehicle.id, false);
+
+    const error = await ctx.save([{ resource_id: ctx.material.id, quantity: 4 }]).catch((e) => e);
+
+    expect(error.name).toBe("ResourceAvailabilityExceededException");
+    expect(error.conflicts).toEqual([
+      expect.objectContaining({
+        resource_id: ctx.vehicle.id,
+        message: `${ctx.vehicleName} no se modificó, pero su cantidad asignada (1) ya no está disponible para el horario indicado (disponible: 0).`,
+      }),
+    ]);
+    expect(await ctx.active()).toEqual(all());
   });
 
   it("un error de validación devuelve mensajes específicos y no cambia las asignaciones", async () => {
@@ -174,6 +219,6 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
       constructor: AgreementsValidationException,
       message: "El recurso con identificador 999999 no está asignado a la solicitud.",
     });
-    expect(await ctx.active()).toEqual({ [ctx.material.id]: 3, [ctx.vehicle.id]: 1 });
+    expect(await ctx.active()).toEqual(all());
   });
 });
