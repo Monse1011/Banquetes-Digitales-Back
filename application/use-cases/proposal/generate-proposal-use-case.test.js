@@ -59,7 +59,7 @@ describe("GenerateProposalUseCase", () => {
       derivedInformationRepository
     );
     assignedResourceRepository = new InMemoryAssignedResourceRepository([
-      { id: 1, name: "Mesero", type: "HUMAN", unitCost: 300, totalQuantity: 5 },
+      { id: 1, name: "Mesero", type: "HUMAN", unitCost: null, precio: 60, totalQuantity: 5 },
     ]);
     pdfGenerator = {
       stored: [],
@@ -308,6 +308,7 @@ describe("GenerateProposalUseCase", () => {
     );
 
     const stored = await proposalRepository.findCurrentByRequestId(request.requestId);
+    // Defecto 4: un mesero a $60 por hora en un evento de 18:00 a 23:00 (5 h) cuesta $300.
     expect(stored.subtotal).toBe(300);
     expect(stored.discountAmount).toBe(100);
     expect(stored.totalAmount).toBe(200);

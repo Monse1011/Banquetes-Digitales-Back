@@ -218,6 +218,9 @@ CREATE TABLE IF NOT EXISTS resources (
   operative_role_id  bigint        REFERENCES operative_roles (id) ON DELETE RESTRICT,
   total_quantity     integer       NOT NULL CHECK (total_quantity >= 0),
   unit_cost          numeric(12,2) CHECK (unit_cost >= 0),
+  -- Tarifa POR HORA del recurso humano. NULL = fila anterior a la columna (cuesta 0 en la
+  -- cotización hasta que se edite); la API exige precio > 0 al crear o editar.
+  precio             numeric(12,2),
   is_active          boolean       NOT NULL DEFAULT true,
   deactivated_at     timestamptz,
   version            integer       NOT NULL DEFAULT 0 CHECK (version >= 0),  -- bloqueo optimista
@@ -225,8 +228,21 @@ CREATE TABLE IF NOT EXISTS resources (
   updated_at         timestamptz   NOT NULL DEFAULT now(),
   -- Solo los recursos humanos tienen rol operativo, y siempre lo tienen.
   CONSTRAINT chk_resources_role_only_human CHECK ((type = 'HUMAN') = (operative_role_id IS NOT NULL)),
-  CONSTRAINT chk_resources_deactivation CHECK (is_active = (deactivated_at IS NULL))
+  CONSTRAINT chk_resources_deactivation CHECK (is_active = (deactivated_at IS NULL)),
+  CONSTRAINT chk_resources_precio CHECK (precio IS NULL OR precio > 0)
 );
+-- Bases ya existentes (CREATE TABLE IF NOT EXISTS no agrega columnas). Equivale a
+-- database/migrations/001-resources-precio.up.sql.
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS precio numeric(12,2);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_resources_precio' AND conrelid = 'resources'::regclass
+  ) THEN
+    ALTER TABLE resources ADD CONSTRAINT chk_resources_precio CHECK (precio IS NULL OR precio > 0);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS ix_resources_operative_role ON resources (operative_role_id);
 CREATE INDEX IF NOT EXISTS ix_resources_type_active ON resources (type, is_active, name);
 -- existsByName: type + LOWER(TRIM(name)); no es UNIQUE porque se permiten repetidos inactivos

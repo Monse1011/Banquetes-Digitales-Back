@@ -96,10 +96,15 @@ const calendarListResponse = {
 
 const humanResourceBody = {
   type: "object",
-  required: ["name", "operative_role_id"],
+  required: ["name", "operative_role_id", "precio"],
   properties: {
     name: { type: "string", maxLength: 100 },
     operative_role_id: { type: "integer" },
+    precio: {
+      type: "number",
+      exclusiveMinimum: 0,
+      description: "Tarifa por hora. Se multiplica por las horas del evento al cotizar.",
+    },
   },
 };
 

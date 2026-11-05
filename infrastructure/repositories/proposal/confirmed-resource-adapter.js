@@ -42,7 +42,8 @@ class ConfirmedResourceAdapter {
         row.status,
         resource.name,
         resource.type,
-        resource.unitCost
+        resource.unitCost,
+        resource.precio
       );
       return Object.assign(assigned, {
         requestedQuantity: row.requestedQuantity ?? null,

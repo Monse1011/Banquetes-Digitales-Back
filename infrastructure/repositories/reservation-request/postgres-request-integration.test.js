@@ -225,7 +225,15 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       const human = await catalogCases.humanResourceUseCases.create.execute({
         name: `Persona prueba ${Date.now()}`,
         operativeRoleId: roles[0].id,
+        precio: 25.5,
       });
+      expect((await resourceRepo.findById(human.id)).precio).toBe(25.5);
+      // La BD también protege la tarifa: 0 o negativa viola chk_resources_precio.
+      await connection.query("SAVEPOINT precio_check");
+      await expect(
+        connection.query("UPDATE resources SET precio = 0 WHERE id = $1", [human.id])
+      ).rejects.toMatchObject({ constraint: "chk_resources_precio" });
+      await connection.query("ROLLBACK TO SAVEPOINT precio_check");
       const material = await catalogCases.materialResourceUseCases.create.execute({
         name: `Material prueba ${Date.now()}`,
         quantity: 10,
@@ -430,8 +438,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             generated.data.proposal_id,
           ])
         ).rows[0];
-        expect(Number(amounts.subtotal)).toBe(24);
-        expect(Number(amounts.total_amount)).toBe(24);
+        // $24 de recursos + persona a $25.50/h × 7 h (18:00 a 01:00, cruza medianoche).
+        expect(Number(amounts.subtotal)).toBe(202.5);
+        expect(Number(amounts.total_amount)).toBe(202.5);
         expect(
           (
             await connection.query(

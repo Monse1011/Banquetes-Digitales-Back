@@ -112,7 +112,8 @@ class InMemoryAssignedResourceRepository {
           AssignedResourceStatus.RELEASED,
           assignment.name,
           assignment.type,
-          assignment.unitCost
+          assignment.unitCost,
+          assignment.precio
         );
       }
     });
@@ -165,7 +166,8 @@ class InMemoryAssignedResourceRepository {
       assignment.status,
       resource?.name ?? null,
       resource?.type ?? null,
-      resource?.unitCost ?? null
+      resource?.unitCost ?? null,
+      resource?.precio ?? null
     );
   }
 }

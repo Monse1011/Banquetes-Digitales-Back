@@ -179,6 +179,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
           type: "HUMAN",
           operative_role_id: 1,
           is_active: true,
+          precio: null,
           operative_role: "Mesero",
           available_quantity: 1,
           assignment: null,

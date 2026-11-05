@@ -24,6 +24,7 @@ const CREATED_AT = new Date(2026, 8, 1, 9, 30, 0);
 const WAITER_ROLE_ID = 1;
 const CHEF_ROLE_ID = 2;
 const INACTIVE_ROLE_ID = 3;
+const PRECIO = 100;
 
 function humanResource(id, name, operativeRoleId, isActive = true) {
   return new Resource(
@@ -36,7 +37,9 @@ function humanResource(id, name, operativeRoleId, isActive = true) {
     isActive,
     CREATED_AT,
     CREATED_AT,
-    isActive ? null : CREATED_AT
+    isActive ? null : CREATED_AT,
+    0,
+    PRECIO
   );
 }
 
@@ -81,6 +84,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         const { id } = await useCases.humanResourceUseCases.create.execute({
           name: "  Ana López  ",
           operativeRoleId: WAITER_ROLE_ID,
+          precio: PRECIO,
         });
 
         const created = await resourceRepository.findById(id);
@@ -107,10 +111,32 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         ).rejects.toMatchObject({ errors: { name: HumanResourceMessages.NAME_TOO_LONG } });
       });
 
+      it("requires a precio per hour greater than 0 with at most 2 decimals", async () => {
+        const { create } = useCases.humanResourceUseCases;
+
+        for (const precio of [undefined, null, 0, -5, "100", NaN, Infinity, 10.123]) {
+          await expect(
+            create.execute({ name: "Ana López", operativeRoleId: WAITER_ROLE_ID, precio })
+          ).rejects.toMatchObject({ errors: { precio: HumanResourceMessages.PRECIO_INVALID } });
+        }
+
+        const { id } = await create.execute({
+          name: "Ana López",
+          operativeRoleId: WAITER_ROLE_ID,
+          precio: 99.99,
+        });
+
+        expect((await resourceRepository.findById(id)).precio).toBe(99.99);
+      });
+
       it("rejects a name without any letter", async () => {
         for (const name of ["12345", "123 456", "---"]) {
           await expect(
-            useCases.humanResourceUseCases.create.execute({ name, operativeRoleId: WAITER_ROLE_ID })
+            useCases.humanResourceUseCases.create.execute({
+              name,
+              operativeRoleId: WAITER_ROLE_ID,
+              precio: PRECIO,
+            })
           ).rejects.toMatchObject({ errors: { name: HumanResourceMessages.NAME_NEEDS_LETTER } });
         }
       });
@@ -118,7 +144,11 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
       it("rejects inactive or unknown operative roles", async () => {
         for (const operativeRoleId of [INACTIVE_ROLE_ID, 999]) {
           await expect(
-            useCases.humanResourceUseCases.create.execute({ name: "Ana López", operativeRoleId })
+            useCases.humanResourceUseCases.create.execute({
+              name: "Ana López",
+              operativeRoleId,
+              precio: PRECIO,
+            })
           ).rejects.toMatchObject({
             errors: { operative_role_id: ResourceMessages.OPERATIVE_ROLE_NOT_ACTIVE },
           });
@@ -130,12 +160,13 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         const { create } = useCases.humanResourceUseCases;
 
         await expect(
-          create.execute({ name: "ana lópez", operativeRoleId: WAITER_ROLE_ID })
+          create.execute({ name: "ana lópez", operativeRoleId: WAITER_ROLE_ID, precio: PRECIO })
         ).rejects.toThrow(DuplicateResourceException);
 
         const { id } = await create.execute({
           name: "ana lópez",
           operativeRoleId: WAITER_ROLE_ID,
+          precio: PRECIO,
           confirmDuplicate: true,
         });
 
@@ -152,6 +183,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           useCases.humanResourceUseCases.create.execute({
             name: "Ana López",
             operativeRoleId: WAITER_ROLE_ID,
+            precio: PRECIO,
           })
         ).resolves.toEqual({ id: 3 });
       });
@@ -164,12 +196,14 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         await useCases.humanResourceUseCases.update.execute(1, {
           name: "David Tec",
           operativeRoleId: CHEF_ROLE_ID,
+          precio: 150.5,
         });
 
         const updated = await resourceRepository.findById(1);
 
         expect(updated.name).toBe("David Tec");
         expect(updated.operativeRoleId).toBe(CHEF_ROLE_ID);
+        expect(updated.precio).toBe(150.5);
         expect(updated.updatedAt).not.toEqual(CREATED_AT);
       });
 
@@ -181,7 +215,11 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           ResourceValidationException
         );
         await expect(
-          update.execute(1, { name: "David Tec", operativeRoleId: INACTIVE_ROLE_ID })
+          update.execute(1, {
+            name: "David Tec",
+            operativeRoleId: INACTIVE_ROLE_ID,
+            precio: PRECIO,
+          })
         ).rejects.toThrow(ResourceValidationException);
       });
 
@@ -192,6 +230,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           useCases.humanResourceUseCases.update.execute(1, {
             name: "Van",
             operativeRoleId: WAITER_ROLE_ID,
+            precio: PRECIO,
           })
         ).rejects.toThrow(
           new ResourceNotFoundException(ResourceNotFoundMessages[ResourceType.HUMAN])
@@ -260,6 +299,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           type: ResourceType.HUMAN,
           operative_role_id: WAITER_ROLE_ID,
           is_active: true,
+          precio: PRECIO,
         });
         expect(result.metadata.pagination).toEqual({ total_records: 3, page: 1, per_page: 10 });
       });
@@ -309,6 +349,7 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
           name: "David Torres",
           type: ResourceType.HUMAN,
           operative_role_id: WAITER_ROLE_ID,
+          precio: PRECIO,
           is_active: true,
           created_at: "2026-09-01T09:30:00",
           updated_at: "2026-09-01T09:30:00",
