@@ -94,17 +94,20 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
     ["Ajustes Solicitados", true],
     ["Asignada", false],
     ["En revisión", false],
-  ])("enables agreements for the domain status %s → %s (RF-3.4.4.5.7)", async (status, expected) => {
-    const useCase = new GetAssignedRequestDetailUseCase({
-      reservationRequestRepository: {
-        findById: vi.fn().mockResolvedValue(makeRequest({ status })),
-      },
-    });
+  ])(
+    "enables agreements for the domain status %s → %s (RF-3.4.4.5.7)",
+    async (status, expected) => {
+      const useCase = new GetAssignedRequestDetailUseCase({
+        reservationRequestRepository: {
+          findById: vi.fn().mockResolvedValue(makeRequest({ status })),
+        },
+      });
 
-    const { data } = await useCase.execute({ requestId: 1, userId: 10 });
+      const { data } = await useCase.execute({ requestId: 1, userId: 10 });
 
-    expect(data.can_register_agreements).toBe(expected);
-  });
+      expect(data.can_register_agreements).toBe(expected);
+    }
+  );
 
   it("lists the client's adjustment requests with the current proposal (RF-3.4.4.5.6)", async () => {
     const useCase = new GetAssignedRequestDetailUseCase({
@@ -120,7 +123,11 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
       },
       proposalAdjustmentRepository: {
         findByRequestId: vi.fn().mockResolvedValue([
-          { id: 7, observations: "Agregar 2 meseros", createdAt: new Date("2026-10-29T21:00:00Z") },
+          {
+            id: 7,
+            observations: "Agregar 2 meseros",
+            createdAt: new Date("2026-10-29T21:00:00Z"),
+          },
         ]),
       },
     });

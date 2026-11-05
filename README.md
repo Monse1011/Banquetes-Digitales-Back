@@ -46,32 +46,28 @@ PROPOSAL_STORAGE_DIR=storage/proposals
 `PROPOSAL_STORAGE_DIR` es opcional e indica el directorio donde se guardan los PDF
 de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
 
-4. Crear la base de datos solo con las migraciones versionadas, en este orden (requiere
-   `psql` 16.10 o superior por el `\restrict` del dump):
+4. Crear la base de datos con el esquema único `database/schema.sql` (no hay migraciones;
+   el script es idempotente y va envuelto en una transacción):
 
 ```bash
 createdb -U postgres banquetes_db
-for f in docs/estructura.sql docs/catalogos-iniciales.sql \
-  database/increment-3/00-align-schema-dad-v3.sql \
-  database/increment-3/01-reservation-request-status-v3.sql \
-  database/increment-3/06-request-status-history.sql \
-  database/increment-3/07-event-closure.sql; do
-  psql -U postgres -d banquetes_db -v ON_ERROR_STOP=1 -f "$f" || break
-done
+psql -U postgres -d banquetes_db -v ON_ERROR_STOP=1 -f database/schema.sql
 ```
 
-Las migraciones de `database/increment-3/` son idempotentes. `00-align-schema-dad-v3.sql`
-alinea el esquema con el DAD v3.0 (llaves `request_id`, estados de asignación en español) y
-también sirve para una BD heredada creada con los scripts de `database/increment-2/`: en ese
-caso aplica primero esos scripts y luego los de `database/increment-3/` en el mismo orden.
+El esquema no trae datos. El catálogo `services` no tiene endpoint de alta: cárgalo aparte
+antes de recibir solicitudes.
 
-5. Pruebas de integración: crea una BD vacía con el paso 4 y define `TEST_PGDATABASE` con su
-   nombre (distinto de `PGDATABASE`). Las pruebas insertan sus datos y los revierten; no hace
-   falta crear tablas, columnas ni usuarios a mano.
+5. Pruebas de integración: usan un PostgreSQL desechable que carga `schema.sql` al crearse.
+   Agrega a `.env` `TEST_PGHOST=127.0.0.1`, `TEST_PGPORT=55432`, `TEST_PGUSER`,
+   `TEST_PGPASSWORD` y `TEST_PGDATABASE`, y luego:
 
 ```bash
-TEST_PGDATABASE=banquetes_test npm run test:run
+docker compose -f docker-compose.test.yml up -d --wait
+npx vitest run
 ```
+
+Sin `TEST_PGHOST` (por ejemplo en CI) las pruebas de base de datos se omiten. Para recrear
+la BD desde cero: `docker compose -f docker-compose.test.yml down -v`.
 
 ## Desarrollo
 
@@ -187,7 +183,7 @@ El Personal de Logística responsable de la solicitud y el Administrador General
 - **POST** `/api/logistics/requests/:id/resources/confirm` - Finalizar confirmación (3.2)
 - **POST** `/api/logistics/requests/:id/resources/cancel` - Descartar las asignaciones provisionales (3.2)
 
-Las asignaciones, confirmaciones y observaciones pendientes de recursos (Función 3.2) se guardan en PostgreSQL mediante `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Aplica `database/increment-2/assigned-resources.sql` después de crear las tablas base; la migración crea las tablas necesarias y agrega los datos de auditoría que usan los flujos de confirmación y acuerdos. La información persiste entre reinicios del servidor. Confirmar recursos guarda las asignaciones, el registro de confirmación, las observaciones pendientes y el estado de la solicitud en una sola transacción.
+Las asignaciones, confirmaciones y observaciones pendientes de recursos (Función 3.2) se guardan en PostgreSQL mediante `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Las tablas (`assigned_resources`, `resource_confirmations` y `resource_confirmation_pending_observations`) están en `database/schema.sql`. La información persiste entre reinicios del servidor. Confirmar recursos guarda las asignaciones, el registro de confirmación, las observaciones pendientes y el estado de la solicitud en una sola transacción.
 
 ## Documentación API
 
