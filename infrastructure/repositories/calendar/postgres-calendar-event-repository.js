@@ -9,6 +9,7 @@ const {
   CalendarEventStatuses,
   ResourceBlockingEventStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
+const { finalizeElapsedEvents } = require("../reservation-request/finalize-elapsed-events");
 const { CalendarRules } = require("../../../domain/constants/calendar-rules");
 const {
   AssignmentStatus,
@@ -234,6 +235,8 @@ class PostgresCalendarEventRepository {
 
   async cancel({ eventId, now }) {
     return this.runInTransaction(async (connection) => {
+      // Un evento cuya hora de fin ya pasó es «Finalizado»: se aplica la regla única antes de leer.
+      await finalizeElapsedEvents(connection, now);
       const locked = await this.lockEventAndRequest(connection, eventId);
 
       if (!locked) {
@@ -241,10 +244,9 @@ class PostgresCalendarEventRepository {
       }
 
       const { request, event } = locked;
+      // Un evento que ya terminó no se cancela, aunque siga «Confirmado» hasta el fin del día.
       const hasFinished = new Date(event.end_at).getTime() <= now.getTime();
 
-      // Un evento cuya hora de fin ya pasó es «Finalizado» aunque el proceso periódico
-      // todavía no lo haya actualizado.
       if (
         fromDatabaseStatus(request.status) !== ReservationRequestStatus.CONFIRMED ||
         hasFinished
@@ -269,12 +271,14 @@ class PostgresCalendarEventRepository {
   }
 
   async findById(id) {
+    await finalizeElapsedEvents(this.pool);
     const result = await this.pool.query(`${EVENT_SELECT} WHERE e.id = $1`, [id]);
 
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
   async findAll(filters, page, perPage) {
+    await finalizeElapsedEvents(this.pool);
     const statuses = filters.includeCancelled
       ? CalendarEventStatuses
       : CalendarEventStatuses.filter((status) => status !== ReservationRequestStatus.CANCELED);
@@ -291,6 +295,14 @@ class PostgresCalendarEventRepository {
       parameters.push(filters.dayEnd, filters.dayStart);
       conditions.push(
         `e.start_at < $${parameters.length - 1} AND e.end_at > $${parameters.length}`
+      );
+    }
+
+    // Defecto 5 (?upcoming=true): no Finalizado y con fin pendiente.
+    if (filters.upcomingFrom) {
+      parameters.push(toDatabaseStatus(ReservationRequestStatus.FINALIZED), filters.upcomingFrom);
+      conditions.push(
+        `r.status <> $${parameters.length - 1} AND e.end_at >= $${parameters.length}`
       );
     }
 
@@ -315,28 +327,9 @@ class PostgresCalendarEventRepository {
     };
   }
 
-  // F.3: Confirmado -> Finalizado al transcurrir la hora de fin. SKIP LOCKED evita esperar
-  // a operaciones en curso sobre la misma solicitud; se actualizarán en el siguiente ciclo.
+  // F.3: delega en la regla única (finalize-elapsed-events.js).
   async finalizeElapsed(now) {
-    const result = await this.pool.query(
-      `UPDATE reservations_request
-       SET status = $1
-       WHERE id IN (
-         SELECT r.id
-         FROM reservations_request r
-         JOIN calendar_events e ON e.id_request = r.id
-         WHERE r.status = $2 AND e.end_at <= $3
-         ORDER BY r.id
-         FOR UPDATE OF r SKIP LOCKED
-       )`,
-      [
-        toDatabaseStatus(ReservationRequestStatus.FINALIZED),
-        toDatabaseStatus(ReservationRequestStatus.CONFIRMED),
-        now,
-      ]
-    );
-
-    return result.rowCount;
+    return finalizeElapsedEvents(this.pool, now);
   }
 
   async runInTransaction(work) {

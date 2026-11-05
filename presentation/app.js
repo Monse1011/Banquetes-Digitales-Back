@@ -70,6 +70,7 @@ const ProposalSendFailedException = require("../domain/exceptions/proposal/propo
 const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
 const EventClosureValidationException = require("../domain/exceptions/event-closure/event-closure-validation-exception");
 const EventClosureConflictException = require("../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../domain/exceptions/event-closure/event-closure-state-exception");
 const EventClosureNotFoundException = require("../domain/exceptions/event-closure/event-closure-not-found-exception");
 const EventClosureAccessDeniedException = require("../domain/exceptions/event-closure/event-closure-access-denied-exception");
 const { AgreementsController } = require("./controller/proposal/agreements-controller");
@@ -369,6 +370,7 @@ function handleEventClosureError(error, response) {
     [EventClosureAccessDeniedException, 403],
     [EventClosureNotFoundException, 404],
     [EventClosureConflictException, 409],
+    [EventClosureStateException, 422],
   ];
   const match = statusByException.find(([exception]) => error instanceof exception);
 

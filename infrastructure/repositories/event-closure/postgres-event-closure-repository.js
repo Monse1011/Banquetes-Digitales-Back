@@ -2,6 +2,7 @@ const {
   toDatabaseStatus,
   fromDatabaseStatus,
 } = require("../reservation-request/postgres-request-status");
+const { finalizeElapsedEvents } = require("../reservation-request/finalize-elapsed-events");
 
 // Función 3.6 - Seguimiento y cierre del evento (DAD 010, secciones 3 y 7).
 // Las columnas de fecha son timestamptz, por lo que el driver entrega instantes reales.
@@ -14,7 +15,9 @@ class PostgresEventClosureRepository {
   // la fila más reciente de derived_information (mayor created_at; en empate, mayor id) y,
   // si tampoco hay, los datos de la solicitud. Inicio y fin proceden siempre de la misma
   // fuente: nunca se combinan valores de filas distintas.
-  async findForUpdate(requestId, transaction) {
+  async findForUpdate(requestId, transaction, now = new Date()) {
+    // Defecto 5: regla única; un Confirmado con fin pasado ya es Finalizado (no admite cierre).
+    await finalizeElapsedEvents(transaction.connection, now);
     const result = await transaction.connection.query(
       `SELECT rr.id, rr.status, rr.logistic_user_id,
               CASE WHEN ce.id IS NOT NULL THEN ce.start_at

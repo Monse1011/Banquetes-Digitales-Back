@@ -74,12 +74,13 @@ class CalendarController {
 
   async list(req, res, next) {
     try {
-      const { date, include_cancelled, page, per_page } = req.query;
+      const { date, include_cancelled, upcoming, page, per_page } = req.query;
 
       const result = await this.listCalendarEventsUseCase.execute({
         actor: req.user,
         date,
         includeCancelled: include_cancelled === "true",
+        upcoming: upcoming === "true",
         page: page ? Number(page) : 1,
         perPage: per_page ? Number(per_page) : undefined,
       });

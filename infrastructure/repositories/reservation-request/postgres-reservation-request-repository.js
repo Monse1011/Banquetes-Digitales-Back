@@ -1,4 +1,5 @@
 const { toDatabaseStatus, fromDatabaseStatus } = require("./postgres-request-status");
+const { finalizeElapsedEvents } = require("./finalize-elapsed-events");
 const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
@@ -103,6 +104,7 @@ class PostgresReservationRequestRepository {
   }
 
   async findById(id, transaction = null) {
+    await finalizeElapsedEvents(transaction?.connection ?? this.pool);
     const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
         ` WHERE rr.id = $1
@@ -115,6 +117,7 @@ class PostgresReservationRequestRepository {
 
   // Función 4.5: consulta por folio, único medio de acceso del cliente (RF-3.4.5.12).
   async findByFolio(folio, transaction = null) {
+    await finalizeElapsedEvents(transaction?.connection ?? this.pool);
     const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
         ` WHERE rr.folio = $1
@@ -381,6 +384,7 @@ class PostgresReservationRequestRepository {
   }
 
   async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
+    await finalizeElapsedEvents(this.pool);
     const parameters = [];
     const where = this.buildConditions(filters, parameters);
 

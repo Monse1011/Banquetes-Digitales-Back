@@ -484,7 +484,15 @@ const openApiDocument = {
         summary: "Consulta el calendario del responsable de logística",
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
-        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        parameters: [
+          { name: "date", in: "query", schema: { type: "string", format: "date" } },
+          {
+            name: "upcoming",
+            in: "query",
+            description: "true: solo eventos no Finalizados cuya hora de fin aún no pasa",
+            schema: { type: "boolean" },
+          },
+        ],
         responses: { 200: calendarListResponse },
       },
     },
@@ -493,7 +501,15 @@ const openApiDocument = {
         summary: "Consulta el calendario del Administrador General",
         tags: ["Calendar"],
         security: [{ cookieAuth: [] }],
-        parameters: [{ name: "date", in: "query", schema: { type: "string", format: "date" } }],
+        parameters: [
+          { name: "date", in: "query", schema: { type: "string", format: "date" } },
+          {
+            name: "upcoming",
+            in: "query",
+            description: "true: solo eventos no Finalizados cuya hora de fin aún no pasa",
+            schema: { type: "boolean" },
+          },
+        ],
         responses: { 200: calendarListResponse },
       },
     },

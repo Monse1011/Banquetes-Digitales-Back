@@ -7,12 +7,11 @@ const {
 } = require("../../../domain/constants/event-closure-messages");
 const EventClosureValidationException = require("../../../domain/exceptions/event-closure/event-closure-validation-exception");
 const EventClosureConflictException = require("../../../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../../../domain/exceptions/event-closure/event-closure-state-exception");
 const EventClosureNotFoundException = require("../../../domain/exceptions/event-closure/event-closure-not-found-exception");
 const EventClosureAccessDeniedException = require("../../../domain/exceptions/event-closure/event-closure-access-denied-exception");
-const {
-  formatMeridaDate,
-  parseMeridaDateTime,
-} = require("../../services/event-closure/merida-time");
+const { parseMeridaDateTime } = require("../../services/event-closure/merida-time");
+const { isWithinClosureDay } = require("../../services/event-closure/closure-window");
 const {
   FinalizeEventResponseDto,
   FINALIZED_API_STATUS,
@@ -38,7 +37,7 @@ class FinalizeEventUseCase {
 
       // El bloqueo de la solicitud serializa dos finalizaciones simultáneas: la segunda ve
       // el estado "Finalizado" y recibe 409 (RF-2.3.6.5).
-      const event = await this.eventClosureRepository.findForUpdate(requestId, transaction);
+      const event = await this.eventClosureRepository.findForUpdate(requestId, transaction, now);
 
       if (!event) {
         throw new EventClosureNotFoundException(EventClosureMessages.REQUEST_NOT_FOUND);
@@ -112,24 +111,18 @@ class FinalizeEventUseCase {
   }
 
   validateState(event, now) {
-    // RF-2.3.6.5: un evento finalizado ya no se modifica ni se vuelve a finalizar.
+    // RF-2.3.6.5: un evento finalizado (manual o automáticamente) ya no se modifica.
     if (event.status === ReservationRequestStatus.FINALIZED) {
-      throw new EventClosureConflictException(EventClosureMessages.ALREADY_FINALIZED);
+      throw new EventClosureStateException(EventClosureMessages.ALREADY_FINALIZED);
     }
 
-    // RF-2.3.6.1: solo eventos en estado "Confirmado".
+    // RF-2.3.6.1 / Defecto 5: solo desde «Confirmado».
     if (event.status !== ReservationRequestStatus.CONFIRMED) {
-      throw new EventClosureConflictException(EventClosureMessages.NOT_CONFIRMED);
+      throw new EventClosureStateException(EventClosureMessages.NOT_CONFIRMED);
     }
 
-    // RF-2.3.6.1: solo el día programado vigente, en hora de Mérida. Si el evento cruza la
-    // medianoche, el registro sigue permitido hasta las 23:59:59 del día de finalización.
-    const today = formatMeridaDate(now);
-    const firstDay = formatMeridaDate(event.scheduledStartAt);
-    // event_end_time de la solicitud puede ser NULL: sin fin, solo cuenta el día de inicio.
-    const lastDay = event.scheduledEndAt ? formatMeridaDate(event.scheduledEndAt) : firstDay;
-
-    if (today < firstDay || today > lastDay) {
+    // RF-2.3.6.1: solo el día programado vigente, en hora de Mérida.
+    if (!isWithinClosureDay(event.scheduledStartAt, event.scheduledEndAt, now)) {
       throw new EventClosureConflictException(EventClosureMessages.OUTSIDE_SCHEDULED_DAY);
     }
   }

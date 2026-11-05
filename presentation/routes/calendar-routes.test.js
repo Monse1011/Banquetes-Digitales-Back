@@ -61,6 +61,18 @@ describe("Calendar Routes (Función 3.3)", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.events).toHaveLength(1);
+      expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ upcoming: false }));
+    });
+
+    it("forwards ?upcoming=true to list only upcoming events (defecto 5)", async () => {
+      mockList.mockResolvedValue({ events: [], totalRecords: 0, page: 1, perPage: 10 });
+
+      const response = await request(app)
+        .get("/api/logistics/calendar?upcoming=true")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(response.status).toBe(200);
+      expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ upcoming: true }));
     });
 
     it("no longer exposes the Google Calendar sync route (defecto 7)", async () => {
