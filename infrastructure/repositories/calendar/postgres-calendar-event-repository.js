@@ -9,8 +9,6 @@ const {
   CalendarEventStatuses,
   ResourceBlockingEventStatuses,
 } = require("../../../domain/enums/reservation-request/request-status");
-const { CalendarSyncStatus } = require("../../../domain/enums/calendar/calendar-sync-status");
-const { CalendarSyncOperation } = require("../../../domain/enums/calendar/calendar-sync-operation");
 const { CalendarRules } = require("../../../domain/constants/calendar-rules");
 const {
   AssignmentStatus,
@@ -22,7 +20,7 @@ const { resourceBlockEnd } = require("../../../application/services/calendar/ava
 
 const EVENT_SELECT = `SELECT e.id AS id_event, e.id_request, r.folio, e.title, e.start_at, e.end_at,
        e.location, r.logistic_user_id, u.full_name AS logistic_user_name, r.status,
-       e.sync_status, e.google_event_id, e.created_at, e.updated_at
+       e.created_at, e.updated_at
   FROM calendar_events e
   JOIN reservations_request r ON r.id = e.id_request
   LEFT JOIN users u ON u.id_user = r.logistic_user_id`;
@@ -102,10 +100,10 @@ class PostgresCalendarEventRepository {
 
       const inserted = await connection.query(
         `INSERT INTO calendar_events
-           (id_request, title, start_at, end_at, location, sync_status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+           (id_request, title, start_at, end_at, location, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
          RETURNING id AS id_event`,
-        [requestId, title.slice(0, 200), startAt, endAt, agreed.location, "PENDING", now]
+        [requestId, title.slice(0, 200), startAt, endAt, agreed.location, now]
       );
       const eventId = Number(inserted.rows[0].id_event);
 
@@ -124,14 +122,12 @@ class PostgresCalendarEventRepository {
         "UPDATE proposals SET status = 'ACCEPTED', updated_at = $2 WHERE request_id = $1",
         [requestId, now]
       );
-      await this.enqueue(connection, eventId, CalendarSyncOperation.CREATE, now);
-
       return accept({ status: "scheduled", event: await this.fetchEvent(connection, eventId) });
     });
   }
 
   // Incremento 3 (RF-3.4.4.4.3): se invoca dentro de la transacción de aceptación. Crea el
-  // evento y encola la sincronización, y revalida disponibilidad sin contar la propia
+  // evento y revalida disponibilidad sin contar la propia
   // solicitud; NO cambia el estado de la solicitud ni de la propuesta (lo hace el caso de uso).
   // connection es la conexión de la transacción del accept.
   async scheduleForAcceptance({ requestId, title, now, connection }) {
@@ -170,14 +166,12 @@ class PostgresCalendarEventRepository {
 
     const inserted = await connection.query(
       `INSERT INTO calendar_events
-         (id_request, title, start_at, end_at, location, sync_status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+         (id_request, title, start_at, end_at, location, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $6)
        RETURNING id AS id_event`,
-      [requestId, title.slice(0, 200), startAt, endAt, agreed.location, "PENDING", now]
+      [requestId, title.slice(0, 200), startAt, endAt, agreed.location, now]
     );
     const eventId = Number(inserted.rows[0].id_event);
-
-    await this.enqueue(connection, eventId, CalendarSyncOperation.CREATE, now);
 
     return { status: "scheduled", event: await this.fetchEvent(connection, eventId) };
   }
@@ -223,9 +217,9 @@ class PostgresCalendarEventRepository {
 
       await connection.query(
         `UPDATE calendar_events
-         SET start_at = $2, end_at = $3, location = $4, sync_status = $5, updated_at = $6
+         SET start_at = $2, end_at = $3, location = $4, updated_at = $5
          WHERE id = $1`,
-        [eventId, startAt, endAt, location, "PENDING", now]
+        [eventId, startAt, endAt, location, now]
       );
       await connection.query(
         `UPDATE reservations_request
@@ -233,7 +227,6 @@ class PostgresCalendarEventRepository {
          WHERE id = $1`,
         [request.id_reservation_request, startAt, endAt, location]
       );
-      await this.enqueue(connection, eventId, CalendarSyncOperation.UPDATE, now);
 
       return accept({ status: "rescheduled", event: await this.fetchEvent(connection, eventId) });
     });
@@ -270,11 +263,6 @@ class PostgresCalendarEventRepository {
          WHERE request_id = $1 AND status = ANY($4)`,
         [request.id_reservation_request, now, AssignmentStatus.RELEASED, BlockingAssignmentStatuses]
       );
-      await connection.query(
-        "UPDATE calendar_events SET sync_status = $2, updated_at = $3 WHERE id = $1",
-        [eventId, "PENDING", now]
-      );
-      await this.enqueue(connection, eventId, CalendarSyncOperation.DELETE, now);
 
       return accept({ status: "cancelled", event: await this.fetchEvent(connection, eventId) });
     });
@@ -405,14 +393,6 @@ class PostgresCalendarEventRepository {
     const result = await connection.query(`${EVENT_SELECT} WHERE e.id = $1`, [eventId]);
 
     return this.toEntity(result.rows[0]);
-  }
-
-  async enqueue(connection, eventId, operation, now) {
-    await connection.query(
-      `INSERT INTO calendar_sync_outbox (calendar_event_id, operation, status, next_attempt_at, created_at)
-       VALUES ($1, $2, 'PENDING', $3, $3)`,
-      [eventId, operation.toUpperCase(), now]
-    );
   }
 
   // Disponibilidad del responsable y de todos los recursos asignados para [startAt, endAt).
@@ -567,8 +547,6 @@ class PostgresCalendarEventRepository {
       row.logistic_user_id === null ? null : Number(row.logistic_user_id),
       row.logistic_user_name,
       fromDatabaseStatus(row.status),
-      row.sync_status === "SYNCED" ? CalendarSyncStatus.SYNCED : CalendarSyncStatus.PENDING,
-      row.google_event_id,
       new Date(row.created_at),
       new Date(row.updated_at)
     );

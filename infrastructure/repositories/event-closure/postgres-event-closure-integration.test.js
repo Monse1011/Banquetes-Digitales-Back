@@ -170,8 +170,8 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", 
         [ids.request, `${oldDay}T18:00:00-06:00`, `${oldDay}T23:00:00-06:00`, ids.logistic]
       );
       await connection.query(
-        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location, sync_status)
-         VALUES ($1, 'Evento T', $2, $3, 'Salón T', 'SYNCED')`,
+        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location)
+         VALUES ($1, 'Evento T', $2, $3, 'Salón T')`,
         [ids.request, `${newDay}T18:00:00-06:00`, `${newDay}T23:00:00-06:00`]
       );
       // Lo mismo que hace reschedule() de la Función 3.3 sobre la solicitud.

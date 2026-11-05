@@ -4,8 +4,6 @@ const CalendarMessages = Object.freeze({
   // ERS A.5
   SCHEDULE_UNAVAILABLE:
     "No es posible agendar el evento: el responsable o los recursos ya no están disponibles para el horario confirmado.",
-  // ERS B.6
-  SYNC_FAILED: "El evento se guardó, pero no pudo sincronizarse con Google Calendar.",
   // ERS E.6
   NO_EVENTS: "No hay eventos agendados para la fecha seleccionada.",
 

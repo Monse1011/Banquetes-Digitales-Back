@@ -430,6 +430,9 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 CREATE INDEX IF NOT EXISTS ix_calendar_events_request ON calendar_events (id_request, id DESC);
 CREATE INDEX IF NOT EXISTS ix_calendar_events_start ON calendar_events (start_at, id);
 
+-- OBSOLETO (defecto 7): el código ya no usa el outbox ni calendar_events.sync_status /
+-- google_event_id. Se eliminan con database/migrations/002-drop-google-calendar-sync.up.sql;
+-- cuando esa migración se ejecute, quitar también estas definiciones de este archivo.
 -- Outbox: operaciones pendientes de enviar a Google Calendar.
 CREATE TABLE IF NOT EXISTS calendar_sync_outbox (
   id_outbox          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

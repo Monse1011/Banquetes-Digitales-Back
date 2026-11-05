@@ -58,7 +58,6 @@ const calendarEventSchema = {
     end_datetime: { type: "string", example: "2026-12-24 23:00:00" },
     location: { type: "string" },
     status: { type: "string" },
-    sync_status: { type: "string" },
   },
 };
 
@@ -480,23 +479,6 @@ const openApiDocument = {
   },
   servers: [{ url: "http://localhost:3000", description: "Development server" }],
   paths: {
-    "/api/logistics/calendar/{id}/sync": {
-      post: {
-        summary: "Retry existing calendar synchronization (admin or responsible logistics user)",
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } },
-        ],
-        responses: {
-          200: {
-            description: "Attempt completed; data.sync_status reports synced or still pending",
-          },
-          401: { description: "Authentication required" },
-          403: { description: "Not the responsible user or administrator" },
-          404: { description: "Event not found" },
-          422: { description: "Invalid event ID" },
-        },
-      },
-    },
     "/api/logistics/calendar": {
       get: {
         summary: "Consulta el calendario del responsable de logística",
@@ -535,8 +517,6 @@ const openApiDocument = {
                         event_id: { type: "integer" },
                         request_id: { type: "integer" },
                         status: { type: "string" },
-                        sync_status: { type: "string" },
-                        google_event_id: { type: "string", nullable: true },
                       },
                     },
                   },

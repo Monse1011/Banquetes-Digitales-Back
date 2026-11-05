@@ -166,18 +166,8 @@ const {
   ListCalendarEventsUseCase,
 } = require("../application/use-cases/calendar/list-calendar-events-use-case");
 const {
-  ProcessPendingCalendarSyncUseCase,
-} = require("../application/use-cases/calendar/process-pending-calendar-sync-use-case");
-const {
   PostgresCalendarEventRepository,
 } = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
-const {
-  PostgresCalendarSyncRepository,
-} = require("../infrastructure/repositories/calendar/postgres-calendar-sync-repository");
-const {
-  RetryCalendarSyncUseCase,
-} = require("../application/use-cases/calendar/retry-calendar-sync-use-case");
-const GoogleCalendarGateway = require("../infrastructure/services/calendar/google-calendar-gateway");
 // Resources use cases (Funciones 2.8 a 2.10)
 const {
   createResourceUseCases,
@@ -394,17 +384,7 @@ async function main() {
 
   // Calendar (necesario para la aceptación de la propuesta, Función 4.4).
   const calendarEventRepository = new PostgresCalendarEventRepository(pool);
-  const calendarSyncRepository = new PostgresCalendarSyncRepository(pool);
-  const externalCalendarGateway = new GoogleCalendarGateway();
-  const processPendingCalendarSyncUseCase = new ProcessPendingCalendarSyncUseCase(
-    calendarEventRepository,
-    calendarSyncRepository,
-    externalCalendarGateway
-  );
-  const acceptanceScheduler = new PostgresProposalAcceptanceScheduler(
-    calendarEventRepository,
-    processPendingCalendarSyncUseCase
-  );
+  const acceptanceScheduler = new PostgresProposalAcceptanceScheduler(calendarEventRepository);
 
   // Incremento 3 - Funciones 4.4 y 4.5: seguimiento por folio y confirmación de evento.
   const proposalAdjustmentRepository = new PostgresProposalAdjustmentRepository(pool);
@@ -451,22 +431,10 @@ async function main() {
   const scheduleEventUseCase = new ScheduleEventUseCase(
     reservationRequestRepository,
     clientRepository,
-    calendarEventRepository,
-    processPendingCalendarSyncUseCase
+    calendarEventRepository
   );
-  const editEventUseCase = new EditEventUseCase(
-    calendarEventRepository,
-    processPendingCalendarSyncUseCase
-  );
-  const cancelEventUseCase = new CancelEventUseCase(
-    calendarEventRepository,
-    processPendingCalendarSyncUseCase
-  );
-  const retryCalendarSyncUseCase = new RetryCalendarSyncUseCase(
-    calendarEventRepository,
-    calendarSyncRepository,
-    processPendingCalendarSyncUseCase
-  );
+  const editEventUseCase = new EditEventUseCase(calendarEventRepository);
+  const cancelEventUseCase = new CancelEventUseCase(calendarEventRepository);
   const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
 
   // Función 3.6 - Seguimiento y cierre del evento.
@@ -496,7 +464,6 @@ async function main() {
     editEventUseCase,
     cancelEventUseCase,
     listCalendarEventsUseCase,
-    retryCalendarSyncUseCase,
     // User management (Función 2.12)
     ...createUserManagementUseCases({ pool, emailService }),
     // Resources
@@ -520,12 +487,6 @@ async function main() {
     // Event closure (Función 3.6)
     finalizeEventUseCase,
   });
-
-  // Start background job for calendar sync. Función 3.6: la finalización ya no es automática
-  // al transcurrir la hora de fin; el Personal de Logística cierra el evento (RF-2.3.6.3).
-  setInterval(() => {
-    processPendingCalendarSyncUseCase.execute().catch((err) => console.error("Sync error:", err));
-  }, 15000); // every 15 seconds
 
   app.listen(config.port, () => {
     console.log(`Server running on port ${config.port}`);

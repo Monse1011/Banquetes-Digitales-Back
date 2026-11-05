@@ -8,7 +8,7 @@ describe("EditEventUseCase DAD request fields", () => {
       findById: vi.fn().mockResolvedValue({ logisticUserId: 12 }),
       reschedule: vi.fn(),
     };
-    const useCase = new EditEventUseCase(eventRepository, { execute: vi.fn() });
+    const useCase = new EditEventUseCase(eventRepository);
 
     await expect(
       useCase.execute(
@@ -36,7 +36,7 @@ describe("EditEventUseCase DAD request fields", () => {
       isConfirmed: () => true,
       hasStarted: () => false,
     };
-    const updatedEvent = { ...event, location: "Updated", isSynced: () => true };
+    const updatedEvent = { ...event, location: "Updated" };
     const eventRepository = {
       findById: vi.fn().mockResolvedValueOnce(event).mockResolvedValue(updatedEvent),
       reschedule: vi.fn().mockResolvedValue({
@@ -44,10 +44,8 @@ describe("EditEventUseCase DAD request fields", () => {
         event: updatedEvent,
       }),
     };
-    const syncProcessor = { execute: vi.fn().mockResolvedValue({}) };
     const useCase = new EditEventUseCase(
       eventRepository,
-      syncProcessor,
       () => new Date("2026-01-01T00:00:00.000Z")
     );
 
@@ -75,7 +73,6 @@ describe("EditEventUseCase DAD request fields", () => {
     const eventRepository = { findById: vi.fn().mockResolvedValue(event), reschedule: vi.fn() };
     const useCase = new EditEventUseCase(
       eventRepository,
-      null,
       () => new Date("2026-01-01T00:00:00.000Z")
     );
 

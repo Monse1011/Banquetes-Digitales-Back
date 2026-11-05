@@ -452,7 +452,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         ).toHaveLength(2);
         await expect(generation.execute(created.requestId, actor.id, input)).rejects.toThrow();
         const calendar = new PostgresCalendarEventRepository(adapter);
-        const schedule = new ScheduleEventUseCase(requests, clients, calendar, null);
+        const schedule = new ScheduleEventUseCase(requests, clients, calendar);
         // Calendar must consume the proposal's persisted resources, even after memory is lost.
         const resourceIds = (
           await connection.query(
@@ -505,9 +505,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
               [scheduled.event.id]
             )
           ).rows[0].count
-        ).toBe(1);
-        const edit = new EditEventUseCase(calendar, null);
-        const cancel = new CancelEventUseCase(calendar, null);
+        ).toBe(0); // Defecto 7: ya no se encola sincronización con Google Calendar.
+        const edit = new EditEventUseCase(calendar);
+        const cancel = new CancelEventUseCase(calendar);
         // Defecto 6: un evento Confirmado solo admite cambiar la ubicación.
         const editedStart = start;
         const editedEnd = end;
@@ -559,7 +559,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             [scheduled.event.id]
           )
         ).rows.map((r) => r.operation);
-        expect(queuedOperations).toEqual(["CREATE", "UPDATE", "DELETE"]);
+        expect(queuedOperations).toEqual([]);
       } finally {
         await fs.rm(pdfDirectory, { recursive: true, force: true });
       }

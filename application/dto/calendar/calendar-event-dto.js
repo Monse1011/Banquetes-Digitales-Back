@@ -36,7 +36,6 @@ function toCalendarEventDto(event) {
       ? { user_id: event.logisticUserId, full_name: event.logisticUserName }
       : null,
     status: event.status,
-    sync_status: event.syncStatus,
   };
 }
 

@@ -1,6 +1,5 @@
 const { CalendarRules } = require("../../constants/calendar-rules");
 const { ReservationRequestStatus } = require("../../enums/reservation-request/request-status");
-const { CalendarSyncStatus } = require("../../enums/calendar/calendar-sync-status");
 
 // Función 3.3: evento del calendario interno. El estado del evento ES el estado de su
 // solicitud (Confirmado, Finalizado o Cancelado); no se duplica en otra columna.
@@ -16,8 +15,6 @@ class CalendarEvent {
     logisticUserId,
     logisticUserName,
     status,
-    syncStatus,
-    googleEventId,
     createdAt,
     updatedAt
   ) {
@@ -31,8 +28,6 @@ class CalendarEvent {
     this.logisticUserId = logisticUserId ?? null;
     this.logisticUserName = logisticUserName ?? null;
     this.status = status;
-    this.syncStatus = syncStatus ?? CalendarSyncStatus.PENDING;
-    this.googleEventId = googleEventId ?? null;
     this.createdAt = createdAt ?? null;
     this.updatedAt = updatedAt ?? null;
   }
@@ -52,10 +47,6 @@ class CalendarEvent {
 
   hasStarted(now) {
     return this.startAt.getTime() <= now.getTime();
-  }
-
-  isSynced() {
-    return this.syncStatus === CalendarSyncStatus.SYNCED;
   }
 }
 
