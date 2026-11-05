@@ -71,7 +71,7 @@ describe("Rutas de la Función 3.4", () => {
     const clientRepository = new InMemoryClientRepository();
     reservationRequestRepository = new InMemoryReservationRequestRepository();
     assignedResourceRepository = new InMemoryAssignedResourceRepository([
-      { id: 1, name: "Mesero", type: "HUMAN", unitCost: 300, totalQuantity: 5 },
+      { id: 1, name: "Mesero", type: "HUMAN", unitCost: 300, precio: 60, totalQuantity: 5 },
     ]);
     derivedInformationRepository = new InMemoryDerivedInformationRepository();
     proposalRepository = new InMemoryProposalRepository(
@@ -281,6 +281,25 @@ describe("Rutas de la Función 3.4", () => {
       can_register_agreements: true,
       client: { client_name: "Andrea Morales", client_email: "andrea@gmail.com" },
     });
+  });
+
+  it("responds 422 naming the people without an hourly price (defecto 4)", async () => {
+    assignedResourceRepository.resources[0].precio = null;
+    const requestId = await createRequest();
+    const saved = await request(app)
+      .post(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody())
+      .expect(201);
+
+    const generated = await request(app)
+      .post(`/api/logistics/requests/${requestId}/proposals`)
+      .set("Cookie", AUTH_COOKIE)
+      .send({ data: { derived_information_id: saved.body.data.derived_information_id } });
+
+    expect(generated.status).toBe(422);
+    expect(generated.body.message).toContain("Mesero");
+    expect(generated.body.resources).toEqual([{ resource_id: 1, name: "Mesero" }]);
   });
 
   it("saves agreements and generates the proposal end to end (RF-2.3.4.5)", async () => {

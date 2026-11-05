@@ -330,4 +330,37 @@ describe("GenerateProposalUseCase", () => {
       )
     ).rejects.toBeInstanceOf(AgreementsValidationException);
   });
+
+  it("responde 422 nombrando a las personas sin precio por hora y no genera nada", async () => {
+    assignedResourceRepository = new InMemoryAssignedResourceRepository([
+      { id: 1, name: "Ana López", type: "HUMAN", unitCost: null, precio: null, totalQuantity: 5 },
+    ]);
+    useCase = new GenerateProposalUseCase(
+      reservationRequestRepository,
+      clientRepository,
+      derivedInformationRepository,
+      proposalRepository,
+      assignedResourceRepository,
+      pdfGenerator
+    );
+    const { request, information } = await setup();
+
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({ derived_information_id: information.id })
+      )
+    ).rejects.toMatchObject({
+      name: "HumanResourcePriceMissingException",
+      message: expect.stringContaining("Ana López"),
+      resources: [{ resource_id: 1, name: "Ana López" }],
+    });
+
+    expect(pdfGenerator.stored).toHaveLength(0);
+    expect(proposalRepository.proposals).toHaveLength(0);
+    expect((await reservationRequestRepository.findById(request.requestId)).status).toBe(
+      ReservationRequestStatus.COORDINATION_READY
+    );
+  });
 });

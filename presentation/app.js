@@ -56,6 +56,7 @@ const EventAvailabilityConflictException = require("../domain/exceptions/calenda
 const EventNotModifiableException = require("../domain/exceptions/calendar/event-not-modifiable-exception");
 const RequestNotSchedulableException = require("../domain/exceptions/calendar/request-not-schedulable-exception");
 const AgreementsValidationException = require("../domain/exceptions/proposal/agreements-validation-exception");
+const HumanResourcePriceMissingException = require("../domain/exceptions/proposal/human-resource-price-missing-exception");
 const RequestNotInAgreementsStateException = require("../domain/exceptions/proposal/request-not-in-agreements-state-exception");
 const AgreementsRevisionChangedException = require("../domain/exceptions/proposal/agreements-revision-changed-exception");
 const ProposalGenerationNotAllowedException = require("../domain/exceptions/proposal/proposal-generation-not-allowed-exception");
@@ -299,6 +300,14 @@ function handleCalendarError(error, response) {
 function handleProposalConflictError(error, response) {
   if (error instanceof AgreementsRevisionChangedException) {
     response.status(409).json({ message: error.message, code: error.code });
+    return true;
+  }
+  if (error instanceof HumanResourcePriceMissingException) {
+    response.status(422).json({
+      message: error.message,
+      errors: error.errors,
+      resources: error.resources,
+    });
     return true;
   }
   if (error instanceof AgreementsValidationException) {

@@ -19,6 +19,7 @@ const {
 const {
   GenerateProposalResponseDto,
 } = require("../../dto/proposal/generate-proposal-response-dto");
+const HumanResourcePriceMissingException = require("../../../domain/exceptions/proposal/human-resource-price-missing-exception");
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const { humanResourceCost } = require("../../services/proposal/human-resource-cost");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
@@ -193,6 +194,14 @@ class GenerateProposalUseCase {
     );
     // Defecto 4: el costo de cada persona es horas del evento × precio por hora; se congela
     // como unitCost de la línea, así el subtotal (Σ quantity × unitCost) y el PDF no cambian.
+    const unpriced = activeResources.filter(
+      (resource) => resource.type === ResourceType.HUMAN && resource.precio == null
+    );
+
+    if (unpriced.length > 0) {
+      throw new HumanResourcePriceMissingException(unpriced);
+    }
+
     const assignedResources = activeResources.map((resource) =>
       resource.type === ResourceType.HUMAN
         ? {
