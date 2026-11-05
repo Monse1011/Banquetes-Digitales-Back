@@ -58,6 +58,16 @@ class InMemoryResourceAssignmentRepository {
       .map((assignment) => copyOf(assignment));
   }
 
+  async findReleasedResourceIds(requestId) {
+    return [
+      ...new Set(
+        this.assignments
+          .filter((a) => a.requestId === requestId && a.status === AssignmentStatus.RELEASED)
+          .map((a) => a.resourceId)
+      ),
+    ];
+  }
+
   async findBlocking(resourceIds, period, excludeRequestId) {
     return this.blockingAssignments(resourceIds, period, excludeRequestId).map((assignment) =>
       copyOf(assignment)

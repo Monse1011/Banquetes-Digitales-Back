@@ -28,3 +28,10 @@ el código del contrato responde 400.
 columnas `calendar_events.sync_status` / `google_event_id`. El código ya no las usa. Antes de
 ejecutarla: respaldar la base y revisar las filas pendientes o con error del outbox. Después de
 ejecutarla, quitar esas definiciones de `database/schema.sql` (están marcadas como obsoletas).
+
+## `PostgresAssignedResourceRepository` sin uso y con errores
+
+`infrastructure/repositories/proposal/postgres-assigned-resource-repository.js` no está conectado (la
+aplicación usa `ConfirmedResourceAdapter`). Si se reutilizara: su `syncAssignments` ignora la
+transacción recibida y hace su propio `COMMIT`, y su `INSERT` omite columnas `NOT NULL`
+(`requested_quantity`, `event_start`, `event_end`). Conviene borrarlo o corregirlo.

@@ -54,6 +54,10 @@ class ConfirmedResourceAdapter {
     });
   }
 
+  async findReleasedResourceIds(requestId, transaction = null) {
+    return this.assignments.findReleasedResourceIds(requestId, transaction);
+  }
+
   async findResourcesByIds(ids, transaction = null) {
     return this.resources.findByIds(ids, transaction);
   }
@@ -89,6 +93,8 @@ class ConfirmedResourceAdapter {
       adjustments.map((adjustment) => adjustment.resourceId),
       transaction
     );
+    // Defecto 8: un recurso no humano liberado de esta solicitud puede volver a agregarse.
+    const reAddable = new Set(await this.findReleasedResourceIds(requestId, transaction));
     const period = blockingPeriod(start, end);
     const ids = adjustments.filter((item) => item.quantity > 0).map((item) => item.resourceId);
     const blocking = ids.length
@@ -116,7 +122,8 @@ class ConfirmedResourceAdapter {
           start,
           end,
           userId,
-          now
+          now,
+          reAddable
         );
       });
     if (updated.length === 0 && releasedIds.length === 0) return;
@@ -125,7 +132,18 @@ class ConfirmedResourceAdapter {
     }
   }
 
-  toConfirmedAssignment(requestId, item, existing, resource, available, start, end, userId, now) {
+  toConfirmedAssignment(
+    requestId,
+    item,
+    existing,
+    resource,
+    available,
+    start,
+    end,
+    userId,
+    now,
+    reAddable = new Set()
+  ) {
     if (!resource || !resource.isActive) throw new ResourceAvailabilityChangedException();
     if (item.quantity > available) {
       throw new ResourceAvailabilityExceededException([
@@ -137,7 +155,7 @@ class ConfirmedResourceAdapter {
         },
       ]);
     }
-    if (!existing && resource.type !== ResourceType.HUMAN) {
+    if (!existing && resource.type !== ResourceType.HUMAN && !reAddable.has(item.resourceId)) {
       throw new ResourceAvailabilityChangedException();
     }
 

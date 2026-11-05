@@ -397,21 +397,110 @@ describe("SaveAgreementsUseCase", () => {
     });
   });
 
-  it("rejects missing adjusted quantities of assigned resources (RF-2.3.4.2)", async () => {
-    const request = await createRequest();
+  describe("recursos parciales (defecto 8)", () => {
+    const activeOf = async (requestId) =>
+      Object.fromEntries(
+        (await assignedResourceRepository.findActiveByRequestId(requestId)).map((assignment) => [
+          assignment.resourceId,
+          assignment.quantity,
+        ])
+      );
 
-    const promise = useCase.execute(
-      request.requestId,
-      LOGISTIC_USER_ID,
-      dto({ adjusted_resources: [{ resource_id: 1, quantity: 2 }] })
-    );
+    it("no exige todas las categorías: un material omitido conserva su cantidad", async () => {
+      const request = await createRequest();
 
-    await expect(promise).rejects.toBeInstanceOf(AgreementsValidationException);
-    await expect(promise).rejects.toMatchObject({
-      errors: {
-        adjusted_resources:
-          "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
-      },
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({ adjusted_resources: [{ resource_id: 1, quantity: 4 }] })
+      );
+
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 50 });
+    });
+
+    it("guarda acuerdos sin personal (solo materiales)", async () => {
+      const request = await createRequest();
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({ adjusted_resources: [{ resource_id: 2, quantity: 50 }] })
+      );
+
+      // Omitir a una persona la libera (contrato documentado de RF-2.3.4.9).
+      expect(await activeOf(request.requestId)).toEqual({ 2: 50 });
+    });
+
+    it("un material liberado con cantidad 0 puede volver a agregarse", async () => {
+      const request = await createRequest();
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          adjusted_resources: [
+            { resource_id: 1, quantity: 4 },
+            { resource_id: 2, quantity: 0 },
+          ],
+        })
+      );
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4 });
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          adjusted_resources: [
+            { resource_id: 1, quantity: 4 },
+            { resource_id: 2, quantity: 20 },
+          ],
+        })
+      );
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 20 });
+    });
+
+    it("responde errores por campo con mensajes específicos, nunca el genérico", async () => {
+      const request = await createRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ location: "", adjusted_resources: [{ resource_id: 99, quantity: 1 }] })
+        )
+      ).rejects.toMatchObject({
+        message: "El campo ubicación es obligatorio.",
+        errors: { location: "El campo ubicación es obligatorio." },
+      });
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ adjusted_resources: [{ resource_id: 3, quantity: 2 }] })
+        )
+      ).rejects.toMatchObject({
+        message: expect.stringContaining("Ana López"),
+        errors: { adjusted_resources: expect.stringContaining("Ana López") },
+      });
+    });
+
+    it("un error no deja asignaciones a medias", async () => {
+      const request = await createRequest();
+      const before = await activeOf(request.requestId);
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            adjusted_resources: [
+              { resource_id: 2, quantity: 0 },
+              { resource_id: 99, quantity: 1 },
+            ],
+          })
+        )
+      ).rejects.toBeInstanceOf(AgreementsValidationException);
+      expect(await activeOf(request.requestId)).toEqual(before);
     });
   });
 

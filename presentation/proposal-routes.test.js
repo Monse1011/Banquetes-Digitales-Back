@@ -190,6 +190,21 @@ describe("Rutas de la Función 3.4", () => {
     };
   }
 
+  it("responde 400 con un mensaje específico, no el genérico (defecto 8)", async () => {
+    const requestId = await createRequest();
+
+    const response = await request(app)
+      .post(`/api/logistics/requests/${requestId}/derived-information`)
+      .set("Cookie", AUTH_COOKIE)
+      .send(agreementsBody({ location: "" }))
+      .expect(400);
+
+    expect(response.body).toEqual({
+      message: "El campo ubicación es obligatorio.",
+      errors: { location: "El campo ubicación es obligatorio." },
+    });
+  });
+
   it("rejects unauthenticated and unsupported roles", async () => {
     const requestId = await createRequest();
 

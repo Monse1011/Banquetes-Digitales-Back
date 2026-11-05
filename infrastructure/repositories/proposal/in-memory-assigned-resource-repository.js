@@ -54,6 +54,20 @@ class InMemoryAssignedResourceRepository {
     });
   }
 
+  async findReleasedResourceIds(requestId) {
+    return [
+      ...new Set(
+        this.assignments
+          .filter(
+            (assignment) =>
+              assignment.reservationRequestId === requestId &&
+              assignment.status === AssignedResourceStatus.RELEASED
+          )
+          .map((assignment) => assignment.resourceId)
+      ),
+    ];
+  }
+
   async findResourcesByIds(resourceIds) {
     return this.resources.filter((resource) => resourceIds.includes(resource.id));
   }

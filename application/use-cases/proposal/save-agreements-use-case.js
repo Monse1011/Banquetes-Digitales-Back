@@ -84,11 +84,10 @@ class SaveAgreementsUseCase {
     const endDatetime = dto.parseDate(dto.endDatetime);
 
     this.assertStartNotInPast(request, latest, startDatetime);
-    const adjustments = dto.toAdjustments();
 
-    // RF-2.3.4.2 / RF-2.3.4.8 / RF-2.3.4.9: solo el personal puede añadirse o
-    // sustituirse desde acuerdos; materiales y logística deben seguir incluidos.
-    await this.validateAdjustedResourcesCoverage(requestId, adjustments, transaction);
+    // RF-2.3.4.2 / RF-2.3.4.8 / RF-2.3.4.9 y defecto 8: ajustes efectivos (los no humanos
+    // omitidos conservan su cantidad).
+    const adjustments = await this.resolveAdjustments(requestId, dto.toAdjustments(), transaction);
 
     await this.validateResponsibleSchedule(request, startDatetime, endDatetime, transaction);
     await this.validateAdjustedAvailability(
@@ -174,12 +173,18 @@ class SaveAgreementsUseCase {
     }
   }
 
-  // RF-2.3.4.9: los ajustes pueden añadir personal humano; omitir personas equivale
-  // a sustituirlas. Los recursos materiales y logísticos existentes son obligatorios.
-  async validateAdjustedResourcesCoverage(requestId, adjustments, transaction) {
+  // RF-2.3.4.9: los ajustes pueden añadir personal humano; omitir a una persona la libera.
+  // Defecto 8: no se exigen todas las categorías. Un recurso material o logístico omitido
+  // conserva su cantidad (se agrega como ajuste sin cambio para que su horario y disponibilidad
+  // se revaliden); para liberarlo se envía cantidad 0. Uno liberado antes en esta solicitud
+  // puede volver a agregarse, así la solicitud no queda sin forma de reasignarlo.
+  async resolveAdjustments(requestId, adjustments, transaction) {
     const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
       requestId,
       transaction
+    );
+    const releasedIds = new Set(
+      await this.assignedResourceRepository.findReleasedResourceIds(requestId, transaction)
     );
     const assignedByResourceId = new Map(
       assignedResources.map((assignment) => [assignment.resourceId, assignment])
@@ -194,40 +199,44 @@ class SaveAgreementsUseCase {
       transaction
     );
     const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-    const errors = [];
-
-    for (const adjustment of adjustments) {
-      const alreadyAssigned = assignedByResourceId.has(adjustment.resourceId);
-      const resource = resourcesById.get(adjustment.resourceId);
-      const error = this.validateResourceAdjustment(adjustment, resource, alreadyAssigned);
-      if (error) errors.push(error);
-    }
-
-    const missingNonHuman = assignedResources.some((assignment) => {
-      if (adjustments.some((adjustment) => adjustment.resourceId === assignment.resourceId)) {
-        return false;
-      }
-
-      return resourcesById.get(assignment.resourceId)?.type !== ResourceType.HUMAN;
-    });
-    if (missingNonHuman) {
-      errors.push(ProposalMessages.ADJUSTED_QUANTITY_MISSING);
-    }
+    const errors = adjustments
+      .map((adjustment) =>
+        this.validateResourceAdjustment(
+          adjustment,
+          resourcesById.get(adjustment.resourceId),
+          assignedByResourceId.has(adjustment.resourceId),
+          releasedIds.has(adjustment.resourceId)
+        )
+      )
+      .filter(Boolean);
 
     if (errors.length > 0) {
       throw new AgreementsValidationException({
         adjusted_resources: [...new Set(errors)].join(" "),
       });
     }
+
+    const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
+    const omittedNonHuman = assignedResources
+      .filter(
+        (assignment) =>
+          !adjustedIds.has(assignment.resourceId) &&
+          resourcesById.get(assignment.resourceId)?.type !== ResourceType.HUMAN
+      )
+      .map((assignment) => ({ resourceId: assignment.resourceId, quantity: assignment.quantity }));
+
+    return [...adjustments, ...omittedNonHuman];
   }
 
-  validateResourceAdjustment(adjustment, resource, alreadyAssigned) {
-    if (!resource || (!alreadyAssigned && resource.type !== ResourceType.HUMAN)) {
-      return resourceNotAssignedMessage(adjustment.resourceId);
+  validateResourceAdjustment(adjustment, resource, alreadyAssigned, releasedBefore) {
+    const canAdd = resource?.type === ResourceType.HUMAN || releasedBefore;
+
+    if (!resource || (!alreadyAssigned && !canAdd)) {
+      return resourceNotAssignedMessage(adjustment.resourceId, resource?.name);
     }
 
     if (resource.type === ResourceType.HUMAN && !alreadyAssigned && adjustment.quantity !== 1) {
-      return ProposalMessages.HUMAN_ADJUSTED_QUANTITY_INVALID;
+      return `${resource.name}: ${ProposalMessages.HUMAN_ADJUSTED_QUANTITY_INVALID}`;
     }
 
     return null;

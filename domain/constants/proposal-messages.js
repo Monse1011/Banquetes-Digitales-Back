@@ -15,9 +15,12 @@ function exceededAvailabilityMessage(resourceName, available) {
   return `La cantidad ajustada de ${resourceName} excede la disponibilidad (${available}) para el horario indicado.`;
 }
 
-// RF-2.3.4.2: los recursos ajustados deben estar asignados a la solicitud.
-function resourceNotAssignedMessage(resourceId) {
-  return `El recurso con identificador ${resourceId} no está asignado a la solicitud.`;
+// RF-2.3.4.2: los recursos ajustados deben estar asignados a la solicitud. Defecto 8: se nombra
+// el recurso cuando se conoce.
+function resourceNotAssignedMessage(resourceId, resourceName = null) {
+  return resourceName
+    ? `El recurso «${resourceName}» no está asignado a la solicitud.`
+    : `El recurso con identificador ${resourceId} no está asignado a la solicitud.`;
 }
 
 const ProposalMessages = Object.freeze({
@@ -32,7 +35,8 @@ const ProposalMessages = Object.freeze({
   GENERATION_FAILED: "No fue posible generar la propuesta. Intente nuevamente.",
   PROPOSAL_FILE_MISSING: "No fue posible leer el archivo de la propuesta.",
   SEND_FAILED: "No fue posible enviar la propuesta.",
-  AGREEMENTS_VALIDATION: "Existen campos obligatorios sin completar.",
+  AGREEMENTS_INVALID: "Los datos de los acuerdos no son válidos.",
+  CLIENT_OBSERVATIONS_INVALID: "Las observaciones para el cliente deben ser texto.",
   END_BEFORE_START: "La hora de fin debe ser posterior a la hora de inicio.",
   DATE_IN_PAST: "La fecha no puede ser anterior a la actual.",
   LOCATION_TOO_LONG: "La ubicación no puede exceder 255 caracteres.",
@@ -40,8 +44,6 @@ const ProposalMessages = Object.freeze({
   ADJUSTED_RESOURCES_DUPLICATE: "No se puede repetir un recurso en las cantidades ajustadas.",
   HUMAN_ADJUSTED_QUANTITY_INVALID:
     "La cantidad ajustada de un recurso humano debe ser 1 o 0 para liberarlo.",
-  ADJUSTED_QUANTITY_MISSING:
-    "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
   RESOURCE_ID_INVALID: "El identificador del recurso no es válido.",
   RESOURCE_NOT_ASSIGNED: "El recurso no está asignado a la solicitud.",
   SCHEDULE_CONFLICT: "El horario confirmado entra en conflicto con la agenda del responsable.",
