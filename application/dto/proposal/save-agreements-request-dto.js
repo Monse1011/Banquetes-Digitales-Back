@@ -3,8 +3,7 @@ const {
   ProposalFieldNames,
   requiredFieldMessage,
 } = require("../../../domain/constants/proposal-messages");
-const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
-const { validateEventWindow, isStartInPast } = require("../../services/calendar/event-window");
+const { validateEventWindow } = require("../../services/calendar/event-window");
 
 // Body de POST /api/logistics/requests/:id/derived-information (contrato DAD).
 class SaveAgreementsRequestDto {
@@ -60,11 +59,7 @@ class SaveAgreementsRequestDto {
       return requiredFieldMessage(ProposalFieldNames.START_DATETIME);
     }
 
-    // RF-2.3.4.2: el inicio no puede ser anterior al momento actual (incluye hoy).
-    if (isStartInPast(start)) {
-      return CalendarMessages.START_IN_PAST;
-    }
-
+    // "Inicio posterior a ahora" lo valida el caso de uso, solo si el inicio cambió.
     return undefined;
   }
 

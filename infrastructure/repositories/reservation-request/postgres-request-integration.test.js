@@ -362,6 +362,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         agreementResources,
         {
           lockRequest: (...args) => derived.lockRequest(...args),
+          findLatestByRequestId: (...args) => derived.findLatestByRequestId(...args),
           create: async () => {
             throw new Error("Simulated save failure");
           },

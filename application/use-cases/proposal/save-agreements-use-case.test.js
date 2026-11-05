@@ -57,15 +57,19 @@ describe("SaveAgreementsUseCase", () => {
     );
   });
 
-  async function createRequest(status = ReservationRequestStatus.COORDINATION_READY) {
+  async function createRequest(
+    status = ReservationRequestStatus.COORDINATION_READY,
+    start = futureDate(10, 18),
+    end = futureDate(10, 23)
+  ) {
     const created = await reservationRequestRepository.create(
       new ReservationRequest(
         null,
         "EVT-2026-0101",
         1,
         null,
-        futureDate(10, 18),
-        futureDate(10, 23),
+        start,
+        end,
         50,
         "Salón Los Pinos",
         status,
@@ -408,6 +412,86 @@ describe("SaveAgreementsUseCase", () => {
         adjusted_resources:
           "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
       },
+    });
+  });
+
+  describe("inicio ya pasado por el simple paso del tiempo", () => {
+    const HOUR = 60 * 60 * 1000;
+    const pastStart = () => new Date(Date.now() - 2 * HOUR);
+    const pastEnd = () => new Date(Date.now() + HOUR);
+
+    async function pastRequest() {
+      const start = pastStart();
+      const end = pastEnd();
+      const request = await createRequest(undefined, start, end);
+
+      return { request, start, end };
+    }
+
+    it("permite re-guardar acuerdos con el mismo inicio aunque ya pasó", async () => {
+      const { request, start, end } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+        )
+      ).resolves.toBeDefined();
+
+      // Y otra vez, ahora contra los últimos acuerdos guardados.
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+        )
+      ).resolves.toBeDefined();
+    });
+
+    it("rechaza cambiar a otro inicio pasado", async () => {
+      const { request, end } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            start_datetime: new Date(Date.now() - 3 * HOUR).toISOString(),
+            end_datetime: end.toISOString(),
+          })
+        )
+      ).rejects.toMatchObject({
+        name: "AgreementsValidationException",
+        errors: { start_datetime: expect.stringMatching(/momento actual/) },
+      });
+    });
+
+    it("permite cambiar a un inicio futuro", async () => {
+      const { request } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            start_datetime: futureDate(10, 18).toISOString(),
+            end_datetime: futureDate(10, 23).toISOString(),
+          })
+        )
+      ).resolves.toBeDefined();
+    });
+
+    it("sigue aplicando las reglas de ventana aunque el inicio no cambie", async () => {
+      const { request, start } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: start.toISOString() })
+        )
+      ).rejects.toMatchObject({ errors: { end_datetime: expect.any(String) } });
     });
   });
 });

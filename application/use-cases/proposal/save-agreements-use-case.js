@@ -16,6 +16,8 @@ const { findOwnedRequest } = require("../../services/proposal/request-ownership"
 const { withAgreementsLock } = require("../../services/proposal/with-agreements-lock");
 const AgreementsRevisionChangedException = require("../../../domain/exceptions/proposal/agreements-revision-changed-exception");
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
+const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
+const { isStartInPast } = require("../../services/calendar/event-window");
 const {
   formatDate,
   formatTime,
@@ -66,18 +68,22 @@ class SaveAgreementsUseCase {
       throw new AgreementsValidationException(errors);
     }
 
-    if (dto.derivedInformationId !== undefined) {
-      const latest = await this.derivedInformationRepository.findLatestByRequestId(
-        requestId,
-        transaction
-      );
-      if ((latest?.id ?? null) !== dto.derivedInformationId) {
-        throw new AgreementsRevisionChangedException();
-      }
+    const latest = await this.derivedInformationRepository.findLatestByRequestId(
+      requestId,
+      transaction
+    );
+
+    if (
+      dto.derivedInformationId !== undefined &&
+      (latest?.id ?? null) !== dto.derivedInformationId
+    ) {
+      throw new AgreementsRevisionChangedException();
     }
 
     const startDatetime = dto.parseDate(dto.startDatetime);
     const endDatetime = dto.parseDate(dto.endDatetime);
+
+    this.assertStartNotInPast(request, latest, startDatetime);
     const adjustments = dto.toAdjustments();
 
     // RF-2.3.4.2 / RF-2.3.4.8 / RF-2.3.4.9: solo el personal puede añadirse o
@@ -119,6 +125,22 @@ class SaveAgreementsUseCase {
     );
 
     return new SaveAgreementsResponseDto(created.id);
+  }
+
+  // El inicio debe ser posterior a "ahora" solo si el usuario lo cambió. Re-guardar el mismo
+  // inicio (el de la solicitud o el de los últimos acuerdos) sigue permitido aunque el tiempo
+  // ya lo haya dejado atrás; si no, la solicitud quedaría bloqueada sin salida.
+  assertStartNotInPast(request, latest, startDatetime) {
+    const currentStarts = [request.eventDateTime, latest?.startDatetime].filter(Boolean);
+    const unchanged = currentStarts.some(
+      (current) => current.getTime() === startDatetime.getTime()
+    );
+
+    if (!unchanged && isStartInPast(startDatetime)) {
+      throw new AgreementsValidationException({
+        start_datetime: CalendarMessages.START_IN_PAST,
+      });
+    }
   }
 
   // RF-2.3.4.10: si el horario confirmado difiere del vigente, se reevalúa la
