@@ -172,14 +172,6 @@ const TABLES = [
        VALUES (${f.request}, 'Evento CRUD', ${WINDOW}, 'Salon') RETURNING *`,
     set: ["location", "Salon editado"],
   },
-  {
-    table: "calendar_sync_outbox",
-    keys: ["id_outbox"],
-    insert: (f) =>
-      `INSERT INTO calendar_sync_outbox (calendar_event_id, operation)
-       VALUES (${f.event}, 'CREATE') RETURNING *`,
-    set: ["status", "DONE"],
-  },
 ];
 
 describe.skipIf(!hasTestDatabase())("schema.sql - CRUD por tabla", () => {

@@ -22,12 +22,15 @@ de logística expone `can_register_finalization` para que el front no compare te
 existen en el contrato; los códigos reales son `"FINALIZED"` y `"CANCELED"`. Filtrar el historial con
 el código del contrato responde 400.
 
-## Migración 002 sin ejecutar
+## Migración 002 sin ejecutar (solo limpieza de bases existentes)
 
-`database/migrations/002-drop-google-calendar-sync.up.sql` elimina `calendar_sync_outbox` y las
-columnas `calendar_events.sync_status` / `google_event_id`. El código ya no las usa. Antes de
-ejecutarla: respaldar la base y revisar las filas pendientes o con error del outbox. Después de
-ejecutarla, quitar esas definiciones de `database/schema.sql` (están marcadas como obsoletas).
+`database/schema.sql` ya es el esquema final y completo: no crea `calendar_sync_outbox` ni las
+columnas `calendar_events.sync_status` / `google_event_id`. Una base **nueva** nace sin ellas.
+
+Las bases que ya existían conservan esas estructuras: volver a correr `schema.sql` no las borra
+(es idempotente y no destruye datos). El código ya no las usa, así que son inofensivas. Para
+eliminarlas, ejecutar `database/migrations/002-drop-google-calendar-sync.up.sql`, previo respaldo
+y revisión de las filas pendientes o con error del outbox. Es opcional.
 
 ## `PostgresAssignedResourceRepository` sin uso y con errores
 

@@ -498,14 +498,6 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             await listCalendar.execute({ actor: { id: Number(admin.id_user), role: "ADMIN" } })
           ).events.some((event) => event.request_id === created.requestId)
         ).toBe(true);
-        expect(
-          (
-            await connection.query(
-              "SELECT COUNT(*)::int AS count FROM calendar_sync_outbox WHERE calendar_event_id=$1",
-              [scheduled.event.id]
-            )
-          ).rows[0].count
-        ).toBe(0); // Defecto 7: ya no se encola sincronización con Google Calendar.
         const edit = new EditEventUseCase(calendar);
         const cancel = new CancelEventUseCase(calendar);
         // Defecto 6: un evento Confirmado solo admite cambiar la ubicación.
@@ -553,13 +545,6 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
           edit.execute(scheduled.event.id, actor, { location: "No permitido" })
         ).rejects.toThrow();
         await expect(cancel.execute(scheduled.event.id, actor)).rejects.toThrow();
-        const queuedOperations = (
-          await connection.query(
-            "SELECT operation FROM calendar_sync_outbox WHERE calendar_event_id=$1 ORDER BY id_outbox",
-            [scheduled.event.id]
-          )
-        ).rows.map((r) => r.operation);
-        expect(queuedOperations).toEqual([]);
       } finally {
         await fs.rm(pdfDirectory, { recursive: true, force: true });
       }

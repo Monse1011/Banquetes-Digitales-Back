@@ -411,7 +411,7 @@ CREATE INDEX IF NOT EXISTS ix_audit_logs_user ON audit_logs (user_id);
 CREATE INDEX IF NOT EXISTS ix_audit_logs_entity ON audit_logs (action, entity_id);
 
 -- -----------------------------------------------------------------------------
--- 8. Calendario interno y sincronización con Google (Función 3.3)
+-- 8. Calendario interno (Función 3.3)
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS calendar_events (
@@ -421,37 +421,12 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   start_at         timestamptz  NOT NULL,
   end_at           timestamptz  NOT NULL,
   location         text         NOT NULL,
-  sync_status      varchar(10)  NOT NULL DEFAULT 'PENDING' CHECK (sync_status IN ('PENDING', 'SYNCED')),
-  google_event_id  varchar(255) UNIQUE,
   created_at       timestamptz  NOT NULL DEFAULT now(),
   updated_at       timestamptz  NOT NULL DEFAULT now(),
   CONSTRAINT chk_calendar_events_window CHECK (end_at > start_at)
 );
 CREATE INDEX IF NOT EXISTS ix_calendar_events_request ON calendar_events (id_request, id DESC);
 CREATE INDEX IF NOT EXISTS ix_calendar_events_start ON calendar_events (start_at, id);
-
--- OBSOLETO (defecto 7): el código ya no usa el outbox ni calendar_events.sync_status /
--- google_event_id. Se eliminan con database/migrations/002-drop-google-calendar-sync.up.sql;
--- cuando esa migración se ejecute, quitar también estas definiciones de este archivo.
--- Outbox: operaciones pendientes de enviar a Google Calendar.
-CREATE TABLE IF NOT EXISTS calendar_sync_outbox (
-  id_outbox          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  calendar_event_id  bigint      NOT NULL REFERENCES calendar_events (id) ON DELETE CASCADE,
-  operation          varchar(10) NOT NULL CHECK (operation IN ('CREATE', 'UPDATE', 'DELETE')),
-  status             varchar(10) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'DONE')),
-  attempts           integer     NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-  next_attempt_at    timestamptz NOT NULL DEFAULT now(),
-  locked_until       timestamptz,
-  last_error         text,
-  processed_at       timestamptz,
-  created_at         timestamptz NOT NULL DEFAULT now(),
-  updated_at         timestamptz NOT NULL DEFAULT now()
-);
--- claimNext: siguiente PENDING vencida en orden de id.
-CREATE INDEX IF NOT EXISTS ix_calendar_sync_outbox_pending
-  ON calendar_sync_outbox (next_attempt_at, id_outbox) WHERE status = 'PENDING';
-CREATE INDEX IF NOT EXISTS ix_calendar_sync_outbox_event
-  ON calendar_sync_outbox (calendar_event_id, status);
 
 -- -----------------------------------------------------------------------------
 -- 9. Funciones y triggers

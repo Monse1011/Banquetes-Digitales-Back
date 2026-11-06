@@ -92,10 +92,6 @@ const INVALID_FOREIGN_KEYS = [
       `INSERT INTO calendar_events (id_request, title, start_at, end_at, location)
        VALUES (-1, 't', ${WINDOW}, 'x')`,
   ],
-  [
-    "calendar_sync_outbox.calendar_event_id",
-    () => "INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES (-1, 'CREATE')",
-  ],
 ];
 
 const DUPLICATES = [
@@ -172,12 +168,6 @@ const DUPLICATES = [
       `INSERT INTO resource_confirmation_pending_observations (request_id, observations)
        VALUES (${f.request}, 'a'), (${f.request}, 'b')`,
   ],
-  [
-    "calendar_events.google_event_id",
-    (f) =>
-      `INSERT INTO calendar_events (id_request, title, start_at, end_at, location, google_event_id)
-       VALUES (${f.request}, 'a', ${WINDOW}, 'x', 'g-1'), (${f.request}, 'b', ${WINDOW}, 'x', 'g-1')`,
-  ],
 ];
 
 const NULLS = [
@@ -214,10 +204,6 @@ const NULLS = [
   [
     "calendar_events.location",
     (f) => `UPDATE calendar_events SET location = NULL WHERE id = ${f.event}`,
-  ],
-  [
-    "calendar_sync_outbox.operation",
-    (f) => `INSERT INTO calendar_sync_outbox (calendar_event_id) VALUES (${f.event})`,
   ],
 ];
 
@@ -277,15 +263,6 @@ const CHECKS = [
   [
     "proposals.status en minúsculas",
     (f) => `UPDATE proposals SET status = 'accepted' WHERE id = ${f.proposal}`,
-  ],
-  [
-    "calendar_events.sync_status desconocido",
-    (f) => `UPDATE calendar_events SET sync_status = 'DONE' WHERE id = ${f.event}`,
-  ],
-  [
-    "calendar_sync_outbox.operation en minúsculas",
-    (f) =>
-      `INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES (${f.event}, 'create')`,
   ],
   [
     "document_counters.kind desconocido",
@@ -380,23 +357,6 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
           [f.proposal]
         );
         expect(Number(left.rows[0].total)).toBe(0);
-      }));
-
-    it("CASCADE: borrar un evento elimina su cola de sincronización", () =>
-      withRollback(pool, async (db) => {
-        const f = await seedGraph(db);
-        await db.query(
-          "INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES ($1, 'CREATE')",
-          [f.event]
-        );
-
-        await db.query("DELETE FROM calendar_events WHERE id = $1", [f.event]);
-
-        const left = await db.query(
-          "SELECT count(*) FROM calendar_sync_outbox WHERE calendar_event_id = $1",
-          [f.event]
-        );
-        expect(Number(left.rows[0].count)).toBe(0);
       }));
 
     it("RESTRICT: el historial impide borrar la solicitud; sin él, se borran sus detalles", () =>
