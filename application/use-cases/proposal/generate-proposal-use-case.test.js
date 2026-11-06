@@ -353,7 +353,9 @@ describe("GenerateProposalUseCase", () => {
       )
     ).rejects.toMatchObject({
       name: "HumanResourcePriceMissingException",
-      message: expect.stringContaining("Ana López"),
+      message:
+        "No se puede generar la propuesta: Ana López no tiene precio por hora. " +
+        "Asigna un precio por hora antes de continuar.",
       resources: [{ resource_id: 1, name: "Ana López" }],
     });
 
