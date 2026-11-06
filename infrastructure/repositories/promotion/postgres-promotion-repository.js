@@ -139,7 +139,10 @@ class PostgresPromotionRepository {
     return this.toEntity(result.rows[0]);
   }
 
-  async update(id, { name, description, discount_percentage: discountPercentage, valid_until: validUntil }) {
+  async update(
+    id,
+    { name, description, discount_percentage: discountPercentage, valid_until: validUntil }
+  ) {
     const result = await this.pool.query(
       `UPDATE promotions
        SET name = $1, description = $2, discount_percentage = $3, valid_until = $4::date, updated_at = NOW()

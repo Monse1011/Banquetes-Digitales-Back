@@ -25,7 +25,12 @@ function isValidCalendarDate(dateString) {
 }
 
 class PromotionRequestDto {
-  constructor({ name, description, discount_percentage: discountPercentage, valid_until: validUntil } = {}) {
+  constructor({
+    name,
+    description,
+    discount_percentage: discountPercentage,
+    valid_until: validUntil,
+  } = {}) {
     this.name = name;
     this.description = description;
     this.discountPercentage = discountPercentage;

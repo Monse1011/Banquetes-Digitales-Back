@@ -457,6 +457,17 @@ function createResourceControllers(dependencies) {
   };
 }
 
+function resolvePromotionController(dependencies) {
+  if (dependencies.promotionController) return dependencies.promotionController;
+  if (dependencies.promotionsService) {
+    return new PromotionController(dependencies.promotionsService);
+  }
+  if (dependencies.promotionRepository) {
+    return new PromotionController(new PromotionsService(dependencies.promotionRepository));
+  }
+  return null;
+}
+
 function createApp(dependencies) {
   const app = express();
 
@@ -473,14 +484,8 @@ function createApp(dependencies) {
   };
   const clientProposalController = new ClientProposalController(dependencies);
   const eventClosureController = new EventClosureController(dependencies);
-  const promotionsService =
-    dependencies.promotionsService ||
-    (dependencies.promotionRepository
-      ? new PromotionsService(dependencies.promotionRepository)
-      : null);
-  const promotionController =
-    dependencies.promotionController ||
-    (promotionsService ? new PromotionController(promotionsService) : null);
+
+  const promotionController = resolvePromotionController(dependencies);
 
   app.use(express.json());
 
@@ -508,14 +513,24 @@ function createApp(dependencies) {
 
   app.use(
     "/api/client",
-    createClientRoutes(reservationRequestController, serviceController, clientProposalController, promotionController)
+    createClientRoutes(
+      reservationRequestController,
+      serviceController,
+      clientProposalController,
+      promotionController
+    )
   );
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
-    createAdminRoutes(reservationRequestController, userController, authMiddleware, promotionController)
+    createAdminRoutes(
+      reservationRequestController,
+      userController,
+      authMiddleware,
+      promotionController
+    )
   );
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(

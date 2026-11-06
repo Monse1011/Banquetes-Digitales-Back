@@ -121,7 +121,9 @@ class PromotionsService {
   }
 
   async deactivatePromotion(id, statusPayload = null) {
-    const statusDto = new PromotionStatusRequestDto({ status: statusPayload || PromotionStatus.INACTIVE });
+    const statusDto = new PromotionStatusRequestDto({
+      status: statusPayload || PromotionStatus.INACTIVE,
+    });
     const { status: targetStatus } = statusDto.validate();
 
     const currentDate = this.getCurrentMeridaDate();

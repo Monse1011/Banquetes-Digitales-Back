@@ -25,12 +25,12 @@ class InMemoryPromotionRepository {
 
   async expireOutdatedPromotions(currentDate) {
     let expiredCount = 0;
-    this.promotions.forEach((promotion) => {
+    for (const promotion of this.promotions) {
       if (promotion.status === PromotionStatus.ACTIVE && promotion.validUntil < currentDate) {
         promotion.status = PromotionStatus.INACTIVE;
         expiredCount++;
       }
-    });
+    }
     return expiredCount;
   }
 
@@ -191,8 +191,13 @@ class InMemoryPromotionRepository {
     );
   }
 
-  async update(id, { name, description, discount_percentage: discountPercentage, valid_until: validUntil }) {
-    const index = this.promotions.findIndex((promotion) => Number(promotion.id) === Number(id));
+  async update(
+    id,
+    { name, description, discount_percentage: discountPercentage, valid_until: validUntil }
+  ) {
+    const index = this.promotions.findIndex(
+      (promotion) => Number(promotion.id) === Number(id)
+    );
     if (index === -1) return null;
 
     const current = this.promotions[index];
