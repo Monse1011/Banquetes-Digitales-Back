@@ -312,7 +312,7 @@ CREATE INDEX IF NOT EXISTS ix_resource_confirmations_confirmed_by
 -- Borrador de observaciones (una fila por solicitud: ON CONFLICT (request_id)).
 CREATE TABLE IF NOT EXISTS resource_confirmation_pending_observations (
   request_id    bigint      PRIMARY KEY REFERENCES reservations_request (id) ON DELETE CASCADE,
-  observations  text        NOT NULL,
+  observations  text,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
