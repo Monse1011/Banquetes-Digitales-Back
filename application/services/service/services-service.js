@@ -16,7 +16,8 @@ class ServicesService {
     const pageNumber = Math.max(1, parseInt(page, 10) || 1);
     const perPageNumber = Math.max(1, Math.min(100, parseInt(perPage, 10) || 10));
 
-    const { services, total_records: totalRecords } = await this.serviceRepository.findAllNotDeleted({
+    const { services, total_records: totalRecords } =
+      await this.serviceRepository.findAllNotDeleted({
       page: pageNumber,
       per_page: perPageNumber,
     });
@@ -93,7 +94,10 @@ class ServicesService {
       return this.reactivateService(id, existingService);
     }
 
-    const updatedService = await this.serviceRepository.updateStatus(Number(id), ServiceStatus.INACTIVE);
+    const updatedService = await this.serviceRepository.updateStatus(
+      Number(id),
+      ServiceStatus.INACTIVE
+    );
     return ServiceResponseDto.fromEntity(updatedService);
   }
 
@@ -107,12 +111,17 @@ class ServicesService {
       throw new ServiceConflictException(ServiceMessages.STATUS_SAME);
     }
 
-    const isDuplicate = await this.serviceRepository.checkDuplicateActiveName(serviceToReactivate.name);
+    const isDuplicate = await this.serviceRepository.checkDuplicateActiveName(
+      serviceToReactivate.name
+    );
     if (isDuplicate) {
       throw new DuplicateServiceNameException(ServiceMessages.DUPLICATE_NAME);
     }
 
-    const updatedService = await this.serviceRepository.updateStatus(Number(id), ServiceStatus.ACTIVE);
+    const updatedService = await this.serviceRepository.updateStatus(
+      Number(id),
+      ServiceStatus.ACTIVE
+    );
     return ServiceResponseDto.fromEntity(updatedService);
   }
 

@@ -502,14 +502,23 @@ function createApp(dependencies) {
 
   app.use(
     "/api/client",
-    createClientRoutes(reservationRequestController, serviceController, clientProposalController)
+    createClientRoutes(
+      reservationRequestController,
+      serviceController,
+      clientProposalController
+    )
   );
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
   app.use("/api/logistics", createLogisticsCalendarRoutes(calendarController, authMiddleware));
   app.use(
     "/api/admin",
-    createAdminRoutes(reservationRequestController, userController, authMiddleware, serviceController)
+    createAdminRoutes(
+      reservationRequestController,
+      userController,
+      authMiddleware,
+      serviceController
+    )
   );
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(

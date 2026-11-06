@@ -5,7 +5,8 @@ class Service {
     this.description = description;
 
     if (status !== undefined) {
-      this.price = priceOrStatus !== null && priceOrStatus !== undefined ? Number(priceOrStatus) : null;
+      this.price =
+        priceOrStatus !== null && priceOrStatus !== undefined ? Number(priceOrStatus) : null;
       this.status = status;
     } else if (typeof priceOrStatus === "number") {
       this.price = priceOrStatus;
