@@ -51,9 +51,16 @@ class FinalizeEventUseCase {
         throw new EventClosureAccessDeniedException(EventClosureMessages.FORBIDDEN);
       }
 
-      const input = this.validateInput(dto, now, event);
+      const input = this.validateInput(dto, now);
 
       this.validateState(event, now);
+
+      // El día real de inicio no puede ser anterior al programado; la hora sí (casos particulares).
+      if (formatMeridaDate(input.actualStartAt) < formatMeridaDate(event.scheduledStartAt)) {
+        throw new EventClosureValidationException(
+          EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
+        );
+      }
 
       const closure = {
         requestId: event.requestId,
@@ -71,7 +78,7 @@ class FinalizeEventUseCase {
   }
 
   // Validaciones del cuerpo en el orden de los errores del contrato (DAD, Función 3.6).
-  validateInput(dto, now, event) {
+  validateInput(dto, now) {
     if (isMissing(dto.actualStartAt) || isMissing(dto.actualEndAt)) {
       throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIMES_REQUIRED);
     }
@@ -90,13 +97,6 @@ class FinalizeEventUseCase {
 
     if (actualStartAt.getTime() > now.getTime() || actualEndAt.getTime() > now.getTime()) {
       throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIME_IN_FUTURE);
-    }
-
-    // El día real de inicio no puede ser anterior al programado; la hora sí (casos particulares).
-    if (formatMeridaDate(actualStartAt) < formatMeridaDate(event.scheduledStartAt)) {
-      throw new EventClosureValidationException(
-        EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
-      );
     }
 
     const eventObservation = this.normalizeObservation(dto.eventObservation);
