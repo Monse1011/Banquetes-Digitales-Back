@@ -1,8 +1,11 @@
 const CreateReservationRequestDto = require("./create-reservation-req-request-dto");
 
+// Más de 3 meses: cumple cualquier plazo de anticipación por temporada.
+const FAR_FUTURE_MS = 400 * 24 * 60 * 60 * 1000;
+
 function validDto(overrides = {}) {
   const eventDate = new Date();
-  eventDate.setDate(eventDate.getDate() + 1);
+  eventDate.setTime(eventDate.getTime() + FAR_FUTURE_MS);
 
   const fields = {
     client_full_name: "John Doe",
@@ -57,9 +60,9 @@ describe("CreateReservationRequestDto", () => {
     expect(errors.event_date_time).toBeDefined();
   });
 
-  it("should accept an event date scheduled for today", () => {
+  it("should accept an event date far enough in advance", () => {
     const errors = validDto({
-      event_date_time: new Date(Date.now() + 60 * 1000).toISOString(),
+      event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 1000).toISOString(),
     }).validate();
 
     expect(errors.event_date_time).toBeUndefined();
@@ -102,19 +105,26 @@ describe("CreateReservationRequestDto", () => {
   it("should reject a start earlier today (the time already passed)", () => {
     const errors = validDto({
       event_date_time: new Date(Date.now() - 60 * 1000).toISOString(),
-      event_end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 60 * 1000).toISOString(),
     }).validate();
 
     expect(errors.event_date_time).toMatch(/momento actual/);
   });
 
   it("should reject an end the next day that is later than the start time", () => {
-    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const start = new Date(Date.now() + FAR_FUTURE_MS);
     const errors = validDto({
       event_date_time: start.toISOString(),
       event_end_time: new Date(start.getTime() + 26 * 60 * 60 * 1000).toISOString(),
     }).validate();
 
     expect(errors.event_end_time).toBeDefined();
+  });
+
+  it("should reject an event without the lead time required by season and guests", () => {
+    const soon = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const errors = validDto({ event_date_time: soon, event_end_time: soon }).validate();
+
+    expect(errors.event_date_time).toMatch(/anticipación/);
   });
 });

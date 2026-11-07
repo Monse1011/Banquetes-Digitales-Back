@@ -1,6 +1,7 @@
 const Email = require("../../../domain/value-objects/email");
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
 const { validateEventWindow, isStartInPast } = require("../../services/calendar/event-window");
+const { validateLeadTime } = require("../../services/calendar/booking-lead-time");
 
 // RF-3.4.3.2: solo letras (con acentos) y al menos nombre + apellido.
 const FULL_NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ]+)+$/;
@@ -83,6 +84,11 @@ class CreateReservationRequestDto {
     // El instante absoluto cubre días pasados y horas ya transcurridas hoy (America/Merida).
     if (isStartInPast(parsedDate)) {
       return CalendarMessages.START_IN_PAST;
+    }
+
+    // Sin invitados válidos no hay plazo que evaluar: guest_count ya reporta su propio error.
+    if (this.validateGuestCount() === undefined) {
+      return validateLeadTime(parsedDate, this.guest_count);
     }
 
     return undefined;
