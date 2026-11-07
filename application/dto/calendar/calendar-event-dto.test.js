@@ -7,8 +7,8 @@ describe("toCalendarEventDto", () => {
       requestId: 34,
       folio: "EVT-2026-0101",
       title: "Event",
-      startAt: new Date(2026, 11, 24, 18, 0, 5),
-      endAt: new Date(2026, 11, 24, 23, 0, 9),
+      startAt: new Date("2026-12-24T18:00:05-06:00"),
+      endAt: new Date("2026-12-24T23:00:09-06:00"),
       location: "Main hall",
       logisticUserId: 27,
       logisticUserName: "Logistic User",
@@ -33,5 +33,21 @@ describe("toCalendarEventDto", () => {
     expect(dto).not.toHaveProperty("end_time");
     expect(dto).not.toHaveProperty("logistic_user");
     expect(dto).not.toHaveProperty("request_detail_path");
+  });
+
+  it("keeps the Mérida wall time of an event that crosses midnight, whatever the server zone", () => {
+    const dto = toCalendarEventDto({
+      id: 1,
+      requestId: 1,
+      folio: "EVT-2026-0102",
+      title: "Event",
+      startAt: new Date("2026-12-24T23:00:00-06:00"),
+      endAt: new Date("2026-12-25T05:00:00-06:00"),
+      location: "Main hall",
+      status: "Confirmado",
+    });
+
+    expect(dto.start_datetime).toBe("2026-12-24 23:00:00");
+    expect(dto.end_datetime).toBe("2026-12-25 05:00:00");
   });
 });
