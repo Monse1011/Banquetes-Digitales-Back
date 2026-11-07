@@ -141,6 +141,16 @@ describe("Resource use cases (Funciones 2.8 a 2.10)", () => {
         }
       });
 
+      it("rejects a name that contains digits", async () => {
+        await expect(
+          useCases.humanResourceUseCases.create.execute({
+            name: "Jenny Rivera 2",
+            operativeRoleId: WAITER_ROLE_ID,
+            precio: PRECIO,
+          })
+        ).rejects.toMatchObject({ errors: { name: HumanResourceMessages.NAME_NO_DIGITS } });
+      });
+
       it("rejects inactive or unknown operative roles", async () => {
         for (const operativeRoleId of [INACTIVE_ROLE_ID, 999]) {
           await expect(

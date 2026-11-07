@@ -20,7 +20,9 @@ class HumanResourceRequestDto extends ResourceRequestDto {
 
   // Defecto 3: un nombre solo numérico o de símbolos no es válido.
   validateNameHasLetter() {
-    return /\p{L}/u.test(this.name) ? undefined : HumanResourceMessages.NAME_NEEDS_LETTER;
+    if (!/\p{L}/u.test(this.name)) return HumanResourceMessages.NAME_NEEDS_LETTER;
+
+    return /\p{N}/u.test(this.name) ? HumanResourceMessages.NAME_NO_DIGITS : undefined;
   }
 
   // Defecto 4: tarifa por hora, decimal > 0 (numeric(12,2) en la BD).

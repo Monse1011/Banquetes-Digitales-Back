@@ -12,6 +12,12 @@ describe("validateOperativeRoleName", () => {
 
   it("accepts names with at least one letter", () => {
     expect(validateOperativeRoleName("Mesero")).toEqual({});
-    expect(validateOperativeRoleName("Capitán 2")).toEqual({});
+    expect(validateOperativeRoleName("Capitán")).toEqual({});
+  });
+
+  it("rejects names containing digits", () => {
+    expect(validateOperativeRoleName("Mesero 2")).toEqual({
+      name: OperativeRoleMessages.NAME_NO_DIGITS,
+    });
   });
 });
