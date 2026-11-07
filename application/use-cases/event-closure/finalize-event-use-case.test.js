@@ -303,6 +303,24 @@ describe("FinalizeEventUseCase (Función 3.6)", () => {
       );
     });
 
+    it("rechaza un día real de inicio anterior al programado", async () => {
+      const { run } = buildUseCase();
+
+      await expectRejection(
+        run(validBody({ actual_start_at: "2026-11-14T23:50:00-06:00" })),
+        EventClosureValidationException,
+        EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
+      );
+    });
+
+    it("acepta una hora real de inicio anterior a la programada el mismo día", async () => {
+      const { run } = buildUseCase();
+
+      await expect(
+        run(validBody({ actual_start_at: "2026-11-15T10:00:00-06:00" }))
+      ).resolves.toBeDefined();
+    });
+
     it("acepta una hora real igual a la hora actual", async () => {
       const { run } = buildUseCase();
 

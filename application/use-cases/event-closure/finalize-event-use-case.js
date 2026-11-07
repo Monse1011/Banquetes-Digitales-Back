@@ -10,7 +10,10 @@ const EventClosureConflictException = require("../../../domain/exceptions/event-
 const EventClosureStateException = require("../../../domain/exceptions/event-closure/event-closure-state-exception");
 const EventClosureNotFoundException = require("../../../domain/exceptions/event-closure/event-closure-not-found-exception");
 const EventClosureAccessDeniedException = require("../../../domain/exceptions/event-closure/event-closure-access-denied-exception");
-const { parseMeridaDateTime } = require("../../services/event-closure/merida-time");
+const {
+  parseMeridaDateTime,
+  formatMeridaDate,
+} = require("../../services/event-closure/merida-time");
 const { isWithinClosureDay } = require("../../services/event-closure/closure-window");
 const {
   FinalizeEventResponseDto,
@@ -48,7 +51,7 @@ class FinalizeEventUseCase {
         throw new EventClosureAccessDeniedException(EventClosureMessages.FORBIDDEN);
       }
 
-      const input = this.validateInput(dto, now);
+      const input = this.validateInput(dto, now, event);
 
       this.validateState(event, now);
 
@@ -68,7 +71,7 @@ class FinalizeEventUseCase {
   }
 
   // Validaciones del cuerpo en el orden de los errores del contrato (DAD, Función 3.6).
-  validateInput(dto, now) {
+  validateInput(dto, now, event) {
     if (isMissing(dto.actualStartAt) || isMissing(dto.actualEndAt)) {
       throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIMES_REQUIRED);
     }
@@ -87,6 +90,13 @@ class FinalizeEventUseCase {
 
     if (actualStartAt.getTime() > now.getTime() || actualEndAt.getTime() > now.getTime()) {
       throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIME_IN_FUTURE);
+    }
+
+    // El día real de inicio no puede ser anterior al programado; la hora sí (casos particulares).
+    if (formatMeridaDate(actualStartAt) < formatMeridaDate(event.scheduledStartAt)) {
+      throw new EventClosureValidationException(
+        EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
+      );
     }
 
     const eventObservation = this.normalizeObservation(dto.eventObservation);
