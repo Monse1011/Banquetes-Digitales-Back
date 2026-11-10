@@ -46,7 +46,7 @@ function gate() {
 }
 
 // Opt-in. Real commits and independent connections in a unique disposable schema.
-// Repositories run against the real migration in an isolated schema; no production data or PDF
+// Repositories run against database/schema.sql in an isolated schema; no production data or PDF
 // is used.
 describe.skipIf(!process.env.TEST_PGDATABASE)(
   "Agreement revisions with concurrent PostgreSQL transactions",
@@ -72,42 +72,24 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
         options: `-c search_path=${schema} -c statement_timeout=5000`,
         application_name: schema,
       });
-      await pool.query(`
-      CREATE TABLE users (id_user bigint PRIMARY KEY);
-      CREATE TABLE resources (id bigint PRIMARY KEY);
-      CREATE TABLE reservations_request (
-        id bigint PRIMARY KEY,
-        id_reservation_request bigint UNIQUE,
-        status text,
-        status_changed_at timestamptz,
-        event_date_time timestamp NOT NULL,
-        event_end_time timestamp NOT NULL
+      // Esquema real (database/schema.sql) instalado en el esquema aislado de esta prueba.
+      await pool.query(
+        await fs.readFile(path.join(__dirname, "../../../database/schema.sql"), "utf8")
       );
-      CREATE TABLE derived_information (id bigserial PRIMARY KEY, request_id bigint,
-        location text, start_datetime timestamptz, end_datetime timestamptz,
-        observations text, created_by_user_id bigint, created_at timestamptz DEFAULT now());
-      CREATE TABLE document_counters (kind text, year integer, last_number integer, PRIMARY KEY(kind, year));
-      CREATE TABLE proposals (id bigserial PRIMARY KEY, request_id bigint UNIQUE, derived_information_id bigint,
-        proposal_code text, file_name text, status text, subtotal numeric, discount_amount numeric,
-        client_observations text, created_by_user_id bigint, created_at timestamptz,
-        version integer, viewed_at timestamp, accepted_at timestamptz, accepted_pdf_path text,
-        pdf_path text, total_amount numeric, currency char(3));
-      CREATE TABLE proposal_resources (proposal_id bigint, resource_id bigint, quantity integer, unit_cost numeric);
+      await pool.query(`
+      INSERT INTO users (id_user, id_employee, full_name, email, password_hash, role)
+        OVERRIDING SYSTEM VALUE VALUES (9, 'T9', 'Logistica', 'l9@example.invalid', 'x', 'LOGISTICS');
+      INSERT INTO clients (full_name, email, phone) VALUES ('Cliente', 'c@example.invalid', '9991234567');
+      INSERT INTO resources (id, name, type, total_quantity, unit_cost) OVERRIDING SYSTEM VALUE
+        VALUES (7, 'Sillas', 'MATERIAL', 30, 5);
     `);
-      for (const migration of [
-        "increment-2/assigned-resources.sql",
-        "increment-3/00-align-schema-dad-v3.sql",
-      ]) {
-        await pool.query(
-          await fs.readFile(path.join(__dirname, "../../../database", migration), "utf8")
-        );
-      }
-      await pool.query("INSERT INTO users (id_user) VALUES (9)");
-      await pool.query("INSERT INTO resources (id) VALUES (7)");
       await pool.query(
         `INSERT INTO reservations_request
-          (id, id_reservation_request, status, event_date_time, event_end_time)
-         VALUES (1, 1, 'COORDINATION_READY', $1, $2)`,
+          (id, folio, client_id, event_date, event_time, event_end_time, guest_count, event_address,
+           status) OVERRIDING SYSTEM VALUE
+         VALUES (1, 'BD-2035-00001', 1, ($1::timestamptz AT TIME ZONE 'America/Merida')::date,
+           ($1::timestamptz AT TIME ZONE 'America/Merida')::time, $2, 10, 'Lugar original',
+           'COORDINATION_READY')`,
         [start, end]
       );
       const requests = {
