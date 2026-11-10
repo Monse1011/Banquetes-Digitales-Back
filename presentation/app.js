@@ -4,6 +4,7 @@ const createAuthMiddleware = require("./middleware/auth/auth-middleware");
 const createAuthRoutes = require("./routes/auth-routes");
 const createClientRoutes = require("./routes/client-routes");
 const createAdminRoutes = require("./routes/admin-routes");
+const createAdminReportRoutes = require("./routes/admin-report-routes");
 const createAdminResourceRoutes = require("./routes/admin-resource-routes");
 const createLogisticsRoutes = require("./routes/logistics-routes");
 const createEventClosureRoutes = require("./routes/event-closure-routes");
@@ -12,7 +13,10 @@ const {
   ReservationRequestController,
 } = require("./controller/reservation-request/reservation-request-controller");
 const { UserController } = require("./controller/user/user-controller");
-const { ServiceController } = require("./controller/service/service-controller");
+const { ReportController } = require("./controller/report/report-controller");
+const {
+  ClientContentController,
+} = require("./controller/client-content/client-content-controller");
 const CalendarController = require("./controller/calendar/calendar-controller");
 const {
   createLogisticsCalendarRoutes,
@@ -68,6 +72,8 @@ const ScheduleConflictException = require("../domain/exceptions/proposal/schedul
 const ProposalGenerationFailedException = require("../domain/exceptions/proposal/proposal-generation-failed-exception");
 const ProposalSendFailedException = require("../domain/exceptions/proposal/proposal-send-failed-exception");
 const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
+const ValidationException = require("../domain/exceptions/validation-exception");
+const NotFoundException = require("../domain/exceptions/not-found-exception");
 const EventClosureValidationException = require("../domain/exceptions/event-closure/event-closure-validation-exception");
 const EventClosureConflictException = require("../domain/exceptions/event-closure/event-closure-conflict-exception");
 const EventClosureStateException = require("../domain/exceptions/event-closure/event-closure-state-exception");
@@ -380,11 +386,18 @@ function handleEventClosureError(error, response) {
   return true;
 }
 
-// Estándares de Código 2.4: los ids inválidos de la URL responden 400. Después, los errores
+// Estándares de Código 2.4: los ids inválidos de la URL responden 400. Funciones 2.15 y 4.1
+// (AD-09): los 400 con mensaje específico del DTO de reportes y el 404 de exportación sin
+// resultados se responden antes del resto de los manejadores. Después, los errores
 // de la Función 3.6.
 function handleCommonError(error, response) {
   if (error instanceof InvalidIdException) {
     response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ValidationException || error instanceof NotFoundException) {
+    response.status(error.status).json({ message: error.message });
     return true;
   }
 
@@ -441,7 +454,12 @@ function createApp(dependencies) {
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
-  const serviceController = new ServiceController(dependencies.serviceRepository);
+  const reportController = new ReportController(
+    dependencies.generateReportUseCase,
+    dependencies.exportReportUseCase,
+    dependencies.listReportClientsUseCase
+  );
+  const clientContentController = new ClientContentController(dependencies);
   const calendarController = new CalendarController(dependencies);
   const resourceControllers = createResourceControllers(dependencies);
   const proposalControllers = {
@@ -477,7 +495,11 @@ function createApp(dependencies) {
 
   app.use(
     "/api/client",
-    createClientRoutes(reservationRequestController, serviceController, clientProposalController)
+    createClientRoutes(
+      reservationRequestController,
+      clientContentController,
+      clientProposalController
+    )
   );
   app.use("/api/admin/resources", createAdminResourceRoutes(resourceControllers, authMiddleware));
   app.use("/api/admin", createAdminCalendarRoutes(calendarController, authMiddleware));
@@ -486,6 +508,8 @@ function createApp(dependencies) {
     "/api/admin",
     createAdminRoutes(reservationRequestController, userController, authMiddleware)
   );
+  // Función 2.15: /reports, /reports/export y /clients (contratos 13 a 15).
+  app.use("/api/admin", createAdminReportRoutes(reportController, authMiddleware));
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(
     "/api/logistics",

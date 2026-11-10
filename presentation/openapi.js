@@ -716,8 +716,68 @@ const openApiDocument = {
     "/api/client/services": {
       get: {
         tags: ["Client"],
-        summary: "List available services",
-        responses: { 200: { description: "Services list" } },
+        summary:
+          "Contrato 12: catálogo público de servicios vigentes con nombre, descripción y precio (público, con rate limit)",
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+          {
+            name: "per_page",
+            in: "query",
+            description: "1 a 100; sin enviarlo llega la lista completa vigente",
+            schema: { type: "integer", minimum: 1, maximum: 100 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "{data:{services:[{id,name,description,price}]}} + metadata.pagination",
+          },
+          400: { description: "Paginación inválida" },
+          429: { description: "Demasiadas solicitudes" },
+        },
+      },
+    },
+    "/api/client/promotions": {
+      get: {
+        tags: ["Client"],
+        summary:
+          "Contrato 11: promociones vigentes (expira antes de listar; solo ACTIVE con valid_until >= fecha de Mérida)",
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          200: {
+            description:
+              "{data:{promotions:[{id,name,description,discount_percentage,valid_until}]}} + metadata.pagination",
+          },
+          400: { description: "Paginación inválida" },
+          429: { description: "Demasiadas solicitudes" },
+        },
+      },
+    },
+    "/api/client/gallery": {
+      get: {
+        tags: ["Client"],
+        summary:
+          "Galería de eventos realizados, ordenada por position e id (público, con rate limit)",
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          200: { description: "{data:{gallery:[{id,url,title,alt}]}} + metadata.pagination" },
+          429: { description: "Demasiadas solicitudes" },
+        },
+      },
+    },
+    "/api/client/social-links": {
+      get: {
+        tags: ["Client"],
+        summary: "Redes sociales con enlace registrado (RF-3.4.1.3, sin paginación)",
+        responses: {
+          200: { description: "{data:{social_links:[{network,url}]}}" },
+          429: { description: "Demasiadas solicitudes" },
+        },
       },
     },
     "/api/client/requests/{folio}": {
@@ -1083,6 +1143,136 @@ const openApiDocument = {
         summary: "List active Personal de Logística users for assignment (RF-1.2.4.10)",
         security: [{ CookieAuth: [] }],
         responses: { 200: { description: "Available users" } },
+      },
+    },
+    "/api/admin/reports": {
+      get: {
+        tags: ["Reports"],
+        summary: "Contrato 13: genera el reporte REQUESTS/EVENTS/SERVICES/PROMOTIONS con filtros",
+        security: [{ cookieAuth: [] }],
+        parameters: [
+          {
+            name: "type",
+            in: "query",
+            required: true,
+            schema: { type: "string", enum: ["REQUESTS", "EVENTS", "SERVICES", "PROMOTIONS"] },
+          },
+          {
+            name: "period_type",
+            in: "query",
+            schema: { type: "string", enum: ["NONE", "DAY", "MONTH", "RANGE"], default: "NONE" },
+          },
+          {
+            name: "date",
+            in: "query",
+            description: "AAAA-MM-DD; obligatoria con DAY",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            name: "month",
+            in: "query",
+            description: "AAAA-MM; obligatoria con MONTH",
+            schema: { type: "string" },
+          },
+          {
+            name: "from",
+            in: "query",
+            description: "AAAA-MM-DD; obligatoria con RANGE",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            name: "to",
+            in: "query",
+            description: "AAAA-MM-DD; obligatoria con RANGE",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            name: "client_email",
+            in: "query",
+            description: "Comparación sin mayúsculas ni espacios",
+            schema: { type: "string" },
+          },
+          {
+            name: "service_id",
+            in: "query",
+            description: "Solo EVENTS y SERVICES; se ignora en otros tipos",
+            schema: { type: "integer", minimum: 1 },
+          },
+          {
+            name: "promotion_id",
+            in: "query",
+            description: "Solo EVENTS y PROMOTIONS; se ignora en otros tipos",
+            schema: { type: "integer", minimum: 1 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "{data:{report:{type,title,filters,generated_at,summary,table,chart}}}",
+          },
+          400: {
+            description:
+              "Invalid report type. / Missing required date. / Missing required month. / Missing required range. / El rango seleccionado es inválido. / Campos no validos",
+          },
+          401: { description: "Su sesión no es válida o ha expirado." },
+          403: { description: "No tiene permisos para realizar esta acción." },
+          500: { description: "Ocurrió un error inesperado. Intente nuevamente." },
+        },
+      },
+    },
+    "/api/admin/reports/export": {
+      get: {
+        tags: ["Reports"],
+        summary: "Contrato 14: exporta a Excel exactamente el reporte del contrato 13",
+        security: [{ cookieAuth: [] }],
+        parameters: [
+          {
+            name: "type",
+            in: "query",
+            required: true,
+            schema: { type: "string", enum: ["REQUESTS", "EVENTS", "SERVICES", "PROMOTIONS"] },
+          },
+          {
+            name: "period_type",
+            in: "query",
+            schema: { type: "string", enum: ["NONE", "DAY", "MONTH", "RANGE"] },
+          },
+          { name: "date", in: "query", schema: { type: "string", format: "date" } },
+          { name: "month", in: "query", schema: { type: "string" } },
+          { name: "from", in: "query", schema: { type: "string", format: "date" } },
+          { name: "to", in: "query", schema: { type: "string", format: "date" } },
+          { name: "client_email", in: "query", schema: { type: "string" } },
+          { name: "service_id", in: "query", schema: { type: "integer", minimum: 1 } },
+          { name: "promotion_id", in: "query", schema: { type: "integer", minimum: 1 } },
+        ],
+        responses: {
+          200: {
+            description:
+              'Archivo .xlsx (hoja Reporte, sin gráfica); Content-Disposition: attachment; filename="reporte-{tipo}-{AAAA-MM-DD}.xlsx"',
+            content: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+          400: { description: "Mismas validaciones que el contrato 13" },
+          401: { description: "Su sesión no es válida o ha expirado." },
+          403: { description: "No tiene permisos para realizar esta acción." },
+          404: { description: "No hay resultados para exportar." },
+          500: { description: "Ocurrió un error inesperado. Intente nuevamente." },
+        },
+      },
+    },
+    "/api/admin/clients": {
+      get: {
+        tags: ["Reports"],
+        summary: "Contrato 15: clientes con al menos una solicitud para el filtro Cliente",
+        security: [{ cookieAuth: [] }],
+        responses: {
+          200: { description: "{data:{clients:[{email,name}]}} ordenados por nombre y correo" },
+          401: { description: "Su sesión no es válida o ha expirado." },
+          403: { description: "No tiene permisos para realizar esta acción." },
+          500: { description: "Ocurrió un error inesperado. Intente nuevamente." },
+        },
       },
     },
   },

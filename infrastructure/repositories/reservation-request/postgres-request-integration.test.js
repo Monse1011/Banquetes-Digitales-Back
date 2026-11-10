@@ -223,7 +223,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       expect(roles.length).toBeGreaterThan(0);
       const catalogCases = createResourceUseCases(resourceRepo, roleRepo);
       const human = await catalogCases.humanResourceUseCases.create.execute({
-        name: `Persona prueba ${Date.now()}`,
+        name: "Persona de integración",
         operativeRoleId: roles[0].id,
         precio: 25.5,
       });

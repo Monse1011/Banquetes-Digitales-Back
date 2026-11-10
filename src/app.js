@@ -227,6 +227,27 @@ const {
   FinalizeEventUseCase,
 } = require("../application/use-cases/event-closure/finalize-event-use-case");
 
+// Incremento 4 - Funciones 2.15 y 4.1: reportes y contenido público.
+const {
+  PostgresReportRepository,
+} = require("../infrastructure/repositories/report/postgres-report-repository");
+const {
+  PostgresClientDirectoryRepository,
+} = require("../infrastructure/repositories/client/postgres-client-directory-repository");
+const {
+  PostgresGalleryRepository,
+} = require("../infrastructure/repositories/content/postgres-gallery-repository");
+const {
+  PostgresSocialLinkRepository,
+} = require("../infrastructure/repositories/content/postgres-social-link-repository");
+const {
+  PostgresPromotionRepository,
+} = require("../infrastructure/repositories/promotion/postgres-promotion-repository");
+const { writeReportWorkbook } = require("../infrastructure/services/excel/excel-report-writer");
+const GenerateReportUseCase = require("../application/use-cases/reports/generate-report-use-case");
+const ExportReportUseCase = require("../application/use-cases/reports/export-report-use-case");
+const ListReportClientsUseCase = require("../application/use-cases/reports/list-report-clients-use-case");
+
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
@@ -443,6 +464,19 @@ async function main() {
     new PostgresTransactionManager(pool)
   );
 
+  // Incremento 4 - Función 2.15 (reportes) y Función 4.1 (contenido público).
+  const reportRepository = new PostgresReportRepository(pool);
+  const generateReportUseCase = new GenerateReportUseCase(reportRepository);
+  const exportReportUseCase = new ExportReportUseCase(generateReportUseCase, reportRepository, {
+    write: writeReportWorkbook,
+  });
+  const listReportClientsUseCase = new ListReportClientsUseCase(
+    new PostgresClientDirectoryRepository(pool)
+  );
+  const promotionRepository = new PostgresPromotionRepository(pool);
+  const galleryRepository = new PostgresGalleryRepository(pool);
+  const socialLinkRepository = new PostgresSocialLinkRepository(pool);
+
   const app = createApp({
     // Authentication
     authController,
@@ -486,6 +520,14 @@ async function main() {
     getClientProposalPdfUseCase,
     // Event closure (Función 3.6)
     finalizeEventUseCase,
+    // Incremento 4 - Funciones 2.15 y 4.1
+    reportRepository,
+    generateReportUseCase,
+    exportReportUseCase,
+    listReportClientsUseCase,
+    promotionRepository,
+    galleryRepository,
+    socialLinkRepository,
   });
 
   app.listen(config.port, () => {

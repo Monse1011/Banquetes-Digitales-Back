@@ -27,7 +27,9 @@ const INVALID_FOREIGN_KEYS = [
   ],
   [
     "request_services.service_id",
-    (f) => `INSERT INTO request_services (request_id, service_id) VALUES (${f.request}, -1)`,
+    (f) => `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+        service_description_snapshot, service_price_snapshot)
+       VALUES (${f.request}, -1, 'x', 'x', 1)`,
   ],
   [
     "request_status_history.request_id",
@@ -112,7 +114,11 @@ const DUPLICATES = [
     () =>
       "INSERT INTO clients (full_name, email, phone) VALUES ('x', 'fx-client@example.invalid', '1')",
   ],
-  ["services.name", () => "INSERT INTO services (name) VALUES ('Servicio FX')"],
+  [
+    "services.name",
+    () =>
+      "INSERT INTO services (name, description, price) VALUES ('Servicio FX', 'Descripción FX', 1500)",
+  ],
   [
     "operative_roles.name sin distinguir mayúsculas ni espacios",
     () => "INSERT INTO operative_roles (name) VALUES ('  rol fx ')",
@@ -139,8 +145,10 @@ const DUPLICATES = [
   [
     "request_services (request_id, service_id)",
     (f) =>
-      `INSERT INTO request_services (request_id, service_id)
-       VALUES (${f.request}, ${f.service}), (${f.request}, ${f.service})`,
+      `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+         service_description_snapshot, service_price_snapshot)
+       VALUES (${f.request}, ${f.service}, 'x', 'x', 1),
+              (${f.request}, ${f.service}, 'x', 'x', 1)`,
   ],
   [
     "proposals (request_id, version)",
@@ -370,10 +378,12 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
             [f.client]
           )
         ).rows[0].id;
-        await db.query("INSERT INTO request_services (request_id, service_id) VALUES ($1, $2)", [
-          request,
-          f.service,
-        ]);
+        await db.query(
+          `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+             service_description_snapshot, service_price_snapshot)
+           VALUES ($1, $2, 'x', 'x', 1)`,
+          [request, f.service]
+        );
         await db.query(
           "INSERT INTO resource_confirmation_pending_observations (request_id, observations) VALUES ($1, 'x')",
           [request]
@@ -407,7 +417,9 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
       [
         "un servicio solicitado",
         (f) =>
-          `WITH used AS (INSERT INTO request_services VALUES (${f.request}, ${f.service}))
+          `WITH used AS (INSERT INTO request_services (request_id, service_id,
+             service_name_snapshot, service_description_snapshot, service_price_snapshot)
+             VALUES (${f.request}, ${f.service}, 'x', 'x', 1))
            DELETE FROM services WHERE id = ${f.service}`,
       ],
     ])("RESTRICT: no permite borrar %s", expectError(FK_VIOLATION));

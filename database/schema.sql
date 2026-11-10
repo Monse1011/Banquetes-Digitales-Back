@@ -105,15 +105,88 @@ CREATE TABLE IF NOT EXISTS clients (
 );
 
 -- El código solo lee este catálogo: debe cargarse por fuera (no hay endpoint de alta).
+-- Incremento 4 (Función 2.6): description y price obligatorias, estado DELETED y nombre
+-- único solo entre ACTIVE (los eliminados/inactivos pueden repetir el nombre).
 CREATE TABLE IF NOT EXISTS services (
   id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name         varchar(100) NOT NULL UNIQUE,
-  description  text,
-  status       varchar(10)  NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
+  name         varchar(100) NOT NULL,
+  description  varchar(300) NOT NULL,
+  price        numeric(12,2) NOT NULL,
+  status       varchar(10)  NOT NULL DEFAULT 'ACTIVE',
   created_at   timestamptz  NOT NULL DEFAULT now(),
-  updated_at   timestamptz  NOT NULL DEFAULT now()
+  updated_at   timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT chk_services_price CHECK (price > 0),
+  CONSTRAINT chk_services_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DELETED'))
 );
 CREATE INDEX IF NOT EXISTS ix_services_status ON services (status, id);
+-- Bases ya existentes (CREATE TABLE IF NOT EXISTS no agrega columnas). Equivale a
+-- database/migrations/003-inc4-services.up.sql.
+ALTER TABLE services ADD COLUMN IF NOT EXISTS price numeric(12,2);
+UPDATE services SET price = 1500.00 WHERE price IS NULL;
+UPDATE services SET description = 'Descripción del catálogo' WHERE description IS NULL;
+ALTER TABLE services ALTER COLUMN description TYPE varchar(300);
+ALTER TABLE services ALTER COLUMN description SET NOT NULL;
+ALTER TABLE services ALTER COLUMN price SET NOT NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_services_price'
+                 AND conrelid = 'services'::regclass) THEN
+    ALTER TABLE services ADD CONSTRAINT chk_services_price CHECK (price > 0);
+  END IF;
+END $$;
+-- El CHECK antiguo solo admitía ACTIVE/INACTIVE; se reemplaza por el de tres estados.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'services_status_check'
+             AND conrelid = 'services'::regclass) THEN
+    ALTER TABLE services DROP CONSTRAINT services_status_check;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_services_status'
+                 AND conrelid = 'services'::regclass) THEN
+    ALTER TABLE services ADD CONSTRAINT chk_services_status
+      CHECK (status IN ('ACTIVE', 'INACTIVE', 'DELETED'));
+  END IF;
+END $$;
+-- El UNIQUE global de nombre se quita: la unicidad solo aplica entre vigentes.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'services_name_key'
+             AND conrelid = 'services'::regclass) THEN
+    ALTER TABLE services DROP CONSTRAINT services_name_key;
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_services_name_active
+  ON services (LOWER(TRIM(name))) WHERE status = 'ACTIVE';
+
+-- Promociones (Función 2.7, DAD §7). La expiración es un UPDATE idempotente que ejecutan
+-- los listados (RF-1.2.7.5); el índice parcial de valid_until lo soporta.
+CREATE TABLE IF NOT EXISTS promotions (
+  id                   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name                 varchar(100) NOT NULL CHECK (char_length(TRIM(name)) BETWEEN 1 AND 100),
+  description          varchar(300) NOT NULL CHECK (char_length(TRIM(description)) BETWEEN 1 AND 300),
+  discount_percentage  numeric(5,2) NOT NULL CHECK (discount_percentage > 0 AND discount_percentage <= 100),
+  valid_until          date         NOT NULL,
+  status               varchar(10)  NOT NULL DEFAULT 'ACTIVE',
+  created_at           timestamptz  NOT NULL DEFAULT now(),
+  updated_at           timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT chk_promotions_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DELETED'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_promotions_name_active
+  ON promotions (LOWER(TRIM(name))) WHERE status = 'ACTIVE';
+CREATE INDEX IF NOT EXISTS ix_promotions_valid_until_active
+  ON promotions (valid_until) WHERE status = 'ACTIVE';
+
+-- Seed mínimo idempotente (solo si el catálogo está vacío) para que el portal público
+-- muestre promociones vigentes mientras la Función 2.7 no da de alta desde el panel.
+INSERT INTO promotions (name, description, discount_percentage, valid_until)
+SELECT v.name, v.description, v.discount_percentage, v.valid_until
+FROM (VALUES
+  ('Primer banquete con 10% de descuento',
+   'Descuento del 10% en tu primer banquete con nosotros.', 10.00, DATE '2027-12-31'),
+  ('3 meses sin intereses',
+   'Diferido a 3 meses sin intereses con tarjetas participantes.', 5.00, DATE '2027-12-31')
+) AS v(name, description, discount_percentage, valid_until)
+WHERE NOT EXISTS (SELECT 1 FROM promotions);
 
 -- Contadores anuales de folios (REQUEST_FOLIO) y códigos de propuesta (PROPOSAL_CODE).
 CREATE TABLE IF NOT EXISTS document_counters (
@@ -170,15 +243,50 @@ CREATE INDEX IF NOT EXISTS ix_reservations_request_status ON reservations_reques
 -- ORDER BY por defecto de los listados.
 CREATE INDEX IF NOT EXISTS ix_reservations_request_event_start
   ON reservations_request (event_date_time, folio);
+-- Filtro de periodo del reporte REQUESTS (DAD §7 "Reportes": índice por request_date).
+CREATE INDEX IF NOT EXISTS ix_reservations_request_request_date
+  ON reservations_request (request_date);
 
+-- Copias congeladas al contratar (RF-1.2.6.3.1): el nombre/descripción/precio históricos
+-- sobreviven a INACTIVE o DELETED del catálogo.
 CREATE TABLE IF NOT EXISTS request_services (
-  request_id  bigint      NOT NULL REFERENCES reservations_request (id) ON DELETE CASCADE,
-  service_id  integer     NOT NULL REFERENCES services (id) ON DELETE RESTRICT,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (request_id, service_id)
+  request_id                   bigint       NOT NULL REFERENCES reservations_request (id) ON DELETE CASCADE,
+  service_id                   integer      NOT NULL REFERENCES services (id) ON DELETE RESTRICT,
+  service_name_snapshot        varchar(100) NOT NULL,
+  service_description_snapshot varchar(300) NOT NULL,
+  service_price_snapshot       numeric(12,2) NOT NULL,
+  created_at                   timestamptz  NOT NULL DEFAULT now(),
+  updated_at                   timestamptz  NOT NULL DEFAULT now(),
+  PRIMARY KEY (request_id, service_id),
+  CONSTRAINT chk_request_services_price_snapshot CHECK (service_price_snapshot > 0)
 );
 CREATE INDEX IF NOT EXISTS ix_request_services_service ON request_services (service_id);
+-- Bases ya existentes. Equivale a database/migrations/004-inc4-request-services-snapshots.up.sql.
+ALTER TABLE request_services ADD COLUMN IF NOT EXISTS service_name_snapshot varchar(100);
+ALTER TABLE request_services ADD COLUMN IF NOT EXISTS service_description_snapshot varchar(300);
+ALTER TABLE request_services ADD COLUMN IF NOT EXISTS service_price_snapshot numeric(12,2);
+UPDATE request_services rs
+   SET service_name_snapshot = s.name,
+       service_description_snapshot = COALESCE(NULLIF(s.description, ''), 'Descripción del catálogo'),
+       service_price_snapshot = COALESCE(s.price, 1500.00)
+  FROM services s
+ WHERE s.id = rs.service_id
+   AND (rs.service_name_snapshot IS NULL
+        OR rs.service_description_snapshot IS NULL
+        OR rs.service_price_snapshot IS NULL);
+UPDATE request_services SET service_price_snapshot = 1500.00 WHERE service_price_snapshot IS NULL;
+ALTER TABLE request_services ALTER COLUMN service_name_snapshot SET NOT NULL;
+ALTER TABLE request_services ALTER COLUMN service_description_snapshot SET NOT NULL;
+ALTER TABLE request_services ALTER COLUMN service_price_snapshot SET NOT NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conname = 'chk_request_services_price_snapshot'
+                   AND conrelid = 'request_services'::regclass) THEN
+    ALTER TABLE request_services ADD CONSTRAINT chk_request_services_price_snapshot
+      CHECK (service_price_snapshot > 0);
+  END IF;
+END $$;
 
 -- RF-1.2.5.4: historial de estados. changed_by_user_id es NULL si cambia el cliente o el sistema.
 CREATE TABLE IF NOT EXISTS request_status_history (
@@ -361,17 +469,60 @@ CREATE TABLE IF NOT EXISTS proposals (
   total_amount            numeric(12,2) NOT NULL CHECK (total_amount >= 0),
   currency                char(3)       NOT NULL DEFAULT 'MXN',
   client_observations     text,
+  -- Promoción aplicada (RF-1.2.7.4.3/7.5.1): los cuatro campos van todos nulos o todos llenos.
+  promotion_id            bigint        REFERENCES promotions (id) ON DELETE RESTRICT,
+  promotion_name_snapshot varchar(100),
+  promotion_description_snapshot varchar(300),
+  promotion_discount_snapshot numeric(5,2),
   created_by_user_id      bigint        REFERENCES users (id_user) ON DELETE RESTRICT,
   created_at              timestamptz   NOT NULL DEFAULT now(),
   updated_at              timestamptz   NOT NULL DEFAULT now(),
   CONSTRAINT ux_proposals_request_version UNIQUE (request_id, version),
   CONSTRAINT chk_proposals_discount CHECK (discount_amount <= subtotal),
+  CONSTRAINT chk_proposals_promotion_fields CHECK (
+    (promotion_id IS NULL) = (promotion_name_snapshot IS NULL)
+    AND (promotion_id IS NULL) = (promotion_description_snapshot IS NULL)
+    AND (promotion_id IS NULL) = (promotion_discount_snapshot IS NULL)
+  ),
   -- Los acuerdos de la propuesta deben ser de la misma solicitud.
   CONSTRAINT fk_proposals_derived_information FOREIGN KEY (derived_information_id, request_id)
     REFERENCES derived_information (id, request_id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS ix_proposals_derived_information ON proposals (derived_information_id, request_id);
 CREATE INDEX IF NOT EXISTS ix_proposals_created_by ON proposals (created_by_user_id);
+-- Bases ya existentes. Equivale a database/migrations/005-inc4-proposals-promotion.up.sql.
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS promotion_id bigint REFERENCES promotions (id) ON DELETE RESTRICT;
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS promotion_name_snapshot varchar(100);
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS promotion_description_snapshot varchar(300);
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS promotion_discount_snapshot numeric(5,2);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conname = 'chk_proposals_promotion_fields'
+                   AND conrelid = 'proposals'::regclass) THEN
+    ALTER TABLE proposals ADD CONSTRAINT chk_proposals_promotion_fields CHECK (
+      (promotion_id IS NULL) = (promotion_name_snapshot IS NULL)
+      AND (promotion_id IS NULL) = (promotion_description_snapshot IS NULL)
+      AND (promotion_id IS NULL) = (promotion_discount_snapshot IS NULL)
+    );
+  END IF;
+END $$;
+-- Filtro de promoción y periodo del reporte (DAD §7 "Reportes").
+CREATE INDEX IF NOT EXISTS ix_proposals_promotion_id ON proposals (promotion_id);
+
+-- Líneas de servicio de la propuesta con las copias congeladas (DAD §7 Proposal_services).
+CREATE TABLE IF NOT EXISTS proposal_services (
+  id                           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  proposal_id                  bigint       NOT NULL REFERENCES proposals (id) ON DELETE CASCADE,
+  service_id                   integer      NOT NULL REFERENCES services (id) ON DELETE RESTRICT,
+  service_name_snapshot        varchar(100) NOT NULL,
+  service_description_snapshot varchar(300) NOT NULL,
+  service_price_snapshot       numeric(12,2) NOT NULL,
+  created_at                   timestamptz  NOT NULL DEFAULT now(),
+  updated_at                   timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT ux_proposal_services UNIQUE (proposal_id, service_id),
+  CONSTRAINT chk_proposal_services_price_snapshot CHECK (service_price_snapshot > 0)
+);
 
 -- Líneas de la propuesta con el costo unitario congelado (RF-3.4.4.3).
 CREATE TABLE IF NOT EXISTS proposal_resources (
@@ -429,7 +580,49 @@ CREATE INDEX IF NOT EXISTS ix_calendar_events_request ON calendar_events (id_req
 CREATE INDEX IF NOT EXISTS ix_calendar_events_start ON calendar_events (start_at, id);
 
 -- -----------------------------------------------------------------------------
--- 9. Funciones y triggers
+-- 9. Contenido público (Función 4.1 / diagrama Función 3.4)
+-- -----------------------------------------------------------------------------
+-- Sin CRUD admin en este incremento (AD-05): el seed idempotente garantiza que el
+-- sitio público tenga contenido mientras se implementa la gestión.
+
+CREATE TABLE IF NOT EXISTS gallery_photos (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  url         varchar(500) NOT NULL,
+  title       varchar(150),
+  alt         varchar(300),
+  position    integer NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS social_links (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  network     varchar(20) NOT NULL,
+  url         varchar(500) NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chk_social_links_network CHECK (network IN ('FACEBOOK', 'INSTAGRAM')),
+  CONSTRAINT ux_social_links_network UNIQUE (network)
+);
+
+-- Seed mínimo idempotente (solo si está vacío).
+INSERT INTO gallery_photos (url, title, alt, position)
+SELECT v.url, v.title, v.alt, v.position
+FROM (VALUES
+  ('/images/boda.jpeg', 'Bodas en hacienda', 'Boda en hacienda', 1),
+  ('/images/eventos-corporativos.webp', 'Eventos corporativos', 'Evento corporativo', 2),
+  ('/images/xv-años.webp', 'XV años', 'Fiesta de XV años', 3),
+  ('/images/cenas-privadas.jpg', 'Cenas privadas', 'Cena privada', 4)
+) AS v(url, title, alt, position)
+WHERE NOT EXISTS (SELECT 1 FROM gallery_photos);
+
+INSERT INTO social_links (network, url)
+VALUES ('FACEBOOK', 'https://facebook.com/banqueteselegancia'),
+       ('INSTAGRAM', 'https://instagram.com/banqueteselegancia')
+ON CONFLICT (network) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 10. Funciones y triggers
 -- -----------------------------------------------------------------------------
 
 -- updated_at = now() en cada UPDATE, salvo que la sentencia ya le asigne un valor

@@ -40,7 +40,8 @@ const TABLES = [
   {
     table: "services",
     keys: ["id"],
-    insert: () => "INSERT INTO services (name) VALUES ('Servicio CRUD') RETURNING *",
+    insert: () =>
+      "INSERT INTO services (name, description, price) VALUES ('Servicio CRUD', 'Descripción CRUD', 1500) RETURNING *",
     set: ["status", "INACTIVE"],
   },
   {
@@ -67,8 +68,9 @@ const TABLES = [
     table: "request_services",
     keys: ["request_id", "service_id"],
     insert: (f) =>
-      `INSERT INTO request_services (request_id, service_id)
-       VALUES (${f.request}, ${f.service}) RETURNING *`,
+      `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+         service_description_snapshot, service_price_snapshot)
+       VALUES (${f.request}, ${f.service}, 'x', 'x', 1) RETURNING *`,
     set: ["created_at", new Date("2001-01-01T00:00:00Z")],
   },
   {
@@ -172,6 +174,39 @@ const TABLES = [
        VALUES (${f.request}, 'Evento CRUD', ${WINDOW}, 'Salon') RETURNING *`,
     set: ["location", "Salon editado"],
   },
+  {
+    table: "promotions",
+    keys: ["id"],
+    insert: () =>
+      `INSERT INTO promotions (name, description, discount_percentage, valid_until)
+       VALUES ('Promo CRUD', 'Descripción promo', 10.00, '2099-12-31') RETURNING *`,
+    set: ["status", "INACTIVE"],
+  },
+  {
+    table: "proposal_services",
+    keys: ["proposal_id", "service_id"],
+    insert: (f) =>
+      `INSERT INTO proposal_services (proposal_id, service_id, service_name_snapshot,
+         service_description_snapshot, service_price_snapshot)
+       VALUES (${f.proposal}, ${f.service}, 'Servicio FX', 'Descripción FX', 1500) RETURNING *`,
+    set: ["service_name_snapshot", "Servicio editado"],
+  },
+  {
+    table: "gallery_photos",
+    keys: ["id"],
+    insert: () =>
+      `INSERT INTO gallery_photos (url, title, alt, position)
+       VALUES ('/images/crud.jpg', 'CRUD', 'Foto CRUD', 99) RETURNING *`,
+    set: ["title", "CRUD editado"],
+  },
+  {
+    // El seed del esquema ocupa ambas redes; se libera antes del alta (misma transacción).
+    table: "social_links",
+    keys: ["network"],
+    before: "DELETE FROM social_links",
+    insert: () => "INSERT INTO social_links (network, url) VALUES ('FACEBOOK', 'x') RETURNING *",
+    set: ["url", "https://facebook.com/editado"],
+  },
 ];
 
 describe.skipIf(!hasTestDatabase())("schema.sql - CRUD por tabla", () => {
@@ -193,6 +228,7 @@ describe.skipIf(!hasTestDatabase())("schema.sql - CRUD por tabla", () => {
   it.each(TABLES)("$table: crea, lee, actualiza (con updated_at) y borra", (spec) =>
     withRollback(pool, async (db) => {
       const fixtures = await seedGraph(db);
+      if (spec.before) await db.query(spec.before);
       const created = (await db.query(spec.insert(fixtures))).rows[0];
       const where = spec.keys.map((key, index) => `${key} = $${index + 1}`).join(" AND ");
       const keyValues = spec.keys.map((key) => created[key]);

@@ -86,8 +86,10 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Acuerdos con recursos parciales (
       unitCost: 5,
     });
     const [role] = await roleRepo.findActive();
+    // Los nombres de recursos humanos no admiten dígitos (ERS defecto 4): se traduce el tag.
+    const letters = String(tag).replace(/\d/g, (digit) => "abcdefghi"[Number(digit)]);
     const person = await catalog.humanResourceUseCases.create.execute({
-      name: `Mesera ${tag}`,
+      name: `Mesera ${letters}`,
       operativeRoleId: role.id,
       precio: 50,
     });

@@ -454,11 +454,15 @@ class PostgresReservationRequestRepository {
 
     if (serviceIds.length === 0) return;
 
-    const values = serviceIds.map((_serviceId, index) => `($1, $${index + 2})`).join(", ");
-
+    // Incremento 4 (RF-1.2.6.3.1): se congelan nombre, descripción y precio del catálogo.
     await connection.query(
-      `INSERT INTO request_services (request_id, service_id) VALUES ${values}`,
-      [requestId, ...serviceIds]
+      `INSERT INTO request_services
+         (request_id, service_id, service_name_snapshot, service_description_snapshot,
+          service_price_snapshot)
+       SELECT $1, s.id, s.name, s.description, s.price
+         FROM services s
+        WHERE s.id = ANY($2::integer[])`,
+      [requestId, serviceIds]
     );
   }
 
