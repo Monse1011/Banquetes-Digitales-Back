@@ -2,6 +2,8 @@
 const ResourceAssignmentMessages = Object.freeze({
   RESOURCES_REQUIRED: "Debe indicar al menos un recurso.",
   NO_RESOURCES_TO_CONFIRM: "Debe registrar al menos un recurso antes de finalizar la confirmación.",
+  HUMAN_RESOURCE_REQUIRED:
+    "Debe asignar al menos un recurso humano antes de finalizar la confirmación.",
   RESOURCE_ID_INVALID: "El identificador del recurso es obligatorio.",
   RESOURCE_DUPLICATED: "El recurso se indicó más de una vez.",
   RESOURCE_NOT_AVAILABLE: "El recurso no existe o no está activo.",

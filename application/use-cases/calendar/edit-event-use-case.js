@@ -4,7 +4,6 @@ const CalendarValidationException = require("../../../domain/exceptions/calendar
 const EventNotModifiableException = require("../../../domain/exceptions/calendar/event-not-modifiable-exception");
 const EventAvailabilityConflictException = require("../../../domain/exceptions/calendar/event-availability-conflict-exception");
 const { assertCanEditEvent } = require("../../services/calendar/calendar-access-policy");
-const { syncEventNow } = require("../../services/calendar/sync-event-now");
 const { toConflictDto } = require("../../dto/calendar/calendar-event-dto");
 const {
   EditCalendarEventRequestDto,
@@ -12,9 +11,8 @@ const {
 
 // Función 3.3, bloque C - Edición de eventos confirmados (fecha, hora y ubicación).
 class EditEventUseCase {
-  constructor(calendarEventRepository, syncProcessor, clock = () => new Date()) {
+  constructor(calendarEventRepository, clock = () => new Date()) {
     this.calendarEventRepository = calendarEventRepository;
-    this.syncProcessor = syncProcessor;
     this.clock = clock;
   }
 
@@ -54,6 +52,19 @@ class EditEventUseCase {
     // C.1 / C.2: respuesta rápida; el repositorio repite estas reglas de forma atómica.
     this.assertEditable(event, now);
 
+    // Un evento Confirmado no admite cambios de fecha/hora (no hay flujo de reprogramación).
+    const scheduleFieldsSent = ["start_datetime", "end_datetime"].filter(
+      (field) => dto[field] !== undefined
+    );
+
+    if (scheduleFieldsSent.length > 0) {
+      throw new CalendarValidationException(
+        Object.fromEntries(
+          scheduleFieldsSent.map((field) => [field, CalendarMessages.RESCHEDULE_NOT_ALLOWED])
+        )
+      );
+    }
+
     const resolved = dto.resolve(event, now);
 
     if (Object.keys(resolved.errors).length > 0) {
@@ -68,13 +79,7 @@ class EditEventUseCase {
       now,
     });
 
-    const updated = this.registerResult(result);
-
-    return syncEventNow({
-      syncProcessor: this.syncProcessor,
-      calendarEventRepository: this.calendarEventRepository,
-      eventId: updated.id,
-    });
+    return { event: this.registerResult(result) };
   }
 
   assertEditable(event, now) {

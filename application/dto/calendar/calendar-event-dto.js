@@ -1,4 +1,9 @@
-const { formatDateTime } = require("../../services/reservation-request/date-time-formatter");
+const { formatMeridaDateTime } = require("../../services/event-closure/merida-time");
+
+// "YYYY-MM-DD HH:mm:ss" en hora de Mérida, sin depender de la zona horaria del servidor.
+function formatDateTime(date) {
+  return formatMeridaDateTime(date).slice(0, 19).replace("T", " ");
+}
 
 // Un conflicto de disponibilidad con los nombres de fecha y hora definidos por el DAD.
 function toConflictDto(conflict) {
@@ -36,7 +41,6 @@ function toCalendarEventDto(event) {
       ? { user_id: event.logisticUserId, full_name: event.logisticUserName }
       : null,
     status: event.status,
-    sync_status: event.syncStatus,
   };
 }
 

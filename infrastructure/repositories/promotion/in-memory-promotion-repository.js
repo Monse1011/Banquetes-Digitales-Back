@@ -1,5 +1,6 @@
 const { Promotion } = require("../../../domain/entities/promotion/promotion");
 const PromotionStatus = require("../../../domain/enums/promotion/promotion-status");
+const { formatMeridaDate } = require("../../../application/services/event-closure/merida-time");
 
 class InMemoryPromotionRepository {
   constructor(promotions = []) {
@@ -24,6 +25,10 @@ class InMemoryPromotionRepository {
   }
 
   async expireOutdatedPromotions(currentDate) {
+    if (currentDate === undefined || currentDate === null) {
+      return this.expireOutdated();
+    }
+
     let expiredCount = 0;
     for (const promotion of this.promotions) {
       if (promotion.status === PromotionStatus.ACTIVE && promotion.validUntil < currentDate) {
@@ -32,6 +37,35 @@ class InMemoryPromotionRepository {
       }
     }
     return expiredCount;
+  }
+
+  // AD-06: misma expiración, evaluando la fecha actual de Mérida (contrato 11).
+  async expireOutdated() {
+    return this.expireOutdatedPromotions(formatMeridaDate(new Date()));
+  }
+
+  // RF-3.4.1.2.2 (contrato 11, Función 4.1): solo ACTIVE y vigentes hoy, orden name, id,
+  // sin el campo status. ClientContentController invoca expireOutdated() antes de listar.
+  async listActiveForPortal() {
+    const today = formatMeridaDate(new Date());
+
+    return this.promotions
+      .filter(
+        (promotion) => promotion.status === PromotionStatus.ACTIVE && promotion.validUntil >= today
+      )
+      .sort((promotionA, promotionB) => {
+        const nameComparison = (promotionA.name || "").localeCompare(promotionB.name || "");
+        if (nameComparison !== 0) return nameComparison;
+
+        return Number(promotionA.id) - Number(promotionB.id);
+      })
+      .map((promotion) => ({
+        id: Number(promotion.id),
+        name: promotion.name,
+        description: promotion.description,
+        discount_percentage: Number(promotion.discountPercentage),
+        valid_until: promotion.validUntil,
+      }));
   }
 
   async findAllNotDeleted({ page = 1, per_page: perPage = 10, currentDate } = {}) {
@@ -195,9 +229,7 @@ class InMemoryPromotionRepository {
     id,
     { name, description, discount_percentage: discountPercentage, valid_until: validUntil }
   ) {
-    const index = this.promotions.findIndex(
-      (promotion) => Number(promotion.id) === Number(id)
-    );
+    const index = this.promotions.findIndex((promotion) => Number(promotion.id) === Number(id));
     if (index === -1) return null;
 
     const current = this.promotions[index];
@@ -248,4 +280,3 @@ class InMemoryPromotionRepository {
 }
 
 module.exports = { InMemoryPromotionRepository };
-

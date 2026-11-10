@@ -1,17 +1,43 @@
 const { Promotion } = require("../../../domain/entities/promotion/promotion");
 const PromotionStatus = require("../../../domain/enums/promotion/promotion-status");
 
+// Fecha actual de Mérida evaluada por la base de datos. AD-06: el UPDATE de expiración
+// (RF-1.2.7.5 / RF-1.2.7.7) tiene una sola implementación, invocada tanto por la gestión
+// de la Función 2.7 (contratos 6 a 10) como por el catálogo público de la Función 4.1
+// (contrato 11).
+const MERIDA_TODAY = "(now() AT TIME ZONE 'America/Merida')::date";
+
 class PostgresPromotionRepository {
   constructor(pool) {
     this.pool = pool;
   }
 
+  // Expiración idempotente: ACTIVE cuya valid_until quedó atrás pasa a INACTIVE (AD-06).
+  // Con currentDate la invoca la gestión (Función 2.7); sin argumento expireOutdated()
+  // usa la fecha de Mérida evaluada por la base, como la necesita el contrato 11.
   async expireOutdatedPromotions(currentDate) {
+    if (currentDate === undefined || currentDate === null) {
+      return this.expireOutdated();
+    }
+
     const result = await this.pool.query(
       `UPDATE promotions
        SET status = $1, updated_at = NOW()
        WHERE status = $2 AND valid_until < $3::date`,
       [PromotionStatus.INACTIVE, PromotionStatus.ACTIVE, currentDate]
+    );
+
+    return result.rowCount || 0;
+  }
+
+  // UPDATE idempotente sin parámetro (RF-1.2.7.5 / RF-1.2.7.7). Devuelve el número de
+  // filas marcadas (0 en casi todas las llamadas).
+  async expireOutdated() {
+    const result = await this.pool.query(
+      `UPDATE promotions
+       SET status = $1, updated_at = NOW()
+       WHERE status = $2 AND valid_until < ${MERIDA_TODAY}`,
+      [PromotionStatus.INACTIVE, PromotionStatus.ACTIVE]
     );
 
     return result.rowCount || 0;
@@ -191,7 +217,26 @@ class PostgresPromotionRepository {
       row.updated_at
     );
   }
+
+  // RF-3.4.1.2.2 (contrato 11, Función 4.1): solo vigentes (ACTIVE y valid_until >= hoy de
+  // Mérida), orden name, id. La expiración previa corre a cargo de expireOutdated().
+  async listActiveForPortal() {
+    const result = await this.pool.query(
+      `SELECT id, name, description, discount_percentage,
+              TO_CHAR(valid_until, 'YYYY-MM-DD') AS valid_until
+         FROM promotions
+        WHERE status = 'ACTIVE' AND valid_until >= ${MERIDA_TODAY}
+        ORDER BY name, id`
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      description: row.description,
+      discount_percentage: Number(row.discount_percentage),
+      valid_until: row.valid_until,
+    }));
+  }
 }
 
 module.exports = { PostgresPromotionRepository };
-

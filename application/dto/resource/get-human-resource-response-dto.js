@@ -1,11 +1,22 @@
 class GetHumanResourceResponseDto {
-  constructor(id, name, type, operativeRoleId, isActive, createdAt, updatedAt, deactivatedAt) {
+  constructor(
+    id,
+    name,
+    type,
+    operativeRoleId,
+    isActive,
+    createdAt,
+    updatedAt,
+    deactivatedAt,
+    precio = null
+  ) {
     this.data = {
       resource: {
         id,
         name,
         type,
         operative_role_id: operativeRoleId,
+        precio,
         is_active: isActive,
         created_at: createdAt,
         updated_at: updatedAt,

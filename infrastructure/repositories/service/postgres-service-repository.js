@@ -18,6 +18,24 @@ class PostgresServiceRepository {
     return result.rows.map((row) => this.toEntity(row));
   }
 
+  // Contrato 12 (función 4.1): catálogo público con precio; orden name, id. AD-11:
+  // devuelve la lista completa vigente (el front pagina en cliente).
+  async findActiveForPortal() {
+    const result = await this.pool.query(
+      `SELECT id, name, description, price
+       FROM services
+       WHERE status = 'ACTIVE'
+       ORDER BY name, id`
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      description: row.description,
+      price: Number(row.price),
+    }));
+  }
+
   async findByIds(ids) {
     if (ids.length === 0) return [];
 
