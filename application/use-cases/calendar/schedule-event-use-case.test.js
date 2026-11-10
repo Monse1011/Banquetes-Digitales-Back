@@ -24,7 +24,6 @@ describe("ScheduleEventUseCase", () => {
       id: 1,
       requestId: 10,
       title: "EVT-2026-0101 - Andrea Morales",
-      isSynced: () => true,
     };
 
     const reservationRequestRepository = {
@@ -40,15 +39,10 @@ describe("ScheduleEventUseCase", () => {
       }),
       findById: vi.fn().mockResolvedValue(createdEvent),
     };
-    const syncProcessor = {
-      execute: vi.fn().mockResolvedValue({ processed: 1, synced: 1, failed: 0 }),
-    };
-
     const useCase = new ScheduleEventUseCase(
       reservationRequestRepository,
       clientRepository,
       calendarEventRepository,
-      syncProcessor,
       () => now
     );
 
@@ -62,9 +56,7 @@ describe("ScheduleEventUseCase", () => {
       title: "EVT-2026-0101 - Andrea Morales",
       now,
     });
-    expect(syncProcessor.execute).toHaveBeenCalledWith({ eventId: 1 });
-    expect(result.event).toEqual(createdEvent);
-    expect(result.syncWarning).toBeNull();
+    expect(result).toEqual({ event: createdEvent });
   });
 
   it("falls back to folio when client is not found", async () => {
@@ -79,7 +71,6 @@ describe("ScheduleEventUseCase", () => {
       id: 1,
       requestId: 10,
       title: "EVT-2026-0101",
-      isSynced: () => true,
     };
 
     const reservationRequestRepository = {
@@ -95,15 +86,10 @@ describe("ScheduleEventUseCase", () => {
       }),
       findById: vi.fn().mockResolvedValue(createdEvent),
     };
-    const syncProcessor = {
-      execute: vi.fn().mockResolvedValue({ processed: 1, synced: 1, failed: 0 }),
-    };
-
     const useCase = new ScheduleEventUseCase(
       reservationRequestRepository,
       clientRepository,
       calendarEventRepository,
-      syncProcessor,
       () => now
     );
 

@@ -47,7 +47,7 @@ class GenerateProposalRequestDto {
       this.clientObservations !== null &&
       typeof this.clientObservations !== "string"
     ) {
-      return ProposalMessages.AGREEMENTS_VALIDATION;
+      return ProposalMessages.CLIENT_OBSERVATIONS_INVALID;
     }
 
     return undefined;

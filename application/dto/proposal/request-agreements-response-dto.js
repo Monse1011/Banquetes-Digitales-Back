@@ -48,6 +48,7 @@ class RequestAgreementsResponseDto {
         sufficiency: resource.sufficiency ?? null,
         observation: resource.observation ?? null,
         unit_cost: resource.unitCost,
+        precio: resource.precio ?? null,
       })),
     };
   }

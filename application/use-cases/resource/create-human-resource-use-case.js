@@ -15,7 +15,7 @@ class CreateHumanResourceUseCase {
   }
 
   async execute(input = {}) {
-    const dto = new HumanResourceRequestDto(input.name, input.operativeRoleId);
+    const dto = new HumanResourceRequestDto(input.name, input.operativeRoleId, input.precio);
     const errors = dto.validate();
 
     if (Object.keys(errors).length > 0) {
@@ -52,7 +52,9 @@ class CreateHumanResourceUseCase {
         true,
         now,
         now,
-        null
+        null,
+        0, // version
+        dto.precio
       )
     );
 

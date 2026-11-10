@@ -13,6 +13,7 @@ const { EventClosureMessages } = require("../../../domain/constants/event-closur
 const { parseMeridaDateTime } = require("../../services/event-closure/merida-time");
 const EventClosureValidationException = require("../../../domain/exceptions/event-closure/event-closure-validation-exception");
 const EventClosureConflictException = require("../../../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../../../domain/exceptions/event-closure/event-closure-state-exception");
 const EventClosureNotFoundException = require("../../../domain/exceptions/event-closure/event-closure-not-found-exception");
 const EventClosureAccessDeniedException = require("../../../domain/exceptions/event-closure/event-closure-access-denied-exception");
 
@@ -194,7 +195,7 @@ describe("FinalizeEventUseCase (Función 3.6)", () => {
 
       await expectRejection(
         run(),
-        EventClosureConflictException,
+        EventClosureStateException,
         EventClosureMessages.ALREADY_FINALIZED
       );
     });
@@ -206,20 +207,16 @@ describe("FinalizeEventUseCase (Función 3.6)", () => {
     ])("rechaza el estado %s", async (status) => {
       const { run } = buildUseCase({ event: { status } });
 
-      await expectRejection(
-        run(),
-        EventClosureConflictException,
-        EventClosureMessages.NOT_CONFIRMED
-      );
+      await expectRejection(run(), EventClosureStateException, EventClosureMessages.NOT_CONFIRMED);
     });
 
-    it("finalizar dos veces: la segunda recibe 409 y no duplica el historial", async () => {
+    it("finalizar dos veces: la segunda recibe 422 y no duplica el historial", async () => {
       const { run, repository } = buildUseCase();
 
       await run();
       await expectRejection(
         run(),
-        EventClosureConflictException,
+        EventClosureStateException,
         EventClosureMessages.ALREADY_FINALIZED
       );
       expect(repository.history).toHaveLength(1);
@@ -304,6 +301,24 @@ describe("FinalizeEventUseCase (Función 3.6)", () => {
         EventClosureValidationException,
         EventClosureMessages.ACTUAL_TIME_IN_FUTURE
       );
+    });
+
+    it("rechaza un día real de inicio anterior al programado", async () => {
+      const { run } = buildUseCase();
+
+      await expectRejection(
+        run(validBody({ actual_start_at: "2026-11-14T23:50:00-06:00" })),
+        EventClosureValidationException,
+        EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
+      );
+    });
+
+    it("acepta una hora real de inicio anterior a la programada el mismo día", async () => {
+      const { run } = buildUseCase();
+
+      await expect(
+        run(validBody({ actual_start_at: "2026-11-15T10:00:00-06:00" }))
+      ).resolves.toBeDefined();
     });
 
     it("acepta una hora real igual a la hora actual", async () => {

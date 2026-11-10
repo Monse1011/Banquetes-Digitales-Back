@@ -31,10 +31,22 @@ class ListCalendarEventsUseCase {
     this.clock = clock;
   }
 
-  async execute({ actor, date, includeCancelled = false, page = 1, perPage } = {}) {
+  async execute({
+    actor,
+    date,
+    includeCancelled = false,
+    upcoming = false,
+    page = 1,
+    perPage,
+  } = {}) {
     assertCanListEvents(actor);
 
     const filters = { includeCancelled: includeCancelled === true };
+
+    // Defecto 5: próximos eventos = no Finalizados y con fin >= ahora. Sin el parámetro no cambia.
+    if (upcoming === true) {
+      filters.upcomingFrom = this.clock();
+    }
 
     if (date !== undefined) {
       const dayStart = parseDayStart(date);
@@ -56,9 +68,7 @@ class ListCalendarEventsUseCase {
       filters.logisticUserId = getActorId(actor);
     }
 
-    // F.3: el estado se actualiza al consultar, sin depender solo del proceso periódico.
-    await this.calendarEventRepository.finalizeElapsed(this.clock());
-
+    // F.3: el repositorio aplica la regla única de finalización antes de leer.
     const size = perPage ?? CalendarRules.DEFAULT_PAGE_SIZE;
     const result = await this.calendarEventRepository.findAll(filters, page, size);
 

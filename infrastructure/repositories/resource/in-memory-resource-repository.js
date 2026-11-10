@@ -19,7 +19,8 @@ function copyOf(resource, overrides = {}) {
     values.createdAt,
     values.updatedAt,
     values.deactivatedAt,
-    values.version
+    values.version,
+    values.precio
   );
 }
 
@@ -54,6 +55,7 @@ class InMemoryResourceRepository {
       operativeRoleId: resource.operativeRoleId,
       totalQuantity: resource.totalQuantity,
       unitCost: resource.unitCost,
+      precio: resource.precio,
       updatedAt: resource.updatedAt,
     });
   }
