@@ -11,7 +11,6 @@ const mockSchedule = vi.fn();
 const mockEdit = vi.fn();
 const mockCancel = vi.fn();
 const mockList = vi.fn();
-const mockRetry = vi.fn();
 
 function buildApp(role) {
   return createApp({
@@ -27,7 +26,6 @@ function buildApp(role) {
     scheduleEventUseCase: { execute: mockSchedule },
     editEventUseCase: { execute: mockEdit },
     cancelEventUseCase: { execute: mockCancel },
-    retryCalendarSyncUseCase: { execute: mockRetry },
     listCalendarEventsUseCase: { execute: mockList },
     // Mock other use cases
     resourceUseCases: {},
@@ -63,6 +61,26 @@ describe("Calendar Routes (Función 3.3)", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.events).toHaveLength(1);
+      expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ upcoming: false }));
+    });
+
+    it("forwards ?upcoming=true to list only upcoming events (defecto 5)", async () => {
+      mockList.mockResolvedValue({ events: [], totalRecords: 0, page: 1, perPage: 10 });
+
+      const response = await request(app)
+        .get("/api/logistics/calendar?upcoming=true")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(response.status).toBe(200);
+      expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ upcoming: true }));
+    });
+
+    it("no longer exposes the Google Calendar sync route (defecto 7)", async () => {
+      const response = await request(app)
+        .post("/api/logistics/calendar/4/sync")
+        .set("Cookie", AUTH_COOKIE);
+
+      expect(response.status).toBe(404);
     });
 
     it("exposes the DAD administrator calendar route and contract documentation", async () => {
@@ -81,7 +99,8 @@ describe("Calendar Routes (Función 3.3)", () => {
       expect(response.status).toBe(200);
       expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-12-24" }));
       expect(documentation.body.paths["/api/logistics/calendar/{id}"].patch).toBeDefined();
-      expect(documentation.body.paths["/api/logistics/calendar/{id}/sync"].post).toBeDefined();
+      // Defecto 7: ya no existe la sincronización con Google Calendar.
+      expect(documentation.body.paths["/api/logistics/calendar/{id}/sync"]).toBeUndefined();
       expect(documentation.body.paths["/api/logistics/requests/{id}/calendar"].post).toBeDefined();
       expect(documentation.body.paths["/api/calendar"]).toBeUndefined();
       expect(documentation.body.paths["/api/calendar/{id}"]).toBeUndefined();
@@ -95,14 +114,11 @@ describe("Calendar Routes (Función 3.3)", () => {
               (path.startsWith("/api/admin/calendar") && path !== "/api/admin/calendar")
           )
           .sort()
-      ).toEqual(["/api/logistics/calendar/{id}", "/api/logistics/calendar/{id}/sync"]);
+      ).toEqual(["/api/logistics/calendar/{id}"]);
     });
 
     it("edits events using the DAD route and forwards immutable fields for validation", async () => {
-      mockEdit.mockResolvedValue({
-        id: 1,
-        syncStatus: "Sincronizado",
-      });
+      mockEdit.mockResolvedValue({ event: { id: 1 } });
 
       const response = await request(app)
         .patch("/api/logistics/calendar/1")
@@ -167,10 +183,7 @@ describe("Calendar Routes (Función 3.3)", () => {
           id: 1,
           requestId: 123,
           status: "Confirmado",
-          syncStatus: "Sincronizado",
-          googleEventId: "google-event-123",
         },
-        syncWarning: null,
       });
 
       const response = await request(app)
@@ -183,16 +196,11 @@ describe("Calendar Routes (Función 3.3)", () => {
         event_id: 1,
         request_id: 123,
         status: "Confirmado",
-        sync_status: "Sincronizado",
-        google_event_id: "google-event-123",
       });
     });
 
     it("cancels events from the DAD route without requiring a request body", async () => {
-      mockCancel.mockResolvedValue({
-        id: 1,
-        syncStatus: "Sincronizado",
-      });
+      mockCancel.mockResolvedValue({ event: { id: 1 } });
 
       const response = await request(app)
         .delete("/api/logistics/calendar/1")
@@ -251,39 +259,5 @@ describe("Calendar Routes (Función 3.3)", () => {
     app = buildApp(UserRole.ADMIN);
     const response = await request(app).get("/api/logistics/calendar");
     expect(response.status).toBe(401);
-  });
-});
-
-describe("calendar retry HTTP integration", () => {
-  it("returns pending state without claiming Google success", async () => {
-    mockRetry.mockResolvedValue({
-      event: { id: 4, syncStatus: "Pendiente de sincronización" },
-      syncWarning: "No pudo sincronizarse",
-    });
-    const response = await request(buildApp(UserRole.ADMIN))
-      .post("/api/logistics/calendar/4/sync")
-      .set("Cookie", AUTH_COOKIE);
-    expect(response.status).toBe(200);
-    expect(mockRetry).toHaveBeenCalledWith(4, { id_user: 1, role: UserRole.ADMIN });
-    expect(response.body.data.sync_status).toBe("Pendiente de sincronización");
-  });
-  it("preserves ownership denial from the existing use case", async () => {
-    mockRetry.mockRejectedValue(new CalendarAccessDeniedException());
-    const response = await request(buildApp(UserRole.LOGISTICS))
-      .post("/api/logistics/calendar/4/sync")
-      .set("Cookie", AUTH_COOKIE);
-    expect(response.status).toBe(403);
-  });
-  it("rejects invalid ids and unauthenticated retries", async () => {
-    expect(
-      (
-        await request(buildApp(UserRole.ADMIN))
-          .post("/api/logistics/calendar/invalid/sync")
-          .set("Cookie", AUTH_COOKIE)
-      ).status
-    ).toBe(422);
-    expect(
-      (await request(buildApp(UserRole.ADMIN)).post("/api/logistics/calendar/4/sync")).status
-    ).toBe(401);
   });
 });

@@ -36,8 +36,10 @@ class InMemoryServiceRepository {
     );
 
     const sortedServices = [...notDeletedServices].sort((serviceA, serviceB) => {
-      const isServiceAActive = serviceA.status === ServiceStatus.ACTIVE || serviceA.status === "activo";
-      const isServiceBActive = serviceB.status === ServiceStatus.ACTIVE || serviceB.status === "activo";
+      const isServiceAActive =
+        serviceA.status === ServiceStatus.ACTIVE || serviceA.status === "activo";
+      const isServiceBActive =
+        serviceB.status === ServiceStatus.ACTIVE || serviceB.status === "activo";
 
       if (isServiceAActive && !isServiceBActive) return -1;
       if (!isServiceAActive && isServiceBActive) return 1;
@@ -52,13 +54,20 @@ class InMemoryServiceRepository {
     const paginatedServices = sortedServices.slice(startIndex, startIndex + perPage);
 
     return {
-      services: paginatedServices.map((service) => new Service(
-        service.id,
-        service.name,
-        service.description,
-        service.price,
-        service.status === "activo" ? ServiceStatus.ACTIVE : (service.status === "inactivo" ? ServiceStatus.INACTIVE : service.status)
-      )),
+      services: paginatedServices.map(
+        (service) =>
+          new Service(
+            service.id,
+            service.name,
+            service.description,
+            service.price,
+            service.status === "activo"
+              ? ServiceStatus.ACTIVE
+              : service.status === "inactivo"
+                ? ServiceStatus.INACTIVE
+                : service.status
+          )
+      ),
       total_records: notDeletedServices.length,
     };
   }
@@ -72,7 +81,11 @@ class InMemoryServiceRepository {
       foundService.name,
       foundService.description,
       foundService.price,
-      foundService.status === "activo" ? ServiceStatus.ACTIVE : (foundService.status === "inactivo" ? ServiceStatus.INACTIVE : foundService.status)
+      foundService.status === "activo"
+        ? ServiceStatus.ACTIVE
+        : foundService.status === "inactivo"
+          ? ServiceStatus.INACTIVE
+          : foundService.status
     );
   }
 
@@ -102,13 +115,7 @@ class InMemoryServiceRepository {
 
   async create({ name, description, price, status = ServiceStatus.ACTIVE }) {
     const newServiceId = this.nextId++;
-    const createdService = new Service(
-      newServiceId,
-      name,
-      description,
-      price,
-      status
-    );
+    const createdService = new Service(newServiceId, name, description, price, status);
     this.services.push(createdService);
 
     return new Service(
@@ -156,6 +163,21 @@ class InMemoryServiceRepository {
 
   async softDelete(id) {
     return this.updateStatus(id, ServiceStatus.DELETED);
+  }
+
+  // Contrato 12 (AD-11): catálogo público completo, orden name, id. Acepta el estado
+  // legado "activo" porque el resto del repositorio también lo trata como vigente.
+  async findActiveForPortal() {
+    return this.services
+      .filter((service) => service.status === ServiceStatus.ACTIVE || service.status === "activo")
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "es") || a.id - b.id)
+      .map((service) => ({
+        id: service.id,
+        name: service.name,
+        description: service.description,
+        price: service.price,
+      }));
   }
 }
 

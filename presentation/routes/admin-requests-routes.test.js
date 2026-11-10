@@ -97,8 +97,8 @@ describe("GET /api/admin/requests: access and validation (Funciones 2.5 y 2.11)"
   });
 });
 
-// Opt-in: TEST_PGDATABASE debe nombrar una base de pruebas creada solo con las migraciones
-// versionadas (ver README). Cada prueba inserta sus datos dentro de una transacción que se
+// Opt-in: TEST_PGDATABASE debe nombrar una base de pruebas creada con database/schema.sql
+// (ver README). Cada prueba inserta sus datos dentro de una transacción que se
 // revierte al terminar.
 describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against PostgreSQL", () => {
   let pool;
@@ -264,7 +264,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
         });
       }
       await connection.query(
-        "INSERT INTO request_services (request_id, service_id) VALUES ($1, $2)",
+        `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+           service_description_snapshot, service_price_snapshot)
+         VALUES ($1, $2, 'x', 'x', 1)`,
         [created.CONFIRMED.id, service.id]
       );
 

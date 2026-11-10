@@ -6,7 +6,10 @@ function createAdminRoutes(
   reservationRequestController,
   userController,
   authMiddleware,
-  serviceController = null
+  // Función 2.6: /api/admin/services (contratos 1 a 5).
+  serviceController = null,
+  // Función 2.7: /api/admin/promotions (contratos 6 a 10).
+  promotionController = null
 ) {
   const router = express.Router();
   // RF-1.2.4.16: las funciones de la Función 2.4 se restringen a Administrador General.
@@ -56,6 +59,7 @@ function createAdminRoutes(
     userController.toggleStatus(request, response).catch(next);
   });
 
+  // Función 2.6: catálogo y gestión de servicios (contratos 1 a 5).
   if (serviceController) {
     router.get("/services", (request, response, next) => {
       serviceController.listAdmin(request, response).catch(next);
@@ -79,6 +83,33 @@ function createAdminRoutes(
 
     router.delete("/services/:id", (request, response, next) => {
       serviceController.delete(request, response).catch(next);
+    });
+  }
+
+  // Función 2.7: catálogo y gestión de promociones (contratos 6 a 10).
+  if (promotionController) {
+    router.get("/promotions", (request, response, next) => {
+      promotionController.listAdmin(request, response).catch(next);
+    });
+
+    router.post("/promotions", (request, response, next) => {
+      promotionController.create(request, response).catch(next);
+    });
+
+    router.put("/promotions/:id", (request, response, next) => {
+      promotionController.update(request, response).catch(next);
+    });
+
+    router.patch("/promotions/:id", (request, response, next) => {
+      promotionController.update(request, response).catch(next);
+    });
+
+    router.put("/promotions/:id/status", (request, response, next) => {
+      promotionController.deactivate(request, response).catch(next);
+    });
+
+    router.delete("/promotions/:id", (request, response, next) => {
+      promotionController.delete(request, response).catch(next);
     });
   }
 

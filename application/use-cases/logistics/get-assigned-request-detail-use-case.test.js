@@ -94,17 +94,20 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
     ["Ajustes Solicitados", true],
     ["Asignada", false],
     ["En revisión", false],
-  ])("enables agreements for the domain status %s → %s (RF-3.4.4.5.7)", async (status, expected) => {
-    const useCase = new GetAssignedRequestDetailUseCase({
-      reservationRequestRepository: {
-        findById: vi.fn().mockResolvedValue(makeRequest({ status })),
-      },
-    });
+  ])(
+    "enables agreements for the domain status %s → %s (RF-3.4.4.5.7)",
+    async (status, expected) => {
+      const useCase = new GetAssignedRequestDetailUseCase({
+        reservationRequestRepository: {
+          findById: vi.fn().mockResolvedValue(makeRequest({ status })),
+        },
+      });
 
-    const { data } = await useCase.execute({ requestId: 1, userId: 10 });
+      const { data } = await useCase.execute({ requestId: 1, userId: 10 });
 
-    expect(data.can_register_agreements).toBe(expected);
-  });
+      expect(data.can_register_agreements).toBe(expected);
+    }
+  );
 
   it("lists the client's adjustment requests with the current proposal (RF-3.4.4.5.6)", async () => {
     const useCase = new GetAssignedRequestDetailUseCase({
@@ -120,7 +123,11 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
       },
       proposalAdjustmentRepository: {
         findByRequestId: vi.fn().mockResolvedValue([
-          { id: 7, observations: "Agregar 2 meseros", createdAt: new Date("2026-10-29T21:00:00Z") },
+          {
+            id: 7,
+            observations: "Agregar 2 meseros",
+            createdAt: new Date("2026-10-29T21:00:00Z"),
+          },
         ]),
       },
     });
@@ -188,6 +195,31 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
     await expect(useCase.execute({ requestId: 999, userId: 10 })).rejects.toMatchObject({
       status: 404,
       message: "Solicitud de reservación no encontrada.",
+    });
+  });
+
+  describe("can_register_finalization (defecto 5)", () => {
+    // 18:00 a 23:00 en Mérida del 24 de diciembre.
+    const start = new Date("2026-12-24T18:00:00-06:00");
+
+    async function flag(status, now) {
+      const request = makeRequest({ status, eventDateTime: start });
+      const useCase = new GetAssignedRequestDetailUseCase({
+        reservationRequestRepository: { findById: vi.fn().mockResolvedValue(request) },
+        clock: () => now,
+      });
+
+      return (await useCase.execute({ requestId: 1, userId: 10 })).data.can_register_finalization;
+    }
+
+    it("es true para Confirmado el día programado", async () => {
+      expect(await flag("Confirmado", new Date("2026-12-24T20:00:00-06:00"))).toBe(true);
+    });
+
+    it("es false otro día o en cualquier estado distinto de Confirmado", async () => {
+      expect(await flag("Confirmado", new Date("2026-12-23T20:00:00-06:00"))).toBe(false);
+      expect(await flag("Finalizado", new Date("2026-12-24T20:00:00-06:00"))).toBe(false);
+      expect(await flag("Propuesta generada", new Date("2026-12-24T20:00:00-06:00"))).toBe(false);
     });
   });
 });

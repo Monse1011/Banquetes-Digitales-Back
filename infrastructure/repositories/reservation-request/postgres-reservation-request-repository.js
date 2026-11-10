@@ -1,4 +1,5 @@
 const { toDatabaseStatus, fromDatabaseStatus } = require("./postgres-request-status");
+const { finalizeElapsedEvents } = require("./finalize-elapsed-events");
 const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
@@ -103,6 +104,7 @@ class PostgresReservationRequestRepository {
   }
 
   async findById(id, transaction = null) {
+    await finalizeElapsedEvents(transaction?.connection ?? this.pool);
     const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
         ` WHERE rr.id = $1
@@ -115,6 +117,7 @@ class PostgresReservationRequestRepository {
 
   // Función 4.5: consulta por folio, único medio de acceso del cliente (RF-3.4.5.12).
   async findByFolio(folio, transaction = null) {
+    await finalizeElapsedEvents(transaction?.connection ?? this.pool);
     const result = await (transaction?.connection ?? this.pool).query(
       this.baseSelect() +
         ` WHERE rr.folio = $1
@@ -381,6 +384,7 @@ class PostgresReservationRequestRepository {
   }
 
   async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
+    await finalizeElapsedEvents(this.pool);
     const parameters = [];
     const where = this.buildConditions(filters, parameters);
 
@@ -450,11 +454,15 @@ class PostgresReservationRequestRepository {
 
     if (serviceIds.length === 0) return;
 
-    const values = serviceIds.map((_serviceId, index) => `($1, $${index + 2})`).join(", ");
-
+    // Incremento 4 (RF-1.2.6.3.1): se congelan nombre, descripción y precio del catálogo.
     await connection.query(
-      `INSERT INTO request_services (request_id, service_id) VALUES ${values}`,
-      [requestId, ...serviceIds]
+      `INSERT INTO request_services
+         (request_id, service_id, service_name_snapshot, service_description_snapshot,
+          service_price_snapshot)
+       SELECT $1, s.id, s.name, s.description, s.price
+         FROM services s
+        WHERE s.id = ANY($2::integer[])`,
+      [requestId, serviceIds]
     );
   }
 

@@ -27,7 +27,7 @@ class PostgresAssignedResourceRepository {
   async findActiveByRequestId(requestId) {
     const result = await this.pool.query(
       `SELECT ar.id, ar.request_id, ar.resource_id, ar.quantity,
-        ar.usage_start, ar.usage_end, ar.status, r.name, r.type, r.unit_cost
+        ar.usage_start, ar.usage_end, ar.status, r.name, r.type, r.unit_cost, r.precio
        FROM assigned_resources ar
        JOIN resources r ON r.id = ar.resource_id
        WHERE ar.request_id = $1 AND ar.status = ANY($2)
@@ -158,7 +158,8 @@ class PostgresAssignedResourceRepository {
       row.status,
       row.name,
       TYPE_BY_DB_TYPE[row.type] ?? row.type,
-      row.unit_cost === null ? null : Number(row.unit_cost)
+      row.unit_cost === null ? null : Number(row.unit_cost),
+      row.precio === null ? null : Number(row.precio)
     );
   }
 }

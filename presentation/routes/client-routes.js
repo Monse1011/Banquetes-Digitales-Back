@@ -12,19 +12,41 @@ function createClientRateLimit() {
   });
 }
 
+// Los catálogos públicos (contratos 11 y 12) los sirve el ClientContentController de la
+// Función 4.1; la gestión de promociones (contratos 6 a 10) es de la Función 2.7 y vive en
+// las rutas de administración.
 function createClientRoutes(
   reservationRequestController,
-  serviceController,
+  clientContentController,
   clientProposalController = null
 ) {
   const router = express.Router();
+
+  // Función 4.1: los cuatro listados públicos van con la misma limitación de solicitudes
+  // que los endpoints de folio (429 con el mensaje del DAD).
+  const contentRateLimit = createClientRateLimit();
 
   router.post("/request", (request, response, next) => {
     reservationRequestController.create(request, response).catch(next);
   });
 
-  router.get("/services", (request, response, next) => {
-    serviceController.list(request, response).catch(next);
+  // Contrato 12 (edición): catálogo vigente con nombre, descripción y precio.
+  router.get("/services", contentRateLimit, (request, response, next) => {
+    clientContentController.services(request, response).catch(next);
+  });
+
+  // Contrato 11: promociones vigentes (expira antes de listar).
+  router.get("/promotions", contentRateLimit, (request, response, next) => {
+    clientContentController.promotions(request, response).catch(next);
+  });
+
+  // Diagrama Función 3.4: galería y redes sociales.
+  router.get("/gallery", contentRateLimit, (request, response, next) => {
+    clientContentController.gallery(request, response).catch(next);
+  });
+
+  router.get("/social-links", contentRateLimit, (request, response, next) => {
+    clientContentController.socialLinks(request, response).catch(next);
   });
 
   if (clientProposalController) {

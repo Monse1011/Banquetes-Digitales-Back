@@ -40,27 +40,21 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("PostgreSQL resource-assignment re
       database: process.env.TEST_PGDATABASE,
       options: `-c search_path=${schema} -c statement_timeout=5000`,
     });
+    // Esquema real (database/schema.sql) instalado en el esquema aislado de esta prueba.
+    await pool.query(
+      await fs.readFile(path.join(__dirname, "../../../database/schema.sql"), "utf8")
+    );
     await pool.query(`
-      CREATE TABLE users (id_user BIGINT PRIMARY KEY);
-      CREATE TABLE resources (id BIGINT PRIMARY KEY);
-      CREATE TABLE reservations_request (
-        id_reservation_request BIGINT PRIMARY KEY,
-        event_date_time TIMESTAMP NOT NULL,
-        event_end_time TIMESTAMP NOT NULL
-      );
-      INSERT INTO users VALUES (7);
-      INSERT INTO resources VALUES (10), (11);
-      INSERT INTO reservations_request VALUES (1, '2035-06-01 20:00:00', '2035-06-01 23:00:00');
+      INSERT INTO users (id_user, id_employee, full_name, email, password_hash, role)
+        OVERRIDING SYSTEM VALUE VALUES (7, 'T7', 'Logistica', 'l7@example.invalid', 'x', 'LOGISTICS');
+      INSERT INTO clients (full_name, email, phone) VALUES ('Cliente', 'c@example.invalid', '9991234567');
+      INSERT INTO resources (id, name, type, total_quantity, unit_cost) OVERRIDING SYSTEM VALUE
+        VALUES (10, 'Sillas', 'MATERIAL', 10, 1), (11, 'Mesas', 'MATERIAL', 10, 1);
+      INSERT INTO reservations_request
+        (id, folio, client_id, event_date, event_time, event_end_time, guest_count, event_address)
+        OVERRIDING SYSTEM VALUE
+        VALUES (1, 'BD-2035-00001', 1, '2035-06-01', '14:00', '2035-06-01T23:00:00Z', 10, 'Lugar');
     `);
-    // Esquema heredado de increment-2 y luego la alineación al DAD v3.0, que renombra sus columnas.
-    for (const migration of [
-      "increment-2/assigned-resources.sql",
-      "increment-3/00-align-schema-dad-v3.sql",
-    ]) {
-      await pool.query(
-        await fs.readFile(path.join(__dirname, "../../../database", migration), "utf8")
-      );
-    }
     assignments = new PostgresResourceAssignmentRepository(pool);
     confirmations = new PostgresResourceConfirmationRepository(pool);
     transactions = new PostgresTransactionManager(pool);

@@ -14,6 +14,17 @@ const {
   PostgresAdminRequestQueryRepository,
 } = require("../reservation-request/postgres-admin-request-query-repository");
 const EventClosureConflictException = require("../../../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../../../domain/exceptions/event-closure/event-closure-state-exception");
+const {
+  PostgresReservationRequestRepository,
+} = require("../reservation-request/postgres-reservation-request-repository");
+const {
+  PostgresCalendarEventRepository,
+} = require("../calendar/postgres-calendar-event-repository");
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+const { finalizeElapsedEvents } = require("../reservation-request/finalize-elapsed-events");
 
 const NOW = parseMeridaDateTime("2035-06-01T23:45:00-06:00");
 
@@ -27,8 +38,7 @@ function body(overrides = {}) {
   });
 }
 
-// Opt-in: TEST_PGDATABASE debe nombrar una base con estructura.sql y las migraciones de
-// database/increment-3 (request-status-history.sql y event-closure.sql). Todo se revierte.
+// Opt-in: TEST_PGDATABASE debe nombrar una base creada con database/schema.sql. Todo se revierte.
 // Las fronteras de transacción se suprimen solo en este adaptador para que los repositorios
 // compartan la transacción externa de la prueba.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", () => {
@@ -161,6 +171,133 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", 
     );
   });
 
+  // Defecto 5: una sola regla (finalize-elapsed-events.js) aplicada antes de cada lectura.
+  describe("finalización automática al pasar end_at (defecto 5)", () => {
+    async function addCalendarEvent(requestId, startAt, endAt) {
+      await connection.query(
+        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location)
+         VALUES ($1, 'Evento T', $2, $3, 'Salón T')`,
+        [requestId, startAt, endAt]
+      );
+    }
+
+    async function addConfirmedRequest(folio) {
+      const row = (
+        await connection.query(
+          `INSERT INTO reservations_request
+             (folio, client_id, logistic_user_id, event_date, event_time, event_end_time,
+              guest_count, event_address, status)
+           SELECT $2, client_id, logistic_user_id, event_date, event_time, event_end_time,
+              guest_count, event_address, 'CONFIRMED'
+           FROM reservations_request WHERE id = $1 RETURNING id`,
+          [ids.request, folio]
+        )
+      ).rows[0];
+
+      return Number(row.id);
+    }
+
+    function useCaseAt(now) {
+      const adapter = {
+        query: (sql, values) =>
+          ["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)
+            ? Promise.resolve({ rows: [] })
+            : connection.query(sql, values),
+        release() {},
+      };
+      adapter.connect = async () => adapter;
+
+      return new FinalizeEventUseCase(
+        new PostgresEventClosureRepository(),
+        new PostgresTransactionManager(adapter),
+        () => now
+      );
+    }
+
+    const statusOf = async (id) =>
+      (await connection.query("SELECT status FROM reservations_request WHERE id=$1", [id])).rows[0]
+        .status;
+
+    it("terminó a las 23:00: el cierre manual a las 23:45 del mismo día funciona", async () => {
+      await addCalendarEvent(ids.request, "2035-06-01T18:00:00-06:00", "2035-06-01T23:00:00-06:00");
+
+      await expect(useCase.execute(ids.request, ids.logistic, body())).resolves.toBeDefined();
+    });
+
+    it("a las 00:01 del día siguiente ya es Finalizado y el cierre manual responde 422", async () => {
+      await addCalendarEvent(ids.request, "2035-06-01T18:00:00-06:00", "2035-06-01T23:00:00-06:00");
+      const nextDay = useCaseAt(parseMeridaDateTime("2035-06-02T00:01:00-06:00"));
+
+      await expect(nextDay.execute(ids.request, ids.logistic, body())).rejects.toBeInstanceOf(
+        EventClosureStateException
+      );
+      expect(await statusOf(ids.request)).toBe("FINALIZED");
+    });
+
+    it("cruza medianoche (18:00 a 01:00): sigue Confirmado hasta que termina el día de end_at", async () => {
+      await addCalendarEvent(ids.request, "2035-06-01T18:00:00-06:00", "2035-06-02T01:00:00-06:00");
+
+      await finalizeElapsedEvents(connection, parseMeridaDateTime("2035-06-02T23:59:59-06:00"));
+      expect(await statusOf(ids.request)).toBe("CONFIRMED");
+
+      await finalizeElapsedEvents(connection, parseMeridaDateTime("2035-06-03T00:00:00-06:00"));
+      expect(await statusOf(ids.request)).toBe("FINALIZED");
+    });
+
+    it("la lectura de la solicitud y el historial reflejan la finalización automática", async () => {
+      // end_at en el pasado real: la lectura sin reloj inyectado aplica la regla.
+      await addCalendarEvent(ids.request, "2020-01-01T18:00:00-06:00", "2020-01-01T23:00:00-06:00");
+      const requests = new PostgresReservationRequestRepository(connection);
+
+      expect((await requests.findById(ids.request)).status).toBe(
+        ReservationRequestStatus.FINALIZED
+      );
+      const history = (
+        await connection.query(
+          "SELECT previous_status, changed_by_user_id FROM request_status_history WHERE request_id=$1 AND new_status='FINALIZED'",
+          [ids.request]
+        )
+      ).rows;
+      expect(history).toEqual([{ previous_status: "CONFIRMED", changed_by_user_id: null }]);
+    });
+
+    it("upcoming excluye desde end_at aunque el evento siga Confirmado ese día", async () => {
+      const crossingId = await addConfirmedRequest("BD-2035-99997");
+      await addCalendarEvent(ids.request, "2035-06-01T18:00:00-06:00", "2035-06-01T23:00:00-06:00");
+      await addCalendarEvent(crossingId, "2035-06-01T18:00:00-06:00", "2035-06-02T01:00:00-06:00");
+      const calendar = new PostgresCalendarEventRepository(connection);
+      const filters = { includeCancelled: false, logisticUserId: ids.logistic };
+      const upcomingAt = async (text) =>
+        (
+          await calendar.findAll({ ...filters, upcomingFrom: parseMeridaDateTime(text) }, 1, 50)
+        ).events.map((event) => event.requestId);
+
+      expect(await upcomingAt("2035-06-01T22:59:59-06:00")).toEqual([ids.request, crossingId]);
+      expect(await upcomingAt("2035-06-01T23:00:01-06:00")).toEqual([crossingId]);
+      expect(await upcomingAt("2035-06-02T01:00:01-06:00")).toEqual([]);
+      // Fuera de upcoming siguen visibles y Confirmados (aún es su día).
+      expect(await statusOf(ids.request)).toBe("CONFIRMED");
+    });
+
+    it("upcoming=true excluye Finalizados y eventos ya terminados; sin él no cambia", async () => {
+      const futureId = await addConfirmedRequest("BD-2035-99998");
+      await addCalendarEvent(ids.request, "2020-01-01T18:00:00-06:00", "2020-01-01T23:00:00-06:00");
+      await addCalendarEvent(futureId, "2035-06-01T18:00:00-06:00", "2035-06-01T23:00:00-06:00");
+      const calendar = new PostgresCalendarEventRepository(connection);
+      const filters = { includeCancelled: false, logisticUserId: ids.logistic };
+
+      const all = await calendar.findAll(filters, 1, 50);
+      const upcoming = await calendar.findAll({ ...filters, upcomingFrom: new Date() }, 1, 50);
+
+      expect(all.events.map((event) => [event.requestId, event.status])).toEqual([
+        [ids.request, ReservationRequestStatus.FINALIZED],
+        [futureId, ReservationRequestStatus.CONFIRMED],
+      ]);
+      expect(upcoming.events.map((event) => event.requestId)).toEqual([futureId]);
+      expect(upcoming.totalRecords).toBe(1);
+    });
+  });
+
   // NC-01 (RTF): al reprogramar desde el calendario (Función 3.3) solo se actualizan
   // calendar_events y la solicitud; derived_information conserva el horario original.
   describe("evento reprogramado desde el calendario (NC-01)", () => {
@@ -171,8 +308,8 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Función 3.6 contra PostgreSQL", 
         [ids.request, `${oldDay}T18:00:00-06:00`, `${oldDay}T23:00:00-06:00`, ids.logistic]
       );
       await connection.query(
-        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location, sync_status)
-         VALUES ($1, 'Evento T', $2, $3, 'Salón T', 'SYNCED')`,
+        `INSERT INTO calendar_events (id_request, title, start_at, end_at, location)
+         VALUES ($1, 'Evento T', $2, $3, 'Salón T')`,
         [ids.request, `${newDay}T18:00:00-06:00`, `${newDay}T23:00:00-06:00`]
       );
       // Lo mismo que hace reschedule() de la Función 3.3 sobre la solicitud.

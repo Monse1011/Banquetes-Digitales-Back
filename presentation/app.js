@@ -4,6 +4,7 @@ const createAuthMiddleware = require("./middleware/auth/auth-middleware");
 const createAuthRoutes = require("./routes/auth-routes");
 const createClientRoutes = require("./routes/client-routes");
 const createAdminRoutes = require("./routes/admin-routes");
+const createAdminReportRoutes = require("./routes/admin-report-routes");
 const createAdminResourceRoutes = require("./routes/admin-resource-routes");
 const createLogisticsRoutes = require("./routes/logistics-routes");
 const createEventClosureRoutes = require("./routes/event-closure-routes");
@@ -12,7 +13,10 @@ const {
   ReservationRequestController,
 } = require("./controller/reservation-request/reservation-request-controller");
 const { UserController } = require("./controller/user/user-controller");
-const { ServiceController } = require("./controller/service/service-controller");
+const { ReportController } = require("./controller/report/report-controller");
+const {
+  ClientContentController,
+} = require("./controller/client-content/client-content-controller");
 const CalendarController = require("./controller/calendar/calendar-controller");
 const {
   createLogisticsCalendarRoutes,
@@ -56,6 +60,7 @@ const EventAvailabilityConflictException = require("../domain/exceptions/calenda
 const EventNotModifiableException = require("../domain/exceptions/calendar/event-not-modifiable-exception");
 const RequestNotSchedulableException = require("../domain/exceptions/calendar/request-not-schedulable-exception");
 const AgreementsValidationException = require("../domain/exceptions/proposal/agreements-validation-exception");
+const HumanResourcePriceMissingException = require("../domain/exceptions/proposal/human-resource-price-missing-exception");
 const RequestNotInAgreementsStateException = require("../domain/exceptions/proposal/request-not-in-agreements-state-exception");
 const AgreementsRevisionChangedException = require("../domain/exceptions/proposal/agreements-revision-changed-exception");
 const ProposalGenerationNotAllowedException = require("../domain/exceptions/proposal/proposal-generation-not-allowed-exception");
@@ -67,8 +72,11 @@ const ScheduleConflictException = require("../domain/exceptions/proposal/schedul
 const ProposalGenerationFailedException = require("../domain/exceptions/proposal/proposal-generation-failed-exception");
 const ProposalSendFailedException = require("../domain/exceptions/proposal/proposal-send-failed-exception");
 const InvalidIdException = require("../domain/exceptions/common/invalid-id-exception");
+const ValidationException = require("../domain/exceptions/validation-exception");
+const NotFoundException = require("../domain/exceptions/not-found-exception");
 const EventClosureValidationException = require("../domain/exceptions/event-closure/event-closure-validation-exception");
 const EventClosureConflictException = require("../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../domain/exceptions/event-closure/event-closure-state-exception");
 const EventClosureNotFoundException = require("../domain/exceptions/event-closure/event-closure-not-found-exception");
 const EventClosureAccessDeniedException = require("../domain/exceptions/event-closure/event-closure-access-denied-exception");
 const { AgreementsController } = require("./controller/proposal/agreements-controller");
@@ -78,11 +86,19 @@ const {
   ClientProposalController,
 } = require("./controller/client-proposal/client-proposal-controller");
 const { ServicesService } = require("../application/services/service/services-service");
+const { ServiceController } = require("./controller/service/service-controller");
 const ServiceNotFoundException = require("../domain/exceptions/service/service-not-found-exception");
 const DuplicateServiceNameException = require("../domain/exceptions/service/duplicate-service-name-exception");
 const ServiceValidationException = require("../domain/exceptions/service/service-validation-exception");
 const ServiceConflictException = require("../domain/exceptions/service/service-conflict-exception");
 const InvalidServiceStatusException = require("../domain/exceptions/service/invalid-service-status-exception");
+const { PromotionController } = require("./controller/promotion/promotion-controller");
+const { PromotionsService } = require("../application/services/promotion/promotions-service");
+const PromotionNotFoundException = require("../domain/exceptions/promotion/promotion-not-found-exception");
+const DuplicatePromotionNameException = require("../domain/exceptions/promotion/duplicate-promotion-name-exception");
+const PromotionValidationException = require("../domain/exceptions/promotion/promotion-validation-exception");
+const PromotionConflictException = require("../domain/exceptions/promotion/promotion-conflict-exception");
+const InvalidPromotionStatusException = require("../domain/exceptions/promotion/invalid-promotion-status-exception");
 const InvalidFolioFormatException = require("../domain/exceptions/client-proposal/invalid-folio-format-exception");
 const ClientRequestNotFoundException = require("../domain/exceptions/client-proposal/client-request-not-found-exception");
 const AcceptedTermsRequiredException = require("../domain/exceptions/client-proposal/accepted-terms-required-exception");
@@ -98,16 +114,14 @@ const ErrorMessages = require("./constants/error-messages");
 // comparten el mensaje del contrato (RF-3.4.5.1.2).
 const TRACKING_ENDPOINT_PATH = /^\/api\/client\/requests\/[^/]+\/?$/;
 
+// Función 2.6: errores de la gestión de servicios (contratos 1 a 5).
 function handleServiceError(error, response) {
   if (error instanceof ServiceNotFoundException) {
     response.status(404).json({ message: error.message });
     return true;
   }
 
-  if (
-    error instanceof DuplicateServiceNameException ||
-    error instanceof ServiceConflictException
-  ) {
+  if (error instanceof DuplicateServiceNameException || error instanceof ServiceConflictException) {
     response.status(409).json({ message: error.message });
     return true;
   }
@@ -118,6 +132,34 @@ function handleServiceError(error, response) {
   }
 
   if (error instanceof ServiceValidationException) {
+    response.status(400).json({ message: error.message, errors: error.errors });
+    return true;
+  }
+
+  return false;
+}
+
+// Función 2.7: errores de la gestión de promociones (contratos 6 a 10).
+function handlePromotionError(error, response) {
+  if (error instanceof PromotionNotFoundException) {
+    response.status(404).json({ message: error.message });
+    return true;
+  }
+
+  if (
+    error instanceof DuplicatePromotionNameException ||
+    error instanceof PromotionConflictException
+  ) {
+    response.status(409).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof InvalidPromotionStatusException) {
+    response.status(422).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof PromotionValidationException) {
     response.status(400).json({ message: error.message, errors: error.errors });
     return true;
   }
@@ -334,6 +376,14 @@ function handleProposalConflictError(error, response) {
     response.status(409).json({ message: error.message, code: error.code });
     return true;
   }
+  if (error instanceof HumanResourcePriceMissingException) {
+    response.status(422).json({
+      message: error.message,
+      errors: error.errors,
+      resources: error.resources,
+    });
+    return true;
+  }
   if (error instanceof AgreementsValidationException) {
     response.status(400).json({ message: error.message, errors: error.errors });
     return true;
@@ -393,6 +443,7 @@ function handleEventClosureError(error, response) {
     [EventClosureAccessDeniedException, 403],
     [EventClosureNotFoundException, 404],
     [EventClosureConflictException, 409],
+    [EventClosureStateException, 422],
   ];
   const match = statusByException.find(([exception]) => error instanceof exception);
 
@@ -402,11 +453,18 @@ function handleEventClosureError(error, response) {
   return true;
 }
 
-// Estándares de Código 2.4: los ids inválidos de la URL responden 400. Después, los errores
+// Estándares de Código 2.4: los ids inválidos de la URL responden 400. Funciones 2.15 y 4.1
+// (AD-09): los 400 con mensaje específico del DTO de reportes y el 404 de exportación sin
+// resultados se responden antes del resto de los manejadores. Después, los errores
 // de la Función 3.6.
 function handleCommonError(error, response) {
   if (error instanceof InvalidIdException) {
     response.status(400).json({ message: error.message });
+    return true;
+  }
+
+  if (error instanceof ValidationException || error instanceof NotFoundException) {
+    response.status(error.status).json({ message: error.message });
     return true;
   }
 
@@ -456,6 +514,17 @@ function createResourceControllers(dependencies) {
   };
 }
 
+function resolvePromotionController(dependencies) {
+  if (dependencies.promotionController) return dependencies.promotionController;
+  if (dependencies.promotionsService) {
+    return new PromotionController(dependencies.promotionsService);
+  }
+  if (dependencies.promotionRepository) {
+    return new PromotionController(new PromotionsService(dependencies.promotionRepository));
+  }
+  return null;
+}
+
 function createApp(dependencies) {
   const app = express();
 
@@ -463,10 +532,18 @@ function createApp(dependencies) {
   const authMiddleware = createAuthMiddleware(dependencies.tokenService);
   const reservationRequestController = new ReservationRequestController(dependencies);
   const userController = new UserController(dependencies);
+  // Función 2.6: gestión de servicios (contratos 1 a 5).
   const servicesService =
     dependencies.servicesService ||
     (dependencies.serviceRepository ? new ServicesService(dependencies.serviceRepository) : null);
   const serviceController = new ServiceController(dependencies.serviceRepository, servicesService);
+  const reportController = new ReportController(
+    dependencies.generateReportUseCase,
+    dependencies.exportReportUseCase,
+    dependencies.listReportClientsUseCase
+  );
+  // Función 4.1: catálogos públicos (contratos 11 y 12), galería y redes.
+  const clientContentController = new ClientContentController(dependencies);
   const calendarController = new CalendarController(dependencies);
   const resourceControllers = createResourceControllers(dependencies);
   const proposalControllers = {
@@ -475,6 +552,8 @@ function createApp(dependencies) {
   };
   const clientProposalController = new ClientProposalController(dependencies);
   const eventClosureController = new EventClosureController(dependencies);
+
+  const promotionController = resolvePromotionController(dependencies);
 
   app.use(express.json());
 
@@ -504,7 +583,7 @@ function createApp(dependencies) {
     "/api/client",
     createClientRoutes(
       reservationRequestController,
-      serviceController,
+      clientContentController,
       clientProposalController
     )
   );
@@ -517,9 +596,12 @@ function createApp(dependencies) {
       reservationRequestController,
       userController,
       authMiddleware,
-      serviceController
+      serviceController,
+      promotionController
     )
   );
+  // Función 2.15: /reports, /reports/export y /clients (contratos 13 a 15).
+  app.use("/api/admin", createAdminReportRoutes(reportController, authMiddleware));
   app.use("/api/logistics", createEventClosureRoutes(eventClosureController, authMiddleware));
   app.use(
     "/api/logistics",
@@ -535,6 +617,7 @@ function createApp(dependencies) {
   app.use((error, request, response, _next) => {
     if (handleCommonError(error, response)) return;
     if (handleServiceError(error, response)) return;
+    if (handlePromotionError(error, response)) return;
     if (handleCalendarError(error, response)) return;
     if (handleResourceError(error, response)) return;
     if (handleResourceAssignmentError(error, response)) return;

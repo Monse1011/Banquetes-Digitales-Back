@@ -33,6 +33,15 @@ class PostgresResourceAssignmentRepository {
     return result.rows.map((row) => this.toEntity(row));
   }
 
+  // Defecto 8: recursos que estuvieron asignados a la solicitud y se liberaron.
+  async findReleasedResourceIds(requestId, transaction = null) {
+    const result = await this.executor(transaction).query(
+      "SELECT DISTINCT resource_id FROM assigned_resources WHERE request_id = $1 AND status = $2",
+      [requestId, AssignmentStatus.RELEASED]
+    );
+    return result.rows.map((row) => Number(row.resource_id));
+  }
+
   async findBlocking(resourceIds, period, excludeRequestId, transaction = null) {
     if (resourceIds.length === 0) return [];
 

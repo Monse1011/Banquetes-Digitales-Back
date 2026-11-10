@@ -13,7 +13,8 @@ function toSummaryDto(resource) {
       resource.name,
       resource.type,
       resource.operativeRoleId,
-      resource.isActive
+      resource.isActive,
+      resource.precio
     );
   }
 

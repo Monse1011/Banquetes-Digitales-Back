@@ -6,7 +6,6 @@ const CalendarEventNotFoundException = require("../../../domain/exceptions/calen
 const RequestNotSchedulableException = require("../../../domain/exceptions/calendar/request-not-schedulable-exception");
 const EventAvailabilityConflictException = require("../../../domain/exceptions/calendar/event-availability-conflict-exception");
 const { assertCanViewEvent } = require("../../services/calendar/calendar-access-policy");
-const { syncEventNow } = require("../../services/calendar/sync-event-now");
 const { toConflictDto } = require("../../dto/calendar/calendar-event-dto");
 
 // Función 3.3, bloque A - Agendar un evento.
@@ -15,13 +14,11 @@ class ScheduleEventUseCase {
     reservationRequestRepository,
     clientRepository,
     calendarEventRepository,
-    syncProcessor,
     clock = () => new Date()
   ) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.clientRepository = clientRepository;
     this.calendarEventRepository = calendarEventRepository;
-    this.syncProcessor = syncProcessor;
     this.clock = clock;
   }
 
@@ -49,13 +46,7 @@ class ScheduleEventUseCase {
       now: this.clock(),
     });
 
-    const event = this.registerResult(result);
-
-    return syncEventNow({
-      syncProcessor: this.syncProcessor,
-      calendarEventRepository: this.calendarEventRepository,
-      eventId: event.id,
-    });
+    return { event: this.registerResult(result) };
   }
 
   registerResult(result) {

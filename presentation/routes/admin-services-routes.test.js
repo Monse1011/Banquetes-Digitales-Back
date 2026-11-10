@@ -1,6 +1,8 @@
 const request = require("supertest");
 const { createApp } = require("../app");
-const { InMemoryServiceRepository } = require("../../infrastructure/repositories/service/in-memory-service-repository");
+const {
+  InMemoryServiceRepository,
+} = require("../../infrastructure/repositories/service/in-memory-service-repository");
 const { Service } = require("../../domain/entities/service/service");
 const ServiceStatus = require("../../domain/enums/service/service-status");
 const UserRole = require("../../domain/enums/auth/user-role");
@@ -36,9 +38,21 @@ describe("Admin Service Routes (Función 2.6 - Contrato API)", () => {
     currentUserRole = UserRole.ADMIN;
 
     serviceRepository = new InMemoryServiceRepository([
-      new Service(1, "Banquetes y bebidas", "Texto breve del servicio.", 1500.0, ServiceStatus.ACTIVE),
+      new Service(
+        1,
+        "Banquetes y bebidas",
+        "Texto breve del servicio.",
+        1500.0,
+        ServiceStatus.ACTIVE
+      ),
       new Service(2, "Música", "Sonido profesional.", 800.0, ServiceStatus.ACTIVE),
-      new Service(7, "Servicio de personal", "Texto breve del servicio.", 800.0, ServiceStatus.INACTIVE),
+      new Service(
+        7,
+        "Servicio de personal",
+        "Texto breve del servicio.",
+        800.0,
+        ServiceStatus.INACTIVE
+      ),
       new Service(9, "Servicio eliminado", "No debe mostrarse.", 500.0, ServiceStatus.DELETED),
     ]);
 
@@ -419,7 +433,7 @@ describe("Admin Service Routes (Función 2.6 - Contrato API)", () => {
       // Initial client list: service 1 and 2 are active
       const initialResponse = await request(app).get("/api/client/services");
       expect(initialResponse.status).toBe(200);
-      expect(initialResponse.body.data.map((s) => s.id)).toEqual([1, 2]);
+      expect(initialResponse.body.data.services.map((s) => s.id)).toEqual([1, 2]);
 
       // Deactivate service 1
       await request(app)
@@ -429,7 +443,7 @@ describe("Admin Service Routes (Función 2.6 - Contrato API)", () => {
 
       // Client list should now only contain service 2
       const afterDeactivation = await request(app).get("/api/client/services");
-      expect(afterDeactivation.body.data.map((s) => s.id)).toEqual([2]);
+      expect(afterDeactivation.body.data.services.map((s) => s.id)).toEqual([2]);
 
       // Reactivate service 7
       await request(app)
@@ -439,7 +453,7 @@ describe("Admin Service Routes (Función 2.6 - Contrato API)", () => {
 
       // Client list should now contain service 2 and 7
       const afterReactivation = await request(app).get("/api/client/services");
-      expect(afterReactivation.body.data.map((s) => s.id)).toEqual([2, 7]);
+      expect(afterReactivation.body.data.services.map((s) => s.id)).toEqual([2, 7]);
     });
   });
 });

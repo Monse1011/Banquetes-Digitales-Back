@@ -90,7 +90,7 @@ const {
   ListCalendarEventsUseCase,
 } = require("../../../application/use-cases/calendar/list-calendar-events-use-case");
 
-// Opt-in: TEST_PGDATABASE must name a database with the versioned migrations installed.
+// Opt-in: TEST_PGDATABASE must name a database created with database/schema.sql.
 // All fixtures roll back. Repository transactions become savepoints inside the outer test
 // transaction, so their rollbacks still apply; commit semantics are not tested here.
 describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against PostgreSQL", () => {
@@ -223,9 +223,17 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
       expect(roles.length).toBeGreaterThan(0);
       const catalogCases = createResourceUseCases(resourceRepo, roleRepo);
       const human = await catalogCases.humanResourceUseCases.create.execute({
-        name: `Persona prueba ${Date.now()}`,
+        name: "Persona de integración",
         operativeRoleId: roles[0].id,
+        precio: 25.5,
       });
+      expect((await resourceRepo.findById(human.id)).precio).toBe(25.5);
+      // La BD también protege la tarifa: 0 o negativa viola chk_resources_precio.
+      await connection.query("SAVEPOINT precio_check");
+      await expect(
+        connection.query("UPDATE resources SET precio = 0 WHERE id = $1", [human.id])
+      ).rejects.toMatchObject({ constraint: "chk_resources_precio" });
+      await connection.query("ROLLBACK TO SAVEPOINT precio_check");
       const material = await catalogCases.materialResourceUseCases.create.execute({
         name: `Material prueba ${Date.now()}`,
         quantity: 10,
@@ -354,6 +362,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         agreementResources,
         {
           lockRequest: (...args) => derived.lockRequest(...args),
+          findLatestByRequestId: (...args) => derived.findLatestByRequestId(...args),
           create: async () => {
             throw new Error("Simulated save failure");
           },
@@ -430,8 +439,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             generated.data.proposal_id,
           ])
         ).rows[0];
-        expect(Number(amounts.subtotal)).toBe(24);
-        expect(Number(amounts.total_amount)).toBe(24);
+        // $24 de recursos + persona a $25.50/h × 7 h (18:00 a 01:00, cruza medianoche).
+        expect(Number(amounts.subtotal)).toBe(202.5);
+        expect(Number(amounts.total_amount)).toBe(202.5);
         expect(
           (
             await connection.query(
@@ -442,7 +452,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
         ).toHaveLength(2);
         await expect(generation.execute(created.requestId, actor.id, input)).rejects.toThrow();
         const calendar = new PostgresCalendarEventRepository(adapter);
-        const schedule = new ScheduleEventUseCase(requests, clients, calendar, null);
+        const schedule = new ScheduleEventUseCase(requests, clients, calendar);
         // Calendar must consume the proposal's persisted resources, even after memory is lost.
         const resourceIds = (
           await connection.query(
@@ -488,23 +498,17 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
             await listCalendar.execute({ actor: { id: Number(admin.id_user), role: "ADMIN" } })
           ).events.some((event) => event.request_id === created.requestId)
         ).toBe(true);
-        expect(
-          (
-            await connection.query(
-              "SELECT COUNT(*)::int AS count FROM calendar_sync_outbox WHERE calendar_event_id=$1",
-              [scheduled.event.id]
-            )
-          ).rows[0].count
-        ).toBe(1);
-        const edit = new EditEventUseCase(calendar, null);
-        const cancel = new CancelEventUseCase(calendar, null);
-        const editedStart = new Date(start.getTime() + 86400000);
-        const editedEnd = new Date(end.getTime() + 86400000);
-        await edit.execute(scheduled.event.id, actor, {
-          location: "Lugar editado",
-          start_datetime: editedStart.toISOString(),
-          end_datetime: editedEnd.toISOString(),
-        });
+        const edit = new EditEventUseCase(calendar);
+        const cancel = new CancelEventUseCase(calendar);
+        // Defecto 6: un evento Confirmado solo admite cambiar la ubicación.
+        const editedStart = start;
+        const editedEnd = end;
+        await expect(
+          edit.execute(scheduled.event.id, actor, {
+            start_datetime: new Date(start.getTime() + 86400000).toISOString(),
+          })
+        ).rejects.toMatchObject({ name: "CalendarValidationException" });
+        await edit.execute(scheduled.event.id, actor, { location: "Lugar editado" });
         const edited = await calendar.findById(scheduled.event.id);
         expect(edited.location).toBe("Lugar editado");
         expect(edited.startAt.toISOString()).toBe(editedStart.toISOString());
@@ -541,13 +545,6 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Request repositories against Post
           edit.execute(scheduled.event.id, actor, { location: "No permitido" })
         ).rejects.toThrow();
         await expect(cancel.execute(scheduled.event.id, actor)).rejects.toThrow();
-        const queuedOperations = (
-          await connection.query(
-            "SELECT operation FROM calendar_sync_outbox WHERE calendar_event_id=$1 ORDER BY id_outbox",
-            [scheduled.event.id]
-          )
-        ).rows.map((r) => r.operation);
-        expect(queuedOperations).toEqual(["CREATE", "UPDATE", "DELETE"]);
       } finally {
         await fs.rm(pdfDirectory, { recursive: true, force: true });
       }

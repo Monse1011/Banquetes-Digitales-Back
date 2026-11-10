@@ -1,26 +1,15 @@
 const { parseId } = require("../../utils/parse-id");
 
+// Función 2.6: gestión de servicios (contratos 1 a 5). El catálogo público
+// GET /api/client/services (contrato 12) lo sirve ClientContentController (Función 4.1),
+// por eso este controlador ya no expone el antiguo list con {id, nombre}.
 class ServiceController {
   constructor(serviceRepositoryOrDependencies, servicesService = null) {
     if (serviceRepositoryOrDependencies && serviceRepositoryOrDependencies.servicesService) {
       this.servicesService = serviceRepositoryOrDependencies.servicesService;
-      this.serviceRepository = serviceRepositoryOrDependencies.serviceRepository;
     } else {
-      this.serviceRepository = serviceRepositoryOrDependencies;
       this.servicesService = servicesService;
     }
-  }
-
-  // GET /api/client/services (Client Catalog)
-  async list(_request, response) {
-    const services = await this.serviceRepository.findAll();
-
-    response.json({
-      data: services.map((service) => ({
-        id: service.id,
-        nombre: service.name,
-      })),
-    });
   }
 
   // GET /api/admin/services (Management Catalog)
