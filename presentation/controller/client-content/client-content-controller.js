@@ -1,6 +1,5 @@
 // Función 4.1: listados públicos (contratos 11 y 12 + galería y redes del diagrama
-// Función 3.4). AD-11: la lista llega completa y metadata.pagination es informativo;
-// page/per_page solo se honran si el cliente los envía explícitamente (contratos 11/12).
+// Función 3.4). Contratos 11/12: page = 1 y per_page = 10 por defecto.
 const { AdminRequestMessages } = require("../../../domain/constants/admin-request-messages");
 const ValidationException = require("../../../domain/exceptions/validation-exception");
 
@@ -9,15 +8,15 @@ function parsePagination(query) {
   const rawPerPage =
     query.per_page === undefined || query.per_page === "" ? null : String(query.per_page);
 
-  if (rawPage === null && rawPerPage === null) return null;
-
   const page = rawPage === null ? 1 : Number(rawPage);
-  const perPage = rawPerPage === null ? null : Number(rawPerPage);
+  const perPage = rawPerPage === null ? 10 : Number(rawPerPage);
 
   if (
     !Number.isInteger(page) ||
     page < 1 ||
-    (perPage !== null && (!Number.isInteger(perPage) || perPage < 1 || perPage > 100))
+    !Number.isInteger(perPage) ||
+    perPage < 1 ||
+    perPage > 100
   ) {
     throw new ValidationException(AdminRequestMessages.PAGINATION_INVALID);
   }
@@ -27,13 +26,6 @@ function parsePagination(query) {
 
 function paginate(items, query) {
   const requested = parsePagination(query);
-
-  if (!requested || requested.perPage === null) {
-    return {
-      items,
-      pagination: { total_records: items.length, page: 1, per_page: items.length || 10 },
-    };
-  }
 
   const start = (requested.page - 1) * requested.perPage;
 

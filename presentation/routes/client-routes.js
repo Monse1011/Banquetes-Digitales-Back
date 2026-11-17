@@ -26,7 +26,8 @@ function createClientRoutes(
   // que los endpoints de folio (429 con el mensaje del DAD).
   const contentRateLimit = createClientRateLimit();
 
-  router.post("/request", (request, response, next) => {
+  // Contrato 16: limita por IP antes de validar o crear la solicitud pública.
+  router.post("/request", createClientRateLimit(), (request, response, next) => {
     reservationRequestController.create(request, response).catch(next);
   });
 

@@ -710,6 +710,7 @@ const openApiDocument = {
         responses: {
           201: { description: "Reservation request created" },
           422: { description: "Validation error" },
+          429: { description: "Demasiadas solicitudes. Intente nuevamente en unos minutos." },
         },
       },
     },
@@ -723,8 +724,8 @@ const openApiDocument = {
           {
             name: "per_page",
             in: "query",
-            description: "1 a 100; sin enviarlo llega la lista completa vigente",
-            schema: { type: "integer", minimum: 1, maximum: 100 },
+            description: "1 a 100; por defecto 10 elementos por página",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
           },
         ],
         responses: {
@@ -743,7 +744,11 @@ const openApiDocument = {
           "Contrato 11: promociones vigentes (expira antes de listar; solo ACTIVE con valid_until >= fecha de Mérida)",
         parameters: [
           { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
-          { name: "per_page", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          {
+            name: "per_page",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+          },
         ],
         responses: {
           200: {
@@ -1211,7 +1216,7 @@ const openApiDocument = {
           },
           400: {
             description:
-              "Invalid report type. / Missing required date. / Missing required month. / Missing required range. / El rango seleccionado es inválido. / Campos no validos",
+              "El tipo de reporte es inválido. / La fecha es obligatoria. / El mes es obligatorio. / El rango de fechas es obligatorio. / El rango seleccionado es inválido. / Campos no validos",
           },
           401: { description: "Su sesión no es válida o ha expirado." },
           403: { description: "No tiene permisos para realizar esta acción." },
