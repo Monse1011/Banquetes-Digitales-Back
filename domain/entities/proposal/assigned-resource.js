@@ -11,7 +11,8 @@ class AssignedResource {
     status,
     name = null,
     type = null,
-    unitCost = null
+    unitCost = null,
+    precio = null
   ) {
     this.id = id;
     this.reservationRequestId = reservationRequestId;
@@ -23,6 +24,8 @@ class AssignedResource {
     this.name = name;
     this.type = type;
     this.unitCost = unitCost;
+    // Tarifa por hora del recurso humano (snapshot); null en el resto.
+    this.precio = precio;
   }
 }
 

@@ -264,7 +264,9 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("GET /api/admin/requests against P
         });
       }
       await connection.query(
-        "INSERT INTO request_services (request_id, service_id) VALUES ($1, $2)",
+        `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+           service_description_snapshot, service_price_snapshot)
+         VALUES ($1, $2, 'x', 'x', 1)`,
         [created.CONFIRMED.id, service.id]
       );
 

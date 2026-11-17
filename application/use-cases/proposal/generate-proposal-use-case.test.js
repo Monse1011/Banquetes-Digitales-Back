@@ -59,7 +59,7 @@ describe("GenerateProposalUseCase", () => {
       derivedInformationRepository
     );
     assignedResourceRepository = new InMemoryAssignedResourceRepository([
-      { id: 1, name: "Mesero", type: "HUMAN", unitCost: 300, totalQuantity: 5 },
+      { id: 1, name: "Mesero", type: "HUMAN", unitCost: null, precio: 60, totalQuantity: 5 },
     ]);
     pdfGenerator = {
       stored: [],
@@ -308,6 +308,7 @@ describe("GenerateProposalUseCase", () => {
     );
 
     const stored = await proposalRepository.findCurrentByRequestId(request.requestId);
+    // Defecto 4: un mesero a $60 por hora en un evento de 18:00 a 23:00 (5 h) cuesta $300.
     expect(stored.subtotal).toBe(300);
     expect(stored.discountAmount).toBe(100);
     expect(stored.totalAmount).toBe(200);
@@ -328,5 +329,40 @@ describe("GenerateProposalUseCase", () => {
         })
       )
     ).rejects.toBeInstanceOf(AgreementsValidationException);
+  });
+
+  it("responde 422 nombrando a las personas sin precio por hora y no genera nada", async () => {
+    assignedResourceRepository = new InMemoryAssignedResourceRepository([
+      { id: 1, name: "Ana López", type: "HUMAN", unitCost: null, precio: null, totalQuantity: 5 },
+    ]);
+    useCase = new GenerateProposalUseCase(
+      reservationRequestRepository,
+      clientRepository,
+      derivedInformationRepository,
+      proposalRepository,
+      assignedResourceRepository,
+      pdfGenerator
+    );
+    const { request, information } = await setup();
+
+    await expect(
+      useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({ derived_information_id: information.id })
+      )
+    ).rejects.toMatchObject({
+      name: "HumanResourcePriceMissingException",
+      message:
+        "No se puede generar la propuesta: Ana López no tiene precio por hora. " +
+        "Asigna un precio por hora antes de continuar.",
+      resources: [{ resource_id: 1, name: "Ana López" }],
+    });
+
+    expect(pdfGenerator.stored).toHaveLength(0);
+    expect(proposalRepository.proposals).toHaveLength(0);
+    expect((await reservationRequestRepository.findById(request.requestId)).status).toBe(
+      ReservationRequestStatus.COORDINATION_READY
+    );
   });
 });

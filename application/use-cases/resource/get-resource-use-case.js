@@ -27,7 +27,8 @@ class GetResourceUseCase {
         resource.isActive,
         createdAt,
         updatedAt,
-        deactivatedAt
+        deactivatedAt,
+        resource.precio
       );
     }
 

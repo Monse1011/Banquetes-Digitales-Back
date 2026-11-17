@@ -13,9 +13,9 @@ class UpdateHumanResourceUseCase {
     this.operativeRoleRepository = operativeRoleRepository;
   }
 
-  // RF-1.2.8.2: se modifican el nombre completo y el rol operativo.
+  // RF-1.2.8.2: se modifican el nombre completo, el rol operativo y el precio por hora.
   async execute(id, input = {}) {
-    const dto = new HumanResourceRequestDto(input.name, input.operativeRoleId);
+    const dto = new HumanResourceRequestDto(input.name, input.operativeRoleId, input.precio);
     const errors = dto.validate();
 
     if (Object.keys(errors).length > 0) {
@@ -30,6 +30,7 @@ class UpdateHumanResourceUseCase {
 
     resource.name = dto.name.trim();
     resource.operativeRoleId = dto.operative_role_id;
+    resource.precio = dto.precio;
     resource.updatedAt = new Date();
 
     ensureSaved(await this.resourceRepository.updateDetails(resource));

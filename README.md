@@ -185,6 +185,14 @@ El Personal de Logística responsable de la solicitud y el Administrador General
 
 Las asignaciones, confirmaciones y observaciones pendientes de recursos (Función 3.2) se guardan en PostgreSQL mediante `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Las tablas (`assigned_resources`, `resource_confirmations` y `resource_confirmation_pending_observations`) están en `database/schema.sql`. La información persiste entre reinicios del servidor. Confirmar recursos guarda las asignaciones, el registro de confirmación, las observaciones pendientes y el estado de la solicitud en una sola transacción.
 
+## Fechas y horas
+
+Las fechas y horas que recibe la API deben llegar **con offset o `Z`** (por ejemplo
+`2030-05-01T18:00:00-06:00`). Si llegan sin zona, el servidor las interpreta con su zona local;
+esa interpretación no se modifica. Las reglas de horario (inicio posterior a "ahora", fin al día
+siguiente solo si `horaFin <= horaInicio`, máximo un día) se evalúan en hora de Mérida
+(`America/Merida`) en `application/services/calendar/event-window.js`.
+
 ## Documentación API
 
 La documentación Swagger está disponible en `http://localhost:3000/api-docs`

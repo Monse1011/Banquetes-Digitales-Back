@@ -197,4 +197,29 @@ describe("GetAssignedRequestDetailUseCase (Función 3.1)", () => {
       message: "Solicitud de reservación no encontrada.",
     });
   });
+
+  describe("can_register_finalization (defecto 5)", () => {
+    // 18:00 a 23:00 en Mérida del 24 de diciembre.
+    const start = new Date("2026-12-24T18:00:00-06:00");
+
+    async function flag(status, now) {
+      const request = makeRequest({ status, eventDateTime: start });
+      const useCase = new GetAssignedRequestDetailUseCase({
+        reservationRequestRepository: { findById: vi.fn().mockResolvedValue(request) },
+        clock: () => now,
+      });
+
+      return (await useCase.execute({ requestId: 1, userId: 10 })).data.can_register_finalization;
+    }
+
+    it("es true para Confirmado el día programado", async () => {
+      expect(await flag("Confirmado", new Date("2026-12-24T20:00:00-06:00"))).toBe(true);
+    });
+
+    it("es false otro día o en cualquier estado distinto de Confirmado", async () => {
+      expect(await flag("Confirmado", new Date("2026-12-23T20:00:00-06:00"))).toBe(false);
+      expect(await flag("Finalizado", new Date("2026-12-24T20:00:00-06:00"))).toBe(false);
+      expect(await flag("Propuesta generada", new Date("2026-12-24T20:00:00-06:00"))).toBe(false);
+    });
+  });
 });

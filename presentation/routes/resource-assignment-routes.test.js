@@ -179,6 +179,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
           type: "HUMAN",
           operative_role_id: 1,
           is_active: true,
+          precio: null,
           operative_role: "Mesero",
           available_quantity: 1,
           assignment: null,
@@ -364,7 +365,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("shows the confirmed assignment again (RF-2.3.2.19)", async () => {
-      await assign(1, [{ resource_id: 3, quantity: 5 }]);
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 3, quantity: 5 },
+      ]);
       await post("/api/logistics/requests/1/resources/confirm");
       await assign(1, [{ resource_id: 3, quantity: 2 }]);
 
@@ -437,6 +441,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       await assign(
         1,
         [
+          { resource_id: 1, quantity: 1 },
           { resource_id: 2, quantity: 50 },
           { resource_id: 3, quantity: 5, observation: "Solo hay 2 camiones" },
         ],
@@ -449,7 +454,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       expect(response.body.data).toMatchObject({
         current_status: "Coordinación Incompleta",
         is_fully_sufficient: false,
-        summary: { sufficient_resources: 1, insufficient_resources: 1 },
+        summary: { sufficient_resources: 2, insufficient_resources: 1 },
       });
 
       // RF-2.3.2.19: al volver se muestran las asignaciones confirmadas y las observaciones.
@@ -463,7 +468,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("recalculates the status when coming back from Coordinación Incompleta", async () => {
-      await assign(1, [{ resource_id: 3, quantity: 5 }]);
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 3, quantity: 5 },
+      ]);
       await post("/api/logistics/requests/1/resources/confirm");
 
       await assign(1, [{ resource_id: 3, quantity: 2 }]);
@@ -475,7 +483,7 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       expect(response.body.data).toMatchObject({
         previous_status: "Coordinación Incompleta",
         current_status: "Coordinación Lista",
-        summary: { sufficient_resources: 1, insufficient_resources: 0 },
+        summary: { sufficient_resources: 2, insufficient_resources: 0 },
       });
     });
 
@@ -483,7 +491,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
       context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       await assign(2, [{ resource_id: 3, quantity: 2 }]);
       context.signInAs(GABRIEL_ID, UserRole.LOGISTICS);
-      await assign(1, [{ resource_id: 3, quantity: 1 }]);
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 3, quantity: 1 },
+      ]);
 
       context.signInAs(LAURA_ID, UserRole.LOGISTICS);
       await post("/api/logistics/requests/2/resources/cancel");
@@ -498,7 +509,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("rejects when the availability changed during the process (RF-2.3.2.22)", async () => {
-      await assign(1, [{ resource_id: 2, quantity: 80 }]);
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 2, quantity: 80 },
+      ]);
       const vajilla = await context.resourceRepository.findById(2);
       vajilla.totalQuantity = 50;
       await context.resourceRepository.updateDetails(vajilla);
@@ -512,7 +526,14 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("saves nothing when part of the confirmation fails (single transaction)", async () => {
-      await assign(1, [{ resource_id: 2, quantity: 50 }], "Observación de la sesión");
+      await assign(
+        1,
+        [
+          { resource_id: 1, quantity: 1 },
+          { resource_id: 2, quantity: 50 },
+        ],
+        "Observación de la sesión"
+      );
       context.resourceConfirmationRepository.create = async () => {
         throw new Error("Confirmation could not be saved");
       };
@@ -528,6 +549,17 @@ describe("Resource confirmation routes (Función 3.2)", () => {
         observations: null,
         pending_observations: "Observación de la sesión",
       });
+    });
+
+    it("requires at least one human resource even when material ones are assigned", async () => {
+      await assign(1, [{ resource_id: 2, quantity: 50 }]);
+
+      const response = await post("/api/logistics/requests/1/resources/confirm");
+
+      expect(response.status).toBe(422);
+      expect(JSON.stringify(response.body)).toContain(
+        "Debe asignar al menos un recurso humano antes de finalizar la confirmación."
+      );
     });
 
     it("requires at least one resource", async () => {
@@ -573,7 +605,10 @@ describe("Resource confirmation routes (Función 3.2)", () => {
     });
 
     it("keeps the assignments already confirmed", async () => {
-      await assign(1, [{ resource_id: 3, quantity: 5 }]);
+      await assign(1, [
+        { resource_id: 1, quantity: 1 },
+        { resource_id: 3, quantity: 5 },
+      ]);
       await post("/api/logistics/requests/1/resources/confirm");
       await assign(1, [{ resource_id: 3, quantity: 2 }]);
 

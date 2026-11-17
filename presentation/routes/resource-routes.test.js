@@ -32,7 +32,9 @@ function resource(id, name, type, isActive = true) {
     isActive,
     now,
     now,
-    null
+    null,
+    0,
+    isHuman ? 100 : null
   );
 }
 
@@ -132,7 +134,14 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.resources).toEqual([
-        { id: 1, name: "David Torres", type: "HUMAN", operative_role_id: 1, is_active: true },
+        {
+          id: 1,
+          name: "David Torres",
+          type: "HUMAN",
+          operative_role_id: 1,
+          is_active: true,
+          precio: 100,
+        },
       ]);
       expect(response.body.metadata.pagination).toEqual({
         total_records: 1,
@@ -145,7 +154,7 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       const response = await request(app)
         .post("/api/admin/resources/human")
         .set("Cookie", AUTH_COOKIE)
-        .send({ data: { name: "Ana López", operative_role_id: 1 } });
+        .send({ data: { name: "Ana López", operative_role_id: 1, precio: 80 } });
 
       expect(response.status).toBe(201);
       expect(response.headers.location).toBe("/api/admin/resources/human/5");
@@ -155,7 +164,7 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       const response = await request(app)
         .post("/api/admin/resources/human")
         .set("Cookie", AUTH_COOKIE)
-        .send({ data: { name: "David Torres", operative_role_id: 1 } });
+        .send({ data: { name: "David Torres", operative_role_id: 1, precio: 80 } });
 
       expect(response.status).toBe(409);
       expect(response.body.requires_confirmation).toBe(true);
@@ -168,7 +177,7 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
         .send({ name: "Ana López" });
 
       expect(response.status).toBe(422);
-      expect(Object.keys(response.body.errors)).toEqual(["name", "operative_role_id"]);
+      expect(Object.keys(response.body.errors)).toEqual(["name", "operative_role_id", "precio"]);
     });
 
     it("returns the detail, edits and deactivates a human resource", async () => {
@@ -178,14 +187,14 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       const update = await request(app)
         .patch("/api/admin/resources/human/1")
         .set("Cookie", AUTH_COOKIE)
-        .send({ data: { name: "David Tec", operative_role_id: 1 } });
+        .send({ data: { name: "David Tec", operative_role_id: 1, precio: 120 } });
       const deactivate = await request(app)
         .put("/api/admin/resources/human/1")
         .set("Cookie", AUTH_COOKIE)
         .send({ data: { is_active: false } });
 
       expect(detail.status).toBe(200);
-      expect(detail.body.data.resource).toMatchObject({ id: 1, name: "David Torres" });
+      expect(detail.body.data.resource).toMatchObject({ id: 1, name: "David Torres", precio: 100 });
       expect(update.status).toBe(204);
       expect(deactivate.status).toBe(204);
     });
@@ -259,7 +268,14 @@ describe("Resource routes (Funciones 2.8 a 2.10)", () => {
       expect(materials.body.data.resources.map((item) => item.id)).toEqual([3]);
       // NC-06: el filtro usa los valores del contrato (HUMAN, MATERIAL, LOGISTIC).
       expect(humans.body.data.resources).toEqual([
-        { id: 1, name: "David Torres", type: "HUMAN", operative_role_id: 1, is_active: true },
+        {
+          id: 1,
+          name: "David Torres",
+          type: "HUMAN",
+          operative_role_id: 1,
+          is_active: true,
+          precio: 100,
+        },
       ]);
     });
 

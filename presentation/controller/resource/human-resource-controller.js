@@ -17,6 +17,7 @@ class HumanResourceController extends ResourceController {
     const { id } = await this.useCases.create.execute({
       name: data.name,
       operativeRoleId: data.operative_role_id,
+      precio: data.precio,
       confirmDuplicate: data.confirm_duplicate,
     });
 
@@ -31,6 +32,7 @@ class HumanResourceController extends ResourceController {
     await this.useCases.update.execute(id, {
       name: data.name,
       operativeRoleId: data.operative_role_id,
+      precio: data.precio,
     });
 
     response.status(204).end();

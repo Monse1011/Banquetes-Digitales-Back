@@ -1,4 +1,5 @@
 const { toDatabaseStatus, toApiStatus } = require("./postgres-request-status");
+const { finalizeElapsedEvents } = require("./finalize-elapsed-events");
 const {
   BlockingAssignmentStatuses,
 } = require("../../../domain/enums/resource-assignment/assignment-status");
@@ -76,6 +77,7 @@ class PostgresAdminRequestQueryRepository {
   }
 
   async findAll(filters, page, perPage) {
+    await finalizeElapsedEvents(this.pool);
     const { where, values } = requestFilter(filters);
     const [result, count] = await Promise.all([
       this.pool.query(
@@ -120,6 +122,7 @@ class PostgresAdminRequestQueryRepository {
   }
 
   async findById(id) {
+    await finalizeElapsedEvents(this.pool);
     const result = await this.pool.query(
       `SELECT ${COMMON_COLUMNS}, r.client_phone, r.event_observation, r.current_start, r.current_end,
          ${dateTime("r.current_start")} AS event_date_time,

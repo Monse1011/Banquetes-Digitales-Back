@@ -40,7 +40,9 @@ async function seedGraph(db) {
     `INSERT INTO clients (full_name, email, phone)
      VALUES ('Cliente FX', 'fx-client@example.invalid', '9991234567') RETURNING id`
   );
-  const service = await id("INSERT INTO services (name) VALUES ('Servicio FX') RETURNING id");
+  const service = await id(
+    "INSERT INTO services (name, description, price) VALUES ('Servicio FX', 'Descripción FX', 1500) RETURNING id"
+  );
   const role = await id("INSERT INTO operative_roles (name) VALUES ('Rol FX') RETURNING id");
   const human = await id(
     `INSERT INTO resources (name, type, operative_role_id, total_quantity)

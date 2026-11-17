@@ -35,6 +35,9 @@ const User = require("../domain/entities/auth/user");
 const UserRole = require("../domain/enums/auth/user-role");
 const UserStatus = require("../domain/enums/auth/user-status");
 
+// Más de 3 meses: cumple cualquier plazo de anticipación por temporada.
+const FAR_FUTURE_MS = 400 * 24 * 60 * 60 * 1000;
+
 describe("App", () => {
   let app;
   let reservationRequestRepository;
@@ -47,8 +50,8 @@ describe("App", () => {
 
     const clientRepository = new InMemoryClientRepository();
     const serviceRepository = new InMemoryServiceRepository([
-      new Service(1, "Catering", "Servicio de catering", "activo"),
-      new Service(2, "Decoración", "Servicio de decoración", "activo"),
+      new Service(1, "Catering", "Servicio de catering", "activo", 1500),
+      new Service(2, "Decoración", "Servicio de decoración", "activo", 900),
     ]);
     reservationRequestRepository = new InMemoryReservationRequestRepository();
     const userRepository = new InMemoryUserRepository([
@@ -128,8 +131,8 @@ describe("App", () => {
         client_full_name: "John Doe",
         email: "john@example.com",
         phone: "1234567890",
-        event_date_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        event_end_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
+        event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 24 * 60 * 60 * 1000).toISOString(),
+        event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 26 * 60 * 60 * 1000).toISOString(),
         guest_count: 100,
         event_address: "123 Main St",
         services_ids: [1, 2],
@@ -154,8 +157,8 @@ describe("App", () => {
           client_full_name: "John Doe",
           email: "john@example.com",
           phone: "1234567890",
-          event_date_time: new Date().toISOString(),
-          event_end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+          event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 60 * 1000).toISOString(),
+          event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 3 * 60 * 60 * 1000).toISOString(),
           guest_count: 100,
           event_address: "123 Main St",
           services_ids: [1, 2],
@@ -202,8 +205,8 @@ describe("App", () => {
           client_full_name: "John Doe",
           email: "john@example.com",
           phone: "1234567890",
-          event_date_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          event_end_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
+          event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 24 * 60 * 60 * 1000).toISOString(),
+          event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 26 * 60 * 60 * 1000).toISOString(),
           guest_count: 100,
           event_address: "123 Main St",
           services_ids: [1, 2],
@@ -260,8 +263,12 @@ describe("App", () => {
     const response = await request(app).get("/api/client/services");
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toHaveLength(2);
-    expect(response.body.data[0]).toMatchObject({ id: 1, nombre: "Catering" });
+    // Contrato 12 (función 4.1): {data:{services:[...]}} con nombre, descripción y precio.
+    expect(response.body.data.services).toEqual([
+      { id: 1, name: "Catering", description: "Servicio de catering", price: 1500 },
+      { id: 2, name: "Decoración", description: "Servicio de decoración", price: 900 },
+    ]);
+    expect(response.body.metadata.pagination.total_records).toBe(2);
   });
 
   it("protects the admin reservation routes with the auth cookie", async () => {
@@ -307,8 +314,8 @@ describe("App", () => {
           client_full_name: "John Doe",
           email: "john@example.com",
           phone: "1234567890",
-          event_date_time: new Date().toISOString(),
-          event_end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+          event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 60 * 1000).toISOString(),
+          event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 3 * 60 * 60 * 1000).toISOString(),
           guest_count: 100,
           event_address: "123 Main St",
           services_ids: [1],

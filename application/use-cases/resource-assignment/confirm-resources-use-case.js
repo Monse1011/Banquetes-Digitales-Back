@@ -7,6 +7,7 @@ const {
 const {
   ResourceAssignmentMessages,
 } = require("../../../domain/constants/resource-assignment-messages");
+const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const ResourceAssignmentValidationException = require("../../../domain/exceptions/resource-assignment/resource-assignment-validation-exception");
 const ResourceAvailabilityChangedException = require("../../../domain/exceptions/resource-assignment/resource-availability-changed-exception");
 const UnassignedSufficientResourcesException = require("../../../domain/exceptions/resource-assignment/unassigned-sufficient-resources-exception");
@@ -80,6 +81,13 @@ class ConfirmResourcesUseCase {
       this.resourceRepository,
       reviewed.map((assignment) => assignment.resourceId)
     );
+    // Los recursos materiales y logísticos son opcionales; el personal humano no.
+    if (!resources.some((resource) => resource?.type === ResourceType.HUMAN)) {
+      throw new ResourceAssignmentValidationException({
+        data: ResourceAssignmentMessages.HUMAN_RESOURCE_REQUIRED,
+      });
+    }
+
     const blocking = await this.resourceAssignmentRepository.findBlocking(
       reviewed.map((assignment) => assignment.resourceId),
       period,

@@ -27,7 +27,9 @@ const INVALID_FOREIGN_KEYS = [
   ],
   [
     "request_services.service_id",
-    (f) => `INSERT INTO request_services (request_id, service_id) VALUES (${f.request}, -1)`,
+    (f) => `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+        service_description_snapshot, service_price_snapshot)
+       VALUES (${f.request}, -1, 'x', 'x', 1)`,
   ],
   [
     "request_status_history.request_id",
@@ -92,10 +94,6 @@ const INVALID_FOREIGN_KEYS = [
       `INSERT INTO calendar_events (id_request, title, start_at, end_at, location)
        VALUES (-1, 't', ${WINDOW}, 'x')`,
   ],
-  [
-    "calendar_sync_outbox.calendar_event_id",
-    () => "INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES (-1, 'CREATE')",
-  ],
 ];
 
 const DUPLICATES = [
@@ -116,7 +114,11 @@ const DUPLICATES = [
     () =>
       "INSERT INTO clients (full_name, email, phone) VALUES ('x', 'fx-client@example.invalid', '1')",
   ],
-  ["services.name", () => "INSERT INTO services (name) VALUES ('Servicio FX')"],
+  [
+    "services.name",
+    () =>
+      "INSERT INTO services (name, description, price) VALUES ('Servicio FX', 'Descripción FX', 1500)",
+  ],
   [
     "operative_roles.name sin distinguir mayúsculas ni espacios",
     () => "INSERT INTO operative_roles (name) VALUES ('  rol fx ')",
@@ -143,8 +145,10 @@ const DUPLICATES = [
   [
     "request_services (request_id, service_id)",
     (f) =>
-      `INSERT INTO request_services (request_id, service_id)
-       VALUES (${f.request}, ${f.service}), (${f.request}, ${f.service})`,
+      `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+         service_description_snapshot, service_price_snapshot)
+       VALUES (${f.request}, ${f.service}, 'x', 'x', 1),
+              (${f.request}, ${f.service}, 'x', 'x', 1)`,
   ],
   [
     "proposals (request_id, version)",
@@ -171,12 +175,6 @@ const DUPLICATES = [
     (f) =>
       `INSERT INTO resource_confirmation_pending_observations (request_id, observations)
        VALUES (${f.request}, 'a'), (${f.request}, 'b')`,
-  ],
-  [
-    "calendar_events.google_event_id",
-    (f) =>
-      `INSERT INTO calendar_events (id_request, title, start_at, end_at, location, google_event_id)
-       VALUES (${f.request}, 'a', ${WINDOW}, 'x', 'g-1'), (${f.request}, 'b', ${WINDOW}, 'x', 'g-1')`,
   ],
 ];
 
@@ -214,10 +212,6 @@ const NULLS = [
   [
     "calendar_events.location",
     (f) => `UPDATE calendar_events SET location = NULL WHERE id = ${f.event}`,
-  ],
-  [
-    "calendar_sync_outbox.operation",
-    (f) => `INSERT INTO calendar_sync_outbox (calendar_event_id) VALUES (${f.event})`,
   ],
 ];
 
@@ -277,15 +271,6 @@ const CHECKS = [
   [
     "proposals.status en minúsculas",
     (f) => `UPDATE proposals SET status = 'accepted' WHERE id = ${f.proposal}`,
-  ],
-  [
-    "calendar_events.sync_status desconocido",
-    (f) => `UPDATE calendar_events SET sync_status = 'DONE' WHERE id = ${f.event}`,
-  ],
-  [
-    "calendar_sync_outbox.operation en minúsculas",
-    (f) =>
-      `INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES (${f.event}, 'create')`,
   ],
   [
     "document_counters.kind desconocido",
@@ -382,23 +367,6 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
         expect(Number(left.rows[0].total)).toBe(0);
       }));
 
-    it("CASCADE: borrar un evento elimina su cola de sincronización", () =>
-      withRollback(pool, async (db) => {
-        const f = await seedGraph(db);
-        await db.query(
-          "INSERT INTO calendar_sync_outbox (calendar_event_id, operation) VALUES ($1, 'CREATE')",
-          [f.event]
-        );
-
-        await db.query("DELETE FROM calendar_events WHERE id = $1", [f.event]);
-
-        const left = await db.query(
-          "SELECT count(*) FROM calendar_sync_outbox WHERE calendar_event_id = $1",
-          [f.event]
-        );
-        expect(Number(left.rows[0].count)).toBe(0);
-      }));
-
     it("RESTRICT: el historial impide borrar la solicitud; sin él, se borran sus detalles", () =>
       withRollback(pool, async (db) => {
         const f = await seedGraph(db);
@@ -410,10 +378,12 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
             [f.client]
           )
         ).rows[0].id;
-        await db.query("INSERT INTO request_services (request_id, service_id) VALUES ($1, $2)", [
-          request,
-          f.service,
-        ]);
+        await db.query(
+          `INSERT INTO request_services (request_id, service_id, service_name_snapshot,
+             service_description_snapshot, service_price_snapshot)
+           VALUES ($1, $2, 'x', 'x', 1)`,
+          [request, f.service]
+        );
         await db.query(
           "INSERT INTO resource_confirmation_pending_observations (request_id, observations) VALUES ($1, 'x')",
           [request]
@@ -447,7 +417,9 @@ describe.skipIf(!hasTestDatabase())("schema.sql - integridad", () => {
       [
         "un servicio solicitado",
         (f) =>
-          `WITH used AS (INSERT INTO request_services VALUES (${f.request}, ${f.service}))
+          `WITH used AS (INSERT INTO request_services (request_id, service_id,
+             service_name_snapshot, service_description_snapshot, service_price_snapshot)
+             VALUES (${f.request}, ${f.service}, 'x', 'x', 1))
            DELETE FROM services WHERE id = ${f.service}`,
       ],
     ])("RESTRICT: no permite borrar %s", expectError(FK_VIOLATION));

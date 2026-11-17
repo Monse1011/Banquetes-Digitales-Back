@@ -10,7 +10,8 @@ class Resource {
     createdAt,
     updatedAt,
     deactivatedAt,
-    version = 0
+    version = 0,
+    precio = null
   ) {
     this.id = id;
     this.name = name;
@@ -24,6 +25,8 @@ class Resource {
     this.deactivatedAt = deactivatedAt;
     // Control de concurrencia optimista: aumenta con cada modificación guardada.
     this.version = version;
+    // Tarifa por hora (solo recursos humanos); null en filas anteriores a la columna.
+    this.precio = precio;
   }
 
   // RF-1.2.8.3: la eliminación es lógica.

@@ -51,15 +51,15 @@ describe.skipIf(!process.env.TEST_PGDATABASE)("Calendar closing scenarios on Pos
       endAt: new Date(startAt.getTime() + 3600000),
     });
   }
-  it("finalizes exactly at the end, is repeatable, and retains the three-hour resource block", async () => {
-    expect(
-      await new FinalizeElapsedEventsUseCase(
-        repository,
-        () => new Date(end.getTime() - 1)
-      ).execute()
-    ).toBe(0);
-    expect(await new FinalizeElapsedEventsUseCase(repository, () => end).execute()).toBe(1);
-    expect(await new FinalizeElapsedEventsUseCase(repository, () => end).execute()).toBe(0);
+  // Defecto 5 (opción B): end = 01:00 del 2 de junio en Mérida; el día termina el 3 a las 00:00.
+  it("finalizes when the Merida day of the end ends, is repeatable, and retains the three-hour resource block", async () => {
+    const dayEnd = new Date("2035-06-03T00:00:00-06:00");
+    const finalizeAt = (now) => new FinalizeElapsedEventsUseCase(repository, () => now).execute();
+
+    expect(await finalizeAt(end)).toBe(0);
+    expect(await finalizeAt(new Date(dayEnd.getTime() - 1))).toBe(0);
+    expect(await finalizeAt(dayEnd)).toBe(1);
+    expect(await finalizeAt(dayEnd)).toBe(0);
     expect(
       (await connection.query("SELECT status FROM reservations_request WHERE id=1")).rows[0].status
     ).toBe("FINALIZED");

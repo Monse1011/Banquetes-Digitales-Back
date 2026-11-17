@@ -3,7 +3,7 @@ const { ResourceSortField } = require("../../../domain/enums/resource/resource-s
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 
 const RESOURCE_COLUMNS = `id, name, type, operative_role_id, total_quantity, unit_cost,
-  is_active, created_at, updated_at, deactivated_at, version`;
+  is_active, created_at, updated_at, deactivated_at, version, precio`;
 
 // El esquema actual usa los mismos tipos que el contrato API.
 const DATABASE_TYPES = Object.freeze({
@@ -30,8 +30,8 @@ class PostgresResourceRepository {
     const result = await this.pool.query(
       `INSERT INTO resources
         (name, type, operative_role_id, total_quantity, unit_cost,
-         is_active, created_at, updated_at, deactivated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         is_active, created_at, updated_at, deactivated_at, precio)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${RESOURCE_COLUMNS}`,
       [
         resource.name,
@@ -43,6 +43,7 @@ class PostgresResourceRepository {
         resource.createdAt,
         resource.updatedAt,
         resource.deactivatedAt,
+        resource.precio,
       ]
     );
 
@@ -80,14 +81,15 @@ class PostgresResourceRepository {
     const result = await this.pool.query(
       `UPDATE resources
        SET name = $1, operative_role_id = $2, total_quantity = $3, unit_cost = $4,
-           updated_at = $5, version = version + 1
-       WHERE id = $6 AND version = $7
+           precio = $5, updated_at = $6, version = version + 1
+       WHERE id = $7 AND version = $8
        RETURNING ${RESOURCE_COLUMNS}`,
       [
         resource.name,
         resource.operativeRoleId,
         resource.totalQuantity,
         resource.unitCost,
+        resource.precio,
         resource.updatedAt,
         resource.id,
         resource.version,
@@ -204,7 +206,8 @@ class PostgresResourceRepository {
       new Date(row.created_at),
       new Date(row.updated_at),
       row.deactivated_at === null ? null : new Date(row.deactivated_at),
-      row.version
+      row.version,
+      row.precio === null ? null : Number(row.precio)
     );
   }
 }

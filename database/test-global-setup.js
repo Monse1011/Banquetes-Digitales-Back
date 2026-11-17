@@ -9,8 +9,8 @@ module.exports = async function setup() {
   const pool = createTestPool();
   try {
     await pool.query(
-      `INSERT INTO services (name, description) VALUES ('Servicio de prueba', 'Catálogo de pruebas')
-       ON CONFLICT DO NOTHING`
+      `INSERT INTO services (name, description, price)
+       VALUES ('Servicio de prueba', 'Catálogo de pruebas', 1500) ON CONFLICT DO NOTHING`
     );
     await pool.query(
       "INSERT INTO operative_roles (name) VALUES ('Rol de prueba') ON CONFLICT DO NOTHING"

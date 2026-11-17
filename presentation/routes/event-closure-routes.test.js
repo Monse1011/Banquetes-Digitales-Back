@@ -151,26 +151,26 @@ describe("PATCH /api/logistics/requests/:id/ending (Función 3.6)", () => {
     expect(response.body).toEqual({ message: "El estado indicado no es válido." });
   });
 
-  it("responde 409 si la solicitud no está confirmada", async () => {
+  it("responde 422 si la solicitud no está confirmada", async () => {
     const response = await patchEnding(
       buildApp({ status: ReservationRequestStatus.PROPOSAL_GENERATED }),
       21312,
       validBody()
     );
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(422);
     expect(response.body).toEqual({
       message: "Solo se puede registrar el seguimiento o finalizar eventos en estado Confirmado.",
     });
   });
 
-  it("responde 409 si el evento ya fue finalizado", async () => {
+  it("responde 422 si el evento ya fue finalizado", async () => {
     const app = buildApp();
 
     await patchEnding(app, 21312, validBody());
     const response = await patchEnding(app, 21312, validBody());
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(422);
     expect(response.body).toEqual({
       message: "El evento ya fue finalizado y no puede modificarse.",
     });

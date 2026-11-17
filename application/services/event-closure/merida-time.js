@@ -3,6 +3,7 @@
 // programado se evalúa con la zona horaria de Mérida, Yucatán (America/Merida).
 const MERIDA_OFFSET_HOURS = -6;
 const MERIDA_OFFSET_MS = MERIDA_OFFSET_HOURS * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const STRICT_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})-06:00$/;
 
 function pad(value) {
@@ -63,7 +64,18 @@ function parseMeridaDateTime(value) {
   return isRealDateTime ? instant : null;
 }
 
+// Defecto 5: instante en que termina el día de Mérida de `date` (00:00 del día siguiente,
+// exclusivo). Único cálculo de "fin del día" que usan la ventana de cierre manual
+// (closure-window.js) y la finalización automática (finalize-elapsed-events.js).
+function endOfMeridaDay(date) {
+  const { year, month, day } = meridaParts(date);
+
+  return new Date(Date.UTC(year, month - 1, day + 1) - MERIDA_OFFSET_MS);
+}
+
 module.exports = {
+  DAY_MS,
+  endOfMeridaDay,
   formatMeridaDate,
   formatMeridaDateTime,
   parseMeridaDateTime,

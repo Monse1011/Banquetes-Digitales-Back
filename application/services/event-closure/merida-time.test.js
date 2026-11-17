@@ -1,4 +1,9 @@
-const { formatMeridaDate, formatMeridaDateTime, parseMeridaDateTime } = require("./merida-time");
+const {
+  endOfMeridaDay,
+  formatMeridaDate,
+  formatMeridaDateTime,
+  parseMeridaDateTime,
+} = require("./merida-time");
 
 describe("merida-time", () => {
   describe("parseMeridaDateTime", () => {
@@ -42,6 +47,27 @@ describe("merida-time", () => {
 
     it("devuelve null para una fecha ausente", () => {
       expect(formatMeridaDateTime(null)).toBeNull();
+    });
+  });
+
+  describe("endOfMeridaDay", () => {
+    it("devuelve las 00:00 del día siguiente en Mérida", () => {
+      const end = endOfMeridaDay(parseMeridaDateTime("2026-11-15T23:00:00-06:00"));
+
+      expect(formatMeridaDateTime(end)).toBe("2026-11-16T00:00:00-06:00");
+    });
+
+    it("usa el día de Mérida aunque en UTC ya sea el día siguiente", () => {
+      // 20:00 en Mérida = 02:00 UTC del día 16.
+      const end = endOfMeridaDay(parseMeridaDateTime("2026-11-15T20:00:00-06:00"));
+
+      expect(formatMeridaDateTime(end)).toBe("2026-11-16T00:00:00-06:00");
+    });
+
+    it("a medianoche exacta pertenece al nuevo día", () => {
+      const end = endOfMeridaDay(parseMeridaDateTime("2026-11-16T00:00:00-06:00"));
+
+      expect(formatMeridaDateTime(end)).toBe("2026-11-17T00:00:00-06:00");
     });
   });
 });

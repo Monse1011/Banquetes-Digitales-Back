@@ -2,13 +2,11 @@ const { CalendarMessages } = require("../../../domain/constants/calendar-message
 const CalendarEventNotFoundException = require("../../../domain/exceptions/calendar/calendar-event-not-found-exception");
 const EventNotModifiableException = require("../../../domain/exceptions/calendar/event-not-modifiable-exception");
 const { assertCanViewEvent } = require("../../services/calendar/calendar-access-policy");
-const { syncEventNow } = require("../../services/calendar/sync-event-now");
 
 // Función 3.3, bloque D - Cancelación de eventos.
 class CancelEventUseCase {
-  constructor(calendarEventRepository, syncProcessor, clock = () => new Date()) {
+  constructor(calendarEventRepository, clock = () => new Date()) {
     this.calendarEventRepository = calendarEventRepository;
-    this.syncProcessor = syncProcessor;
     this.clock = clock;
   }
 
@@ -30,13 +28,7 @@ class CancelEventUseCase {
       now: this.clock(),
     });
 
-    const cancelled = this.registerResult(result);
-
-    return syncEventNow({
-      syncProcessor: this.syncProcessor,
-      calendarEventRepository: this.calendarEventRepository,
-      eventId: cancelled.id,
-    });
+    return { event: this.registerResult(result) };
   }
 
   registerResult(result) {

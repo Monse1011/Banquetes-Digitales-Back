@@ -8,6 +8,7 @@ const ResourceAvailabilityExceededException = require("../../../domain/exception
 const ScheduleConflictException = require("../../../domain/exceptions/proposal/schedule-conflict-exception");
 const {
   exceededAvailabilityMessage,
+  unchangedUnavailableMessage,
   resourceNotAssignedMessage,
   ProposalMessages,
 } = require("../../../domain/constants/proposal-messages");
@@ -16,6 +17,8 @@ const { findOwnedRequest } = require("../../services/proposal/request-ownership"
 const { withAgreementsLock } = require("../../services/proposal/with-agreements-lock");
 const AgreementsRevisionChangedException = require("../../../domain/exceptions/proposal/agreements-revision-changed-exception");
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
+const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
+const { isStartInPast } = require("../../services/calendar/event-window");
 const {
   formatDate,
   formatTime,
@@ -66,23 +69,26 @@ class SaveAgreementsUseCase {
       throw new AgreementsValidationException(errors);
     }
 
-    if (dto.derivedInformationId !== undefined) {
-      const latest = await this.derivedInformationRepository.findLatestByRequestId(
-        requestId,
-        transaction
-      );
-      if ((latest?.id ?? null) !== dto.derivedInformationId) {
-        throw new AgreementsRevisionChangedException();
-      }
+    const latest = await this.derivedInformationRepository.findLatestByRequestId(
+      requestId,
+      transaction
+    );
+
+    if (
+      dto.derivedInformationId !== undefined &&
+      (latest?.id ?? null) !== dto.derivedInformationId
+    ) {
+      throw new AgreementsRevisionChangedException();
     }
 
     const startDatetime = dto.parseDate(dto.startDatetime);
     const endDatetime = dto.parseDate(dto.endDatetime);
-    const adjustments = dto.toAdjustments();
 
-    // RF-2.3.4.2 / RF-2.3.4.8 / RF-2.3.4.9: solo el personal puede añadirse o
-    // sustituirse desde acuerdos; materiales y logística deben seguir incluidos.
-    await this.validateAdjustedResourcesCoverage(requestId, adjustments, transaction);
+    this.assertStartNotInPast(request, latest, startDatetime);
+
+    // RF-2.3.4.2 / RF-2.3.4.8 / RF-2.3.4.9 y defecto 8: ajustes efectivos (los no humanos
+    // omitidos conservan su cantidad).
+    const adjustments = await this.resolveAdjustments(requestId, dto.toAdjustments(), transaction);
 
     await this.validateResponsibleSchedule(request, startDatetime, endDatetime, transaction);
     await this.validateAdjustedAvailability(
@@ -121,6 +127,22 @@ class SaveAgreementsUseCase {
     return new SaveAgreementsResponseDto(created.id);
   }
 
+  // El inicio debe ser posterior a "ahora" solo si el usuario lo cambió. Re-guardar el mismo
+  // inicio (el de la solicitud o el de los últimos acuerdos) sigue permitido aunque el tiempo
+  // ya lo haya dejado atrás; si no, la solicitud quedaría bloqueada sin salida.
+  assertStartNotInPast(request, latest, startDatetime) {
+    const currentStarts = [request.eventDateTime, latest?.startDatetime].filter(Boolean);
+    const unchanged = currentStarts.some(
+      (current) => current.getTime() === startDatetime.getTime()
+    );
+
+    if (!unchanged && isStartInPast(startDatetime)) {
+      throw new AgreementsValidationException({
+        start_datetime: CalendarMessages.START_IN_PAST,
+      });
+    }
+  }
+
   // RF-2.3.4.10: si el horario confirmado difiere del vigente, se reevalúa la
   // agenda del responsable y se reporta cada conflicto.
   async validateResponsibleSchedule(request, startDatetime, endDatetime, transaction) {
@@ -152,12 +174,17 @@ class SaveAgreementsUseCase {
     }
   }
 
-  // RF-2.3.4.9: los ajustes pueden añadir personal humano; omitir personas equivale
-  // a sustituirlas. Los recursos materiales y logísticos existentes son obligatorios.
-  async validateAdjustedResourcesCoverage(requestId, adjustments, transaction) {
+  // RF-2.3.4.9 / defecto 8: los ajustes pueden añadir personal humano. Omitir un recurso de
+  // cualquier tipo lo deja sin cambios (se agrega como ajuste sin cambio para revalidar su
+  // horario y disponibilidad); liberarlo es explícito con cantidad 0. Uno liberado antes en
+  // esta solicitud puede volver a agregarse, así la solicitud no queda sin forma de reasignarlo.
+  async resolveAdjustments(requestId, adjustments, transaction) {
     const assignedResources = await this.assignedResourceRepository.findActiveByRequestId(
       requestId,
       transaction
+    );
+    const releasedIds = new Set(
+      await this.assignedResourceRepository.findReleasedResourceIds(requestId, transaction)
     );
     const assignedByResourceId = new Map(
       assignedResources.map((assignment) => [assignment.resourceId, assignment])
@@ -172,40 +199,44 @@ class SaveAgreementsUseCase {
       transaction
     );
     const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-    const errors = [];
-
-    for (const adjustment of adjustments) {
-      const alreadyAssigned = assignedByResourceId.has(adjustment.resourceId);
-      const resource = resourcesById.get(adjustment.resourceId);
-      const error = this.validateResourceAdjustment(adjustment, resource, alreadyAssigned);
-      if (error) errors.push(error);
-    }
-
-    const missingNonHuman = assignedResources.some((assignment) => {
-      if (adjustments.some((adjustment) => adjustment.resourceId === assignment.resourceId)) {
-        return false;
-      }
-
-      return resourcesById.get(assignment.resourceId)?.type !== ResourceType.HUMAN;
-    });
-    if (missingNonHuman) {
-      errors.push(ProposalMessages.ADJUSTED_QUANTITY_MISSING);
-    }
+    const errors = adjustments
+      .map((adjustment) =>
+        this.validateResourceAdjustment(
+          adjustment,
+          resourcesById.get(adjustment.resourceId),
+          assignedByResourceId.has(adjustment.resourceId),
+          releasedIds.has(adjustment.resourceId)
+        )
+      )
+      .filter(Boolean);
 
     if (errors.length > 0) {
       throw new AgreementsValidationException({
         adjusted_resources: [...new Set(errors)].join(" "),
       });
     }
+
+    const adjustedIds = new Set(adjustments.map((adjustment) => adjustment.resourceId));
+    const omitted = assignedResources
+      .filter((assignment) => !adjustedIds.has(assignment.resourceId))
+      .map((assignment) => ({
+        resourceId: assignment.resourceId,
+        quantity: assignment.quantity,
+        unchanged: true,
+      }));
+
+    return [...adjustments, ...omitted];
   }
 
-  validateResourceAdjustment(adjustment, resource, alreadyAssigned) {
-    if (!resource || (!alreadyAssigned && resource.type !== ResourceType.HUMAN)) {
-      return resourceNotAssignedMessage(adjustment.resourceId);
+  validateResourceAdjustment(adjustment, resource, alreadyAssigned, releasedBefore) {
+    const canAdd = resource?.type === ResourceType.HUMAN || releasedBefore;
+
+    if (!resource || (!alreadyAssigned && !canAdd)) {
+      return resourceNotAssignedMessage(adjustment.resourceId, resource?.name);
     }
 
     if (resource.type === ResourceType.HUMAN && !alreadyAssigned && adjustment.quantity !== 1) {
-      return ProposalMessages.HUMAN_ADJUSTED_QUANTITY_INVALID;
+      return `${resource.name}: ${ProposalMessages.HUMAN_ADJUSTED_QUANTITY_INVALID}`;
     }
 
     return null;
@@ -245,7 +276,13 @@ class SaveAgreementsUseCase {
           name: availability.name,
           quantity: adjustment.quantity,
           available: availability.available,
-          message: exceededAvailabilityMessage(availability.name, availability.available),
+          message: adjustment.unchanged
+            ? unchangedUnavailableMessage(
+                availability.name,
+                adjustment.quantity,
+                availability.available
+              )
+            : exceededAvailabilityMessage(availability.name, availability.available),
         });
       }
     }

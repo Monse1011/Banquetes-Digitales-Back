@@ -1,6 +1,7 @@
 const {
   toApiRequestStatus,
 } = require("../../../domain/enums/reservation-request/request-status-api-code");
+const { isWithinClosureDay } = require("../../services/event-closure/closure-window");
 
 const CONFIRMED_STATUSES = ["Confirmado", "CONFIRMED", "Finalizado", "COMPLETED"];
 
@@ -23,7 +24,9 @@ class GetAssignedRequestDetailUseCase {
     serviceRepository,
     proposalRepository,
     proposalAdjustmentRepository,
+    clock = () => new Date(),
   } = {}) {
+    this.clock = clock;
     this.reservationRequestRepository = reservationRequestRepository;
     this.serviceRepository = serviceRepository;
     this.proposalRepository = proposalRepository ?? null;
@@ -99,6 +102,9 @@ class GetAssignedRequestDetailUseCase {
       can_register_agreements: AGREEMENTS_EDITABLE_STATUSES.includes(
         toApiRequestStatus(request.status || "")
       ),
+      // Defecto 5: "Registrar finalización" (PATCH /requests/:id/ending). El estado ya viene con
+      // la regla de finalización automática aplicada por el repositorio.
+      can_register_finalization: this.canRegisterFinalization(request),
       adjustments: adjustments.map((adjustment) => ({
         id: adjustment.id,
         proposals_code: proposal?.proposalsCode ?? null,
@@ -107,6 +113,14 @@ class GetAssignedRequestDetailUseCase {
         requested_at: adjustment.createdAt ? new Date(adjustment.createdAt).toISOString() : null,
       })),
     };
+  }
+
+  canRegisterFinalization(request) {
+    return (
+      toApiRequestStatus(request.status || "") === "CONFIRMED" &&
+      request.eventDateTime instanceof Date &&
+      isWithinClosureDay(request.eventDateTime, request.eventEndTime ?? null, this.clock())
+    );
   }
 
   async execute({ requestId, userId }) {

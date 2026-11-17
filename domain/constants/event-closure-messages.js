@@ -7,6 +7,8 @@ const EventClosureMessages = Object.freeze({
   INVALID_DATE_TIME_FORMAT: "El formato de fecha y hora no es válido.",
   END_BEFORE_START: "La hora real de finalización debe ser posterior a la de inicio.",
   ACTUAL_TIME_IN_FUTURE: "La hora real no puede ser posterior a la hora actual.",
+  ACTUAL_START_BEFORE_SCHEDULED_DAY:
+    "El día real de inicio no puede ser anterior al día programado del evento.",
   OBSERVATION_TOO_LONG: "Las observaciones no deben exceder 1000 caracteres.",
   INVALID_STATUS: "El estado indicado no es válido.",
   NOT_CONFIRMED: "Solo se puede registrar el seguimiento o finalizar eventos en estado Confirmado.",

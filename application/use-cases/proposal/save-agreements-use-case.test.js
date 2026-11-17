@@ -57,15 +57,19 @@ describe("SaveAgreementsUseCase", () => {
     );
   });
 
-  async function createRequest(status = ReservationRequestStatus.COORDINATION_READY) {
+  async function createRequest(
+    status = ReservationRequestStatus.COORDINATION_READY,
+    start = futureDate(10, 18),
+    end = futureDate(10, 23)
+  ) {
     const created = await reservationRequestRepository.create(
       new ReservationRequest(
         null,
         "EVT-2026-0101",
         1,
         null,
-        futureDate(10, 18),
-        futureDate(10, 23),
+        start,
+        end,
         50,
         "Salón Los Pinos",
         status,
@@ -165,7 +169,7 @@ describe("SaveAgreementsUseCase", () => {
     expect(active.find((assignment) => assignment.resourceId === 3).quantity).toBe(1);
   });
 
-  it("releases a human resource omitted from the selected personnel", async () => {
+  it("releases a human resource only when its quantity is explicitly 0", async () => {
     const request = await createRequest();
 
     await useCase.execute(
@@ -173,7 +177,7 @@ describe("SaveAgreementsUseCase", () => {
       LOGISTIC_USER_ID,
       dto({
         adjusted_resources: [
-          { resource_id: 2, quantity: 50 },
+          { resource_id: 1, quantity: 0 },
           { resource_id: 3, quantity: 1 },
         ],
       })
@@ -393,21 +397,189 @@ describe("SaveAgreementsUseCase", () => {
     });
   });
 
-  it("rejects missing adjusted quantities of assigned resources (RF-2.3.4.2)", async () => {
-    const request = await createRequest();
+  describe("recursos parciales (defecto 8)", () => {
+    const activeOf = async (requestId) =>
+      Object.fromEntries(
+        (await assignedResourceRepository.findActiveByRequestId(requestId)).map((assignment) => [
+          assignment.resourceId,
+          assignment.quantity,
+        ])
+      );
 
-    const promise = useCase.execute(
-      request.requestId,
-      LOGISTIC_USER_ID,
-      dto({ adjusted_resources: [{ resource_id: 1, quantity: 2 }] })
-    );
+    it("no exige todas las categorías: un material omitido conserva su cantidad", async () => {
+      const request = await createRequest();
 
-    await expect(promise).rejects.toBeInstanceOf(AgreementsValidationException);
-    await expect(promise).rejects.toMatchObject({
-      errors: {
-        adjusted_resources:
-          "Debe capturar la cantidad ajustada de cada recurso asignado a la solicitud.",
-      },
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({ adjusted_resources: [{ resource_id: 1, quantity: 4 }] })
+      );
+
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 50 });
+    });
+
+    it("mandar solo materiales conserva al personal (omitir = sin cambios)", async () => {
+      const request = await createRequest();
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({ adjusted_resources: [{ resource_id: 2, quantity: 50 }] })
+      );
+
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 50 });
+    });
+
+    it("un material liberado con cantidad 0 puede volver a agregarse", async () => {
+      const request = await createRequest();
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          adjusted_resources: [
+            { resource_id: 1, quantity: 4 },
+            { resource_id: 2, quantity: 0 },
+          ],
+        })
+      );
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4 });
+
+      await useCase.execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        dto({
+          adjusted_resources: [
+            { resource_id: 1, quantity: 4 },
+            { resource_id: 2, quantity: 20 },
+          ],
+        })
+      );
+      expect(await activeOf(request.requestId)).toEqual({ 1: 4, 2: 20 });
+    });
+
+    it("responde errores por campo con mensajes específicos, nunca el genérico", async () => {
+      const request = await createRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ location: "", adjusted_resources: [{ resource_id: 99, quantity: 1 }] })
+        )
+      ).rejects.toMatchObject({
+        message: "El campo ubicación es obligatorio.",
+        errors: { location: "El campo ubicación es obligatorio." },
+      });
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ adjusted_resources: [{ resource_id: 3, quantity: 2 }] })
+        )
+      ).rejects.toMatchObject({
+        message: expect.stringContaining("Ana López"),
+        errors: { adjusted_resources: expect.stringContaining("Ana López") },
+      });
+    });
+
+    it("un error no deja asignaciones a medias", async () => {
+      const request = await createRequest();
+      const before = await activeOf(request.requestId);
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            adjusted_resources: [
+              { resource_id: 2, quantity: 0 },
+              { resource_id: 99, quantity: 1 },
+            ],
+          })
+        )
+      ).rejects.toBeInstanceOf(AgreementsValidationException);
+      expect(await activeOf(request.requestId)).toEqual(before);
+    });
+  });
+
+  describe("inicio ya pasado por el simple paso del tiempo", () => {
+    const HOUR = 60 * 60 * 1000;
+    const pastStart = () => new Date(Date.now() - 2 * HOUR);
+    const pastEnd = () => new Date(Date.now() + HOUR);
+
+    async function pastRequest() {
+      const start = pastStart();
+      const end = pastEnd();
+      const request = await createRequest(undefined, start, end);
+
+      return { request, start, end };
+    }
+
+    it("permite re-guardar acuerdos con el mismo inicio aunque ya pasó", async () => {
+      const { request, start, end } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+        )
+      ).resolves.toBeDefined();
+
+      // Y otra vez, ahora contra los últimos acuerdos guardados.
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+        )
+      ).resolves.toBeDefined();
+    });
+
+    it("rechaza cambiar a otro inicio pasado", async () => {
+      const { request, end } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            start_datetime: new Date(Date.now() - 3 * HOUR).toISOString(),
+            end_datetime: end.toISOString(),
+          })
+        )
+      ).rejects.toMatchObject({
+        name: "AgreementsValidationException",
+        errors: { start_datetime: expect.stringMatching(/momento actual/) },
+      });
+    });
+
+    it("permite cambiar a un inicio futuro", async () => {
+      const { request } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({
+            start_datetime: futureDate(10, 18).toISOString(),
+            end_datetime: futureDate(10, 23).toISOString(),
+          })
+        )
+      ).resolves.toBeDefined();
+    });
+
+    it("sigue aplicando las reglas de ventana aunque el inicio no cambie", async () => {
+      const { request, start } = await pastRequest();
+
+      await expect(
+        useCase.execute(
+          request.requestId,
+          LOGISTIC_USER_ID,
+          dto({ start_datetime: start.toISOString(), end_datetime: start.toISOString() })
+        )
+      ).rejects.toMatchObject({ errors: { end_datetime: expect.any(String) } });
     });
   });
 });

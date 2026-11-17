@@ -1,5 +1,6 @@
 /* eslint-disable no-param-reassign */
 const { CalendarMessages } = require("../../../domain/constants/calendar-messages");
+const { validateEventWindow } = require("../../services/calendar/event-window");
 
 const DATE_TIME_REGEX =
   /^(\d{4})-(\d{2})-(\d{2})[ T]([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.(\d{1,3}))?)?$/;
@@ -115,9 +116,9 @@ class EditCalendarEventRequestDto {
       return { errors };
     }
 
-    if (endAt.getTime() <= startAt.getTime()) {
-      errors.end_datetime = CalendarMessages.END_BEFORE_START;
-    }
+    const windowError = validateEventWindow(startAt, endAt);
+
+    if (windowError) errors.end_datetime = windowError;
 
     const scheduleChanged =
       startAt.getTime() !== event.startAt.getTime() || endAt.getTime() !== event.endAt.getTime();

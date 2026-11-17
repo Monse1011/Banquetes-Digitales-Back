@@ -34,6 +34,7 @@ it("preserves requested and available quantities, zero assignment and shortage n
   };
   const assignments = {
     findByRequest: async () => [row],
+    findReleasedResourceIds: async () => [],
     findBlocking: async () => [],
     confirm: async () => true,
   };
