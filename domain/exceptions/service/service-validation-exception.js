@@ -8,4 +8,3 @@ class ServiceValidationException extends Error {
 }
 
 module.exports = ServiceValidationException;
-

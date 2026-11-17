@@ -9,4 +9,3 @@ class PromotionNotFoundException extends Error {
 }
 
 module.exports = PromotionNotFoundException;
-

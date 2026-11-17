@@ -1,6 +1,8 @@
 const request = require("supertest");
 const { createApp } = require("../app");
-const { InMemoryPromotionRepository } = require("../../infrastructure/repositories/promotion/in-memory-promotion-repository");
+const {
+  InMemoryPromotionRepository,
+} = require("../../infrastructure/repositories/promotion/in-memory-promotion-repository");
 const { Promotion } = require("../../domain/entities/promotion/promotion");
 const PromotionStatus = require("../../domain/enums/promotion/promotion-status");
 const UserRole = require("../../domain/enums/auth/user-role");
@@ -37,9 +39,30 @@ describe("Admin & Client Promotion Routes (Función 2.7 - Contrato API)", () => 
     currentUserRole = UserRole.ADMIN;
 
     promotionRepository = new InMemoryPromotionRepository([
-      new Promotion(1, "Descuento de temporada", "Aplica en eventos de temporada.", 10.0, "2026-12-31", PromotionStatus.ACTIVE),
-      new Promotion(2, "Promoción de verano", "Aplica en eventos de verano.", 5.0, "2026-08-31", PromotionStatus.INACTIVE),
-      new Promotion(3, "Promoción eliminada", "No debe mostrarse.", 15.0, "2026-12-31", PromotionStatus.DELETED),
+      new Promotion(
+        1,
+        "Descuento de temporada",
+        "Aplica en eventos de temporada.",
+        10.0,
+        "2026-12-31",
+        PromotionStatus.ACTIVE
+      ),
+      new Promotion(
+        2,
+        "Promoción de verano",
+        "Aplica en eventos de verano.",
+        5.0,
+        "2026-08-31",
+        PromotionStatus.INACTIVE
+      ),
+      new Promotion(
+        3,
+        "Promoción eliminada",
+        "No debe mostrarse.",
+        15.0,
+        "2026-12-31",
+        PromotionStatus.DELETED
+      ),
     ]);
 
     app = buildApp();
@@ -420,4 +443,3 @@ describe("Admin & Client Promotion Routes (Función 2.7 - Contrato API)", () => 
     });
   });
 });
-

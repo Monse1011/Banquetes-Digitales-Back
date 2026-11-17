@@ -44,4 +44,3 @@ describe("ServiceStatusRequestDto (Función 2.6)", () => {
     });
   });
 });
-

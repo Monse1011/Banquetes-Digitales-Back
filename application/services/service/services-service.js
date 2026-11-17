@@ -18,9 +18,9 @@ class ServicesService {
 
     const { services, total_records: totalRecords } =
       await this.serviceRepository.findAllNotDeleted({
-      page: pageNumber,
-      per_page: perPageNumber,
-    });
+        page: pageNumber,
+        per_page: perPageNumber,
+      });
 
     return {
       services: ServiceResponseDto.fromEntities(services),
@@ -137,4 +137,3 @@ class ServicesService {
 }
 
 module.exports = { ServicesService };
-

@@ -48,4 +48,3 @@ describe("PromotionStatusRequestDto (Función 2.7)", () => {
     });
   });
 });
-

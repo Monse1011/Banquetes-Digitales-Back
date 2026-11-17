@@ -18,4 +18,3 @@ const ServiceMessages = Object.freeze({
 });
 
 module.exports = { ServiceMessages };
-

@@ -17,4 +17,3 @@ class ServiceResponseDto {
 }
 
 module.exports = ServiceResponseDto;
-

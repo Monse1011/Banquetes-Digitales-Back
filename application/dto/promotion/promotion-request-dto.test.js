@@ -164,4 +164,3 @@ describe("PromotionRequestDto (Función 2.7)", () => {
     expect(dto.validate(currentDate).valid_until).toBe(currentDate);
   });
 });
-

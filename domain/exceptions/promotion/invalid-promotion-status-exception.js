@@ -9,4 +9,3 @@ class InvalidPromotionStatusException extends Error {
 }
 
 module.exports = InvalidPromotionStatusException;
-

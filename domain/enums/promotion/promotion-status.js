@@ -5,4 +5,3 @@ const PromotionStatus = Object.freeze({
 });
 
 module.exports = PromotionStatus;
-

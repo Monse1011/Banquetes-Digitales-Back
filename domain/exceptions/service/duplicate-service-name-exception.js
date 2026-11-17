@@ -9,4 +9,3 @@ class DuplicateServiceNameException extends Error {
 }
 
 module.exports = DuplicateServiceNameException;
-

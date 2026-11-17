@@ -9,4 +9,3 @@ class DuplicatePromotionNameException extends Error {
 }
 
 module.exports = DuplicatePromotionNameException;
-

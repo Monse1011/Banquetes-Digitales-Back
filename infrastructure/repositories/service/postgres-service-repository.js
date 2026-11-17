@@ -162,7 +162,11 @@ class PostgresServiceRepository {
     let normalizedStatus = row.status;
     if (row.status === "ACTIVE" || row.status === "Vigente" || row.status === "activo") {
       normalizedStatus = ServiceStatus.ACTIVE;
-    } else if (row.status === "INACTIVE" || row.status === "No vigente" || row.status === "inactivo") {
+    } else if (
+      row.status === "INACTIVE" ||
+      row.status === "No vigente" ||
+      row.status === "inactivo"
+    ) {
       normalizedStatus = ServiceStatus.INACTIVE;
     } else if (row.status === "DELETED" || row.status === "Eliminado") {
       normalizedStatus = ServiceStatus.DELETED;

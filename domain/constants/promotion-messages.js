@@ -23,4 +23,3 @@ const PromotionMessages = Object.freeze({
 });
 
 module.exports = { PromotionMessages };
-

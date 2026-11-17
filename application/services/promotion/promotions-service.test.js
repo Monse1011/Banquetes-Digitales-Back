@@ -1,5 +1,7 @@
 const { PromotionsService } = require("./promotions-service");
-const { InMemoryPromotionRepository } = require("../../../infrastructure/repositories/promotion/in-memory-promotion-repository");
+const {
+  InMemoryPromotionRepository,
+} = require("../../../infrastructure/repositories/promotion/in-memory-promotion-repository");
 const { Promotion } = require("../../../domain/entities/promotion/promotion");
 const PromotionStatus = require("../../../domain/enums/promotion/promotion-status");
 const PromotionNotFoundException = require("../../../domain/exceptions/promotion/promotion-not-found-exception");
@@ -14,10 +16,38 @@ describe("PromotionsService (Función 2.7 - Gestión de promociones)", () => {
 
   beforeEach(() => {
     repository = new InMemoryPromotionRepository([
-      new Promotion(1, "Descuento de temporada", "Aplica en temporada", 10.0, "2026-12-31", PromotionStatus.ACTIVE),
-      new Promotion(2, "Promoción de verano", "Aplica en verano", 5.0, "2026-11-01", PromotionStatus.ACTIVE), // expired relative to 2026-11-04
-      new Promotion(3, "Descuento empresarial", "Eventos corporativos", 15.0, "2026-12-31", PromotionStatus.INACTIVE),
-      new Promotion(4, "Promoción eliminada", "No debe verse", 20.0, "2026-12-31", PromotionStatus.DELETED),
+      new Promotion(
+        1,
+        "Descuento de temporada",
+        "Aplica en temporada",
+        10.0,
+        "2026-12-31",
+        PromotionStatus.ACTIVE
+      ),
+      new Promotion(
+        2,
+        "Promoción de verano",
+        "Aplica en verano",
+        5.0,
+        "2026-11-01",
+        PromotionStatus.ACTIVE
+      ), // expired relative to 2026-11-04
+      new Promotion(
+        3,
+        "Descuento empresarial",
+        "Eventos corporativos",
+        15.0,
+        "2026-12-31",
+        PromotionStatus.INACTIVE
+      ),
+      new Promotion(
+        4,
+        "Promoción eliminada",
+        "No debe verse",
+        20.0,
+        "2026-12-31",
+        PromotionStatus.DELETED
+      ),
     ]);
     service = new PromotionsService(repository);
     service.getCurrentMeridaDate = () => "2026-11-04";
@@ -222,7 +252,9 @@ describe("PromotionsService (Función 2.7 - Gestión de promociones)", () => {
     });
 
     it("rejects reactivating (status ACTIVE) with 409 Conflict (RF-1.2.7.6)", async () => {
-      await expect(service.deactivatePromotion(3, "ACTIVE")).rejects.toThrow(PromotionConflictException);
+      await expect(service.deactivatePromotion(3, "ACTIVE")).rejects.toThrow(
+        PromotionConflictException
+      );
     });
 
     it("rejects DELETED status with 422 Unprocessable Entity", async () => {
@@ -257,4 +289,3 @@ describe("PromotionsService (Función 2.7 - Gestión de promociones)", () => {
     });
   });
 });
-

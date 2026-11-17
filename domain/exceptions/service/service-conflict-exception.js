@@ -9,4 +9,3 @@ class ServiceConflictException extends Error {
 }
 
 module.exports = ServiceConflictException;
-

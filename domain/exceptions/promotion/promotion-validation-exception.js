@@ -8,4 +8,3 @@ class PromotionValidationException extends Error {
 }
 
 module.exports = PromotionValidationException;
-

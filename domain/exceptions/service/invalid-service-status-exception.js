@@ -9,4 +9,3 @@ class InvalidServiceStatusException extends Error {
 }
 
 module.exports = InvalidServiceStatusException;
-

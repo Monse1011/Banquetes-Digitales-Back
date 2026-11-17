@@ -33,4 +33,3 @@ class ServiceStatusRequestDto {
 }
 
 module.exports = ServiceStatusRequestDto;
-

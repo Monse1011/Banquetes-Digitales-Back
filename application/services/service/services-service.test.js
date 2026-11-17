@@ -1,5 +1,7 @@
 const { ServicesService } = require("./services-service");
-const { InMemoryServiceRepository } = require("../../../infrastructure/repositories/service/in-memory-service-repository");
+const {
+  InMemoryServiceRepository,
+} = require("../../../infrastructure/repositories/service/in-memory-service-repository");
 const { Service } = require("../../../domain/entities/service/service");
 const ServiceStatus = require("../../../domain/enums/service/service-status");
 const ServiceNotFoundException = require("../../../domain/exceptions/service/service-not-found-exception");
@@ -269,4 +271,3 @@ describe("ServicesService (Función 2.6 - Gestión de servicios)", () => {
     });
   });
 });
-

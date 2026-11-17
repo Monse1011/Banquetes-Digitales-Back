@@ -28,4 +28,3 @@ class PromotionStatusRequestDto {
 }
 
 module.exports = PromotionStatusRequestDto;
-

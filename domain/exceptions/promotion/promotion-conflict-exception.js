@@ -7,4 +7,3 @@ class PromotionConflictException extends Error {
 }
 
 module.exports = PromotionConflictException;
-

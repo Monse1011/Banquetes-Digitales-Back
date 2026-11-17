@@ -9,4 +9,3 @@ class ServiceNotFoundException extends Error {
 }
 
 module.exports = ServiceNotFoundException;
-

@@ -161,4 +161,3 @@ class PromotionsService {
 }
 
 module.exports = { PromotionsService };
-
