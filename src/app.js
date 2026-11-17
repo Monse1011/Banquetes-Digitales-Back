@@ -3,7 +3,11 @@ require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
-
+const { ServicesService } = require("../application/services/service/services-service");
+const {
+  PostgresPromotionRepository,
+} = require("../infrastructure/repositories/promotion/postgres-promotion-repository");
+const { PromotionsService } = require("../application/services/promotion/promotions-service");
 const {
   PostgresClientRepository,
 } = require("../infrastructure/repositories/client/postgres-client-repository");
@@ -240,9 +244,6 @@ const {
 const {
   PostgresSocialLinkRepository,
 } = require("../infrastructure/repositories/content/postgres-social-link-repository");
-const {
-  PostgresPromotionRepository,
-} = require("../infrastructure/repositories/promotion/postgres-promotion-repository");
 const { writeReportWorkbook } = require("../infrastructure/services/excel/excel-report-writer");
 const GenerateReportUseCase = require("../application/use-cases/reports/generate-report-use-case");
 const ExportReportUseCase = require("../application/use-cases/reports/export-report-use-case");
@@ -327,6 +328,11 @@ async function main() {
 
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
+  // Función 2.6: gestión de servicios.
+  const servicesService = new ServicesService(serviceRepository);
+  // Función 2.7 (gestión) y 4.1 (catálogo público) comparten la misma instancia (AD-06).
+  const promotionRepository = new PostgresPromotionRepository(pool);
+  const promotionsService = new PromotionsService(promotionRepository);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
   const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
@@ -473,7 +479,8 @@ async function main() {
   const listReportClientsUseCase = new ListReportClientsUseCase(
     new PostgresClientDirectoryRepository(pool)
   );
-  const promotionRepository = new PostgresPromotionRepository(pool);
+  // promotionRepository y promotionsService ya se construyeron arriba (Función 2.7);
+  // ClientContentController (contratos 11 y 12) comparte esa misma instancia (AD-06).
   const galleryRepository = new PostgresGalleryRepository(pool);
   const socialLinkRepository = new PostgresSocialLinkRepository(pool);
 
@@ -484,6 +491,9 @@ async function main() {
     tokenService,
     clientRepository,
     serviceRepository,
+    servicesService,
+    promotionRepository,
+    promotionsService,
     reservationRequestRepository,
     folioGenerator,
     upsertClientByEmailUseCase,
@@ -525,7 +535,6 @@ async function main() {
     generateReportUseCase,
     exportReportUseCase,
     listReportClientsUseCase,
-    promotionRepository,
     galleryRepository,
     socialLinkRepository,
   });

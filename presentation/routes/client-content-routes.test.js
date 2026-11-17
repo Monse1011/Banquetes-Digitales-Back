@@ -1,6 +1,5 @@
 // Contratos 11 y 12 + galería y redes (Función 4.1) contra el PostgreSQL desechable.
-// AD-11: sin page/per_page llega la lista completa vigente; los parámetros explícitos
-// del DAD se honran cuando el cliente los envía.
+// Contratos 11 y 12: paginación con page = 1 y per_page = 10 por defecto.
 const { Pool } = require("pg");
 const request = require("supertest");
 const { createApp } = require("../app");
@@ -104,7 +103,7 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
     const get = (url, query = {}) => request(app).get(url).query(query);
 
     describe("GET /api/client/services (contrato 12)", () => {
-      it("lista completa vigente con id, name, description y price, orden name,id", async () => {
+      it("lista vigentes con id, name, description y price, orden name,id", async () => {
         await insertService(connection, "Decoración", "Flores", 50);
         await insertService(connection, "Banquetes", "Menú", 100);
         await insertService(connection, "Fotografía", "Fotos", 75, "INACTIVE");
@@ -116,7 +115,11 @@ describe.skipIf(!process.env.TEST_PGDATABASE)(
           { id: expect.any(Number), name: "Banquetes", description: "Menú", price: 100 },
           { id: expect.any(Number), name: "Decoración", description: "Flores", price: 50 },
         ]);
-        expect(response.body.metadata.pagination.total_records).toBe(2);
+        expect(response.body.metadata.pagination).toEqual({
+          total_records: 2,
+          page: 1,
+          per_page: 10,
+        });
       });
 
       it("page/per_page explícitos rebanan (contrato 12) y llegan los nombres repetidos por id", async () => {
