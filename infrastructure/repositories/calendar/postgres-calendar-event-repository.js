@@ -452,6 +452,7 @@ class PostgresCalendarEventRepository {
       `SELECT a.resource_id AS id_resource, SUM(a.quantity)::int AS quantity
        FROM proposal_resources a JOIN proposals p ON p.id = a.proposal_id
        WHERE p.request_id = $1
+         AND p.version = (SELECT MAX(version) FROM proposals WHERE request_id = p.request_id)
        GROUP BY a.resource_id ORDER BY a.resource_id`,
       [requestId]
     );
@@ -478,6 +479,7 @@ class PostgresCalendarEventRepository {
        JOIN reservations_request r ON r.id = p.request_id
        JOIN calendar_events e ON e.id_request = r.id
        WHERE a.resource_id = ANY($1::bigint[])
+         AND p.version = (SELECT MAX(version) FROM proposals WHERE request_id = p.request_id)
          AND r.id <> $2
          AND r.status = ANY($3)
          AND e.start_at < $4

@@ -10,6 +10,11 @@ const ACTIVE_STATUSES = Object.freeze([
   "Propuesta generada",
   "PROPUESTA_GENERADA",
   "PROPOSAL_GENERATED",
+  "En revisión",
+  "En revision",
+  "IN_REVIEW",
+  "Ajustes Solicitados",
+  "ADJUSTMENTS_REQUESTED",
   "Confirmado",
   "CONFIRMED",
 ]);

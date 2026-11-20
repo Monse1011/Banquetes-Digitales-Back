@@ -75,6 +75,19 @@ describe("ListAssignedRequestsUseCase (Función 3.1)", () => {
     });
   });
 
+  it("includes 'En revisión' and 'Ajustes Solicitados' in the default active filter", async () => {
+    const mockRepo = { findAll: vi.fn().mockResolvedValue({ requests: [], totalRecords: 0 }) };
+    const useCase = new ListAssignedRequestsUseCase({ reservationRequestRepository: mockRepo });
+
+    await useCase.execute({ userId: 10 });
+
+    const { status } = mockRepo.findAll.mock.calls[0][0];
+    expect(status).toEqual(expect.arrayContaining(["IN_REVIEW", "ADJUSTMENTS_REQUESTED"]));
+    await expect(
+      useCase.execute({ userId: 10, status: "Ajustes Solicitados" })
+    ).resolves.toBeDefined();
+  });
+
   it("returns explicit message when logistics user has no assigned requests (NC 15, RF-2.3.1.2)", async () => {
     const mockRepo = {
       findAll: vi.fn().mockResolvedValue({

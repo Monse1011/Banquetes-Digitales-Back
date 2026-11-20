@@ -63,6 +63,10 @@ class InMemoryProposalRepository {
         totalAmount: proposal.totalAmount ?? null,
         currency: proposal.currency ?? "MXN",
         pdfPath: proposal.name,
+        promotionId: proposal.promotionId,
+        promotionName: proposal.promotionName,
+        promotionDescription: proposal.promotionDescription,
+        promotionDiscount: proposal.promotionDiscount,
       }
     );
 

@@ -30,6 +30,10 @@ const ProposalGenerationFailedException = require("../../../domain/exceptions/pr
 const DerivedInformationNotFoundException = require("../../../domain/exceptions/proposal/derived-information-not-found-exception");
 const AgreementsValidationException = require("../../../domain/exceptions/proposal/agreements-validation-exception");
 
+const {
+  InMemoryPromotionRepository,
+} = require("../../../infrastructure/repositories/promotion/in-memory-promotion-repository");
+
 const LOGISTIC_USER_ID = 7;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -314,6 +318,74 @@ describe("GenerateProposalUseCase", () => {
     expect(stored.totalAmount).toBe(200);
     expect(stored.currency).toBe("MXN");
     expect(result.data.version).toBe(1);
+  });
+
+  describe("promoción elegida", () => {
+    const promotion = (overrides = {}) => ({
+      id: 5,
+      name: "Primer banquete con 10% de descuento",
+      description: "Descuento del 10%.",
+      discountPercentage: 10,
+      validUntil: "2999-12-31",
+      status: "ACTIVE",
+      ...overrides,
+    });
+
+    function useCaseWith(promotions) {
+      return new GenerateProposalUseCase(
+        reservationRequestRepository,
+        clientRepository,
+        derivedInformationRepository,
+        proposalRepository,
+        assignedResourceRepository,
+        pdfGenerator,
+        null,
+        new InMemoryPromotionRepository(promotions)
+      );
+    }
+
+    it("calcula el descuento en el servidor, lo guarda con su copia y lo manda al PDF", async () => {
+      const { request, information } = await setup();
+      let received;
+      pdfGenerator.generate = async (input) => {
+        received = input;
+        return { fileName: "propuesta.pdf", buffer: Buffer.from("%PDF-1.4 test") };
+      };
+
+      await useCaseWith([promotion()]).execute(
+        request.requestId,
+        LOGISTIC_USER_ID,
+        new GenerateProposalRequestDto({ derived_information_id: information.id, promotion_id: 5 })
+      );
+
+      const stored = await proposalRepository.findCurrentByRequestId(request.requestId);
+      // Subtotal 300 (mesero $60 × 5 h) con 10%: descuento 30, total 270.
+      expect(stored.subtotal).toBe(300);
+      expect(stored.discountAmount).toBe(30);
+      expect(stored.totalAmount).toBe(270);
+      expect(stored.promotionId).toBe(5);
+      expect(stored.promotionName).toBe("Primer banquete con 10% de descuento");
+      expect(stored.promotionDiscount).toBe(10);
+      expect(received.totals.discountAmount).toBe(30);
+    });
+
+    it("rechaza una promoción vencida, inactiva o inexistente", async () => {
+      for (const promotions of [
+        [promotion({ validUntil: "2000-01-01" })],
+        [promotion({ status: "INACTIVE" })],
+        [],
+      ]) {
+        const { request, information } = await setup();
+
+        await expect(
+          useCaseWith(promotions).execute(
+            request.requestId,
+            LOGISTIC_USER_ID,
+            new GenerateProposalRequestDto({ derived_information_id: information.id, promotion_id: 5 })
+          )
+        ).rejects.toBeInstanceOf(AgreementsValidationException);
+      }
+    });
   });
 
   it("rechaza un descuento mayor que el subtotal (RF-3.4.4.3)", async () => {

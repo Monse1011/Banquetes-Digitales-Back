@@ -389,7 +389,8 @@ async function main() {
     proposalRepository,
     assignedResourceRepository,
     pdfGenerator,
-    new PostgresTransactionManager(pool)
+    new PostgresTransactionManager(pool),
+    promotionRepository
   );
   const getProposalUseCase = new GetProposalUseCase(
     reservationRequestRepository,

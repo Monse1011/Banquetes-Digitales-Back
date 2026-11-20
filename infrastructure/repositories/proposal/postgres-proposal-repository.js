@@ -14,7 +14,9 @@ const TYPE_BY_DB_TYPE = Object.freeze({
 
 const PROPOSAL_SELECT = `SELECT id, request_id, derived_information_id, proposal_code, file_name,
     status, version, viewed_at, accepted_at, accepted_pdf_path, pdf_path, subtotal,
-    discount_amount, total_amount, currency, client_observations, created_by_user_id, created_at`;
+    discount_amount, total_amount, currency, client_observations, created_by_user_id, created_at,
+    promotion_id, promotion_name_snapshot, promotion_description_snapshot,
+    promotion_discount_snapshot`;
 
 class PostgresProposalRepository {
   constructor(pool) {
@@ -82,8 +84,10 @@ class PostgresProposalRepository {
         `INSERT INTO proposals
          (request_id, derived_information_id, proposal_code, file_name, status, version,
           pdf_path, subtotal, discount_amount, total_amount, currency,
-          client_observations, created_by_user_id, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+          client_observations, created_by_user_id, created_at,
+          promotion_id, promotion_name_snapshot, promotion_description_snapshot,
+          promotion_discount_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
         [
           requestId,
           proposal.derivedInformationId,
@@ -99,6 +103,10 @@ class PostgresProposalRepository {
           proposal.clientObservations,
           proposal.createdByUserId,
           proposal.creationDate,
+          proposal.promotionId,
+          proposal.promotionName,
+          proposal.promotionDescription,
+          proposal.promotionDiscount,
         ]
       );
       const created = this.toEntity(result.rows[0]);
@@ -206,6 +214,13 @@ class PostgresProposalRepository {
         discountAmount: row.discount_amount === null ? 0 : Number(row.discount_amount),
         totalAmount: row.total_amount === null ? null : Number(row.total_amount),
         currency: row.currency ?? "MXN",
+        promotionId: row.promotion_id === null || row.promotion_id === undefined ? null : Number(row.promotion_id),
+        promotionName: row.promotion_name_snapshot ?? null,
+        promotionDescription: row.promotion_description_snapshot ?? null,
+        promotionDiscount:
+          row.promotion_discount_snapshot === null || row.promotion_discount_snapshot === undefined
+            ? null
+            : Number(row.promotion_discount_snapshot),
       }
     );
   }

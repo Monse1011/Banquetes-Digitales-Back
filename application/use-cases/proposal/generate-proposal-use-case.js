@@ -22,6 +22,8 @@ const {
 const HumanResourcePriceMissingException = require("../../../domain/exceptions/proposal/human-resource-price-missing-exception");
 const { ResourceType } = require("../../../domain/enums/resource/resource-type");
 const { humanResourceCost } = require("../../services/proposal/human-resource-cost");
+const PromotionStatus = require("../../../domain/enums/promotion/promotion-status");
+const { formatMeridaDate } = require("../../services/event-closure/merida-time");
 const { findOwnedRequest } = require("../../services/proposal/request-ownership");
 const { buildProposalFileName } = require("../../services/proposal/proposal-file-name");
 const { withAgreementsLock } = require("../../services/proposal/with-agreements-lock");
@@ -41,7 +43,8 @@ class GenerateProposalUseCase {
     proposalRepository,
     assignedResourceRepository,
     pdfGenerator,
-    transactionManager = null
+    transactionManager = null,
+    promotionRepository = null
   ) {
     this.reservationRequestRepository = reservationRequestRepository;
     this.clientRepository = clientRepository;
@@ -50,6 +53,7 @@ class GenerateProposalUseCase {
     this.assignedResourceRepository = assignedResourceRepository;
     this.pdfGenerator = pdfGenerator;
     this.transactionManager = transactionManager;
+    this.promotionRepository = promotionRepository;
   }
 
   async execute(requestId, userId, dto, role) {
@@ -98,20 +102,12 @@ class GenerateProposalUseCase {
       throw new AgreementsValidationException(informationErrors);
     }
 
-    const { proposalsCode, fileName, resources } = await this.renderDocument(
+    const { proposalsCode, fileName, resources, totals } = await this.renderDocument(
       dto,
       request,
       information,
       transaction
     );
-
-    // Incremento 3 (RF-3.4.4.3): subtotal = Σ quantity × unit_cost congelado de las líneas;
-    // discount_amount es opcional (0 por defecto) y debe estar entre 0 y el subtotal.
-    const subtotal = resources.reduce(
-      (sum, resource) => sum + Number(resource.quantity) * Number(resource.unitCost ?? 0),
-      0
-    );
-    const discountAmount = this.validateDiscount(dto, subtotal);
 
     const created = await this.proposalRepository.createWithRequestStatus(
       new Proposal(
@@ -125,10 +121,11 @@ class GenerateProposalUseCase {
         userId,
         null,
         {
-          subtotal: round2(subtotal),
-          discountAmount: round2(discountAmount),
-          totalAmount: round2(subtotal - discountAmount),
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          totalAmount: totals.totalAmount,
           currency: "MXN",
+          ...totals.promotion,
         }
       ),
       requestId,
@@ -151,6 +148,51 @@ class GenerateProposalUseCase {
     if (Object.keys(errors).length > 0) {
       throw new AgreementsValidationException(errors);
     }
+  }
+
+  async calculateTotals(dto, resources) {
+    const subtotal = resources.reduce(
+      (sum, resource) => sum + Number(resource.quantity) * Number(resource.unitCost ?? 0),
+      0
+    );
+    const promotion = await this.findApplicablePromotion(dto);
+    const discountAmount = promotion
+      ? round2((subtotal * promotion.discountPercentage) / 100)
+      : this.validateDiscount(dto, subtotal);
+
+    return {
+      subtotal: round2(subtotal),
+      discountAmount: round2(discountAmount),
+      totalAmount: round2(subtotal - discountAmount),
+      promotion: promotion
+        ? {
+            promotionId: promotion.id,
+            promotionName: promotion.name,
+            promotionDescription: promotion.description,
+            promotionDiscount: promotion.discountPercentage,
+          }
+        : {},
+    };
+  }
+
+  // La promoción debe existir, estar activa y vigente hoy (fecha de Mérida).
+  async findApplicablePromotion(dto) {
+    if (dto.promotionId === undefined || dto.promotionId === null) return null;
+
+    const promotion = await this.promotionRepository?.findById(Number(dto.promotionId));
+    const today = formatMeridaDate(new Date());
+
+    if (
+      !promotion ||
+      promotion.status !== PromotionStatus.ACTIVE ||
+      String(promotion.validUntil).slice(0, 10) < today
+    ) {
+      throw new AgreementsValidationException({
+        promotion_id: "La promoción seleccionada no existe o ya no está vigente.",
+      });
+    }
+
+    return promotion;
   }
 
   // Contrato DAD: discount_amount opcional (default 0), numérico, 0 ≤ d ≤ subtotal.
@@ -219,6 +261,10 @@ class GenerateProposalUseCase {
         adjusted_resources: "No hay recursos confirmados disponibles para generar la propuesta.",
       });
     }
+    // Incremento 3 (RF-3.4.4.3): subtotal = Σ quantity × unit_cost congelado de las líneas.
+    // El descuento sale de la promoción elegida (calculado aquí) o, si no hay, de
+    // discount_amount (opcional, 0 por defecto); siempre entre 0 y el subtotal.
+    const totals = await this.calculateTotals(dto, assignedResources);
     const proposalsCode = await this.proposalRepository.nextProposalCode(transaction);
     const baseFileName = buildProposalFileName(
       client?.fullName ?? "",
@@ -235,12 +281,13 @@ class GenerateProposalUseCase {
         request,
         information,
         resources: assignedResources,
+        totals,
         clientObservations: dto.clientObservations ?? null,
       });
 
       await this.pdfGenerator.store(fileName, document.buffer);
 
-      return { proposalsCode, fileName, resources: assignedResources };
+      return { proposalsCode, fileName, resources: assignedResources, totals };
     } catch (error) {
       if (error instanceof ProposalGenerationFailedException) {
         throw error;

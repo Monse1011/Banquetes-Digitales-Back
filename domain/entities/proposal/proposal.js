@@ -35,6 +35,11 @@ class Proposal {
     this.discountAmount = details.discountAmount ?? 0;
     this.totalAmount = details.totalAmount ?? null;
     this.currency = details.currency ?? "MXN";
+    // Copia congelada de la promoción aplicada (los cuatro campos van juntos o todos nulos).
+    this.promotionId = details.promotionId ?? null;
+    this.promotionName = details.promotionName ?? null;
+    this.promotionDescription = details.promotionDescription ?? null;
+    this.promotionDiscount = details.promotionDiscount ?? null;
   }
 
   // RF-3.4.4.4.6: la etiqueta visible para el cliente tras aceptar es "Aprobada".

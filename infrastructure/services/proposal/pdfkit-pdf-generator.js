@@ -28,6 +28,7 @@ class PdfkitPdfGenerator {
     request,
     information,
     resources,
+    totals,
     clientObservations,
   }) {
     const buffer = await new Promise((resolve, reject) => {
@@ -42,7 +43,7 @@ class PdfkitPdfGenerator {
       this.renderClient(document, client);
       this.renderEvent(document, request, information);
       this.renderResources(document, resources);
-      this.renderTotal(document, resources);
+      this.renderTotal(document, resources, totals);
       this.renderObservations(document, clientObservations);
       this.renderClauses(document);
 
@@ -205,17 +206,28 @@ class PdfkitPdfGenerator {
     document.moveDown(1);
   }
 
-  renderTotal(document, resources) {
-    const total = resources.reduce(
-      (amount, resource) => amount + resource.quantity * (resource.unitCost ?? 0),
-      0
-    );
+  renderTotal(document, resources, totals) {
+    const subtotal =
+      totals?.subtotal ??
+      resources.reduce((amount, resource) => amount + resource.quantity * (resource.unitCost ?? 0), 0);
+    const discount = totals?.discountAmount ?? 0;
+    const promotion = totals?.promotion?.promotionName;
+
+    document.fontSize(10).text(`Subtotal: $${subtotal.toFixed(2)}`);
+
+    if (promotion) {
+      document.text(
+        `Promoción aplicada: ${promotion} (${totals.promotion.promotionDiscount}%): -$${discount.toFixed(2)}`
+      );
+    } else if (discount > 0) {
+      document.text(`Descuento: -$${discount.toFixed(2)}`);
+    } else {
+      document.text("Promociones aplicadas: sin promociones aplicadas.");
+    }
 
     document
-      .fontSize(10)
-      .text("Promociones aplicadas: sin promociones aplicadas.")
       .fontSize(12)
-      .text(`Total a pagar: $${total.toFixed(2)}`)
+      .text(`Total a pagar: $${(totals?.totalAmount ?? subtotal - discount).toFixed(2)}`)
       .moveDown(1);
   }
 

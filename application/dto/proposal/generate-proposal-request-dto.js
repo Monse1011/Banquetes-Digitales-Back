@@ -11,6 +11,8 @@ class GenerateProposalRequestDto {
     this.clientObservations = data.client_observations;
     // Incremento 3 (RF-3.4.4.3): descuento opcional, por defecto 0.
     this.discountAmount = data.discount_amount;
+    // Promoción vigente elegida: el descuento lo calcula el servidor, nunca el navegador.
+    this.promotionId = data.promotion_id;
   }
 
   validate() {
@@ -23,6 +25,7 @@ class GenerateProposalRequestDto {
     return {
       derived_information_id: this.validateDerivedInformationId(),
       client_observations: this.validateClientObservations(),
+      promotion_id: this.validatePromotionId(),
     };
   }
 
@@ -39,6 +42,14 @@ class GenerateProposalRequestDto {
     }
 
     return undefined;
+  }
+
+  validatePromotionId() {
+    if (this.promotionId === undefined || this.promotionId === null) return undefined;
+
+    return Number.isInteger(this.promotionId) && this.promotionId >= 1
+      ? undefined
+      : "La promoción seleccionada no es válida.";
   }
 
   validateClientObservations() {
