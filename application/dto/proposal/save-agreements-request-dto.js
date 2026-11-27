@@ -1,0 +1,134 @@
+const {
+  ProposalMessages,
+  ProposalFieldNames,
+  requiredFieldMessage,
+} = require("../../../domain/constants/proposal-messages");
+const { validateEventWindow } = require("../../services/calendar/event-window");
+
+// Body de POST /api/logistics/requests/:id/derived-information (contrato DAD).
+class SaveAgreementsRequestDto {
+  constructor(data = {}) {
+    this.location = data.location;
+    this.startDatetime = data.start_datetime;
+    this.endDatetime = data.end_datetime;
+    this.observations = data.observations;
+    this.adjustedResources = data.adjusted_resources;
+    // Opcional para clientes anteriores; null significa que aún no había acuerdos.
+    this.derivedInformationId = data.derived_information_id;
+  }
+
+  validate() {
+    return Object.fromEntries(
+      Object.entries(this.fieldValidations()).filter(([, message]) => message !== undefined)
+    );
+  }
+
+  fieldValidations() {
+    return {
+      location: this.validateLocation(),
+      start_datetime: this.validateStartDatetime(),
+      end_datetime: this.validateEndDatetime(),
+      adjusted_resources: this.validateAdjustedResources(),
+      derived_information_id:
+        this.derivedInformationId !== undefined &&
+        this.derivedInformationId !== null &&
+        (!Number.isInteger(this.derivedInformationId) || this.derivedInformationId < 1)
+          ? "La revisión de acuerdos no es válida. Actualiza los acuerdos."
+          : undefined,
+    };
+  }
+
+  validateLocation() {
+    const value = typeof this.location === "string" ? this.location.trim() : "";
+
+    if (!value) {
+      return requiredFieldMessage(ProposalFieldNames.LOCATION);
+    }
+
+    if (value.length > 255) {
+      return ProposalMessages.LOCATION_TOO_LONG;
+    }
+
+    return undefined;
+  }
+
+  validateStartDatetime() {
+    const start = this.parseDate(this.startDatetime);
+
+    if (!start) {
+      return requiredFieldMessage(ProposalFieldNames.START_DATETIME);
+    }
+
+    // "Inicio posterior a ahora" lo valida el caso de uso, solo si el inicio cambió.
+    return undefined;
+  }
+
+  validateEndDatetime() {
+    const end = this.parseDate(this.endDatetime);
+
+    if (!end) {
+      return requiredFieldMessage(ProposalFieldNames.END_DATETIME);
+    }
+
+    const start = this.parseDate(this.startDatetime);
+
+    // RF-2.3.4.2: la hora de fin debe ser posterior a la de inicio (y coherente si cruza el día).
+    if (start) {
+      return validateEventWindow(start, end);
+    }
+
+    return undefined;
+  }
+
+  validateAdjustedResources() {
+    if (this.adjustedResources === undefined || this.adjustedResources === null) {
+      return requiredFieldMessage(ProposalFieldNames.ADJUSTED_RESOURCES);
+    }
+
+    if (!Array.isArray(this.adjustedResources)) {
+      return ProposalMessages.ADJUSTED_QUANTITY_INVALID;
+    }
+
+    const invalidItem = this.adjustedResources.some((item) => {
+      const resourceId = Number(item?.resource_id);
+      const quantity = item?.quantity;
+
+      return (
+        !Number.isInteger(resourceId) ||
+        resourceId < 1 ||
+        !Number.isInteger(quantity) ||
+        quantity < 0
+      );
+    });
+
+    if (invalidItem) {
+      return ProposalMessages.ADJUSTED_QUANTITY_INVALID;
+    }
+
+    const resourceIds = this.adjustedResources.map((item) => Number(item.resource_id));
+    if (new Set(resourceIds).size !== resourceIds.length) {
+      return ProposalMessages.ADJUSTED_RESOURCES_DUPLICATE;
+    }
+
+    return undefined;
+  }
+
+  parseDate(value) {
+    if (typeof value !== "string" || value.trim() === "") {
+      return null;
+    }
+
+    const date = new Date(value.replace(" ", "T"));
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  toAdjustments() {
+    return (this.adjustedResources ?? []).map((item) => ({
+      resourceId: Number(item.resource_id),
+      quantity: Number(item.quantity),
+    }));
+  }
+}
+
+module.exports = { SaveAgreementsRequestDto };

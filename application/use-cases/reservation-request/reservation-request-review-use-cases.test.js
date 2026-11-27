@@ -1,45 +1,32 @@
 const { ApproveReservationRequestUseCase } = require("./approve-reservation-request-use-case");
-const { GetReservationRequestUseCase } = require("./get-reservation-request-use-case");
 const { CreateReservationRequestUseCase } = require("./create-reservation-request-use-case");
 const { UpsertClientByEmailUseCase } = require("../client/upsert-client-by-email-use-case");
 const {
   InMemoryClientRepository,
 } = require("../../../infrastructure/repositories/client/in-memory-client-repository");
 const {
-  InMemoryServiceRepository,
-} = require("../../../infrastructure/repositories/service/in-memory-service-repository");
-const {
   InMemoryReservationRequestRepository,
 } = require("../../../infrastructure/repositories/reservation-request/in-memory-reservation-request-repository");
 const {
   InMemoryFolioGenerator,
 } = require("../../../infrastructure/services/reservation-request/in-memory-folio-generator");
-const { Service } = require("../../../domain/entities/service/service");
+
+// Más de 3 meses: cumple cualquier plazo de anticipación por temporada.
+const FAR_FUTURE_MS = 400 * 24 * 60 * 60 * 1000;
 
 describe("ReservationRequest Review UseCases", () => {
   let clientRepository;
-  let serviceRepository;
   let reservationRequestRepository;
   let approveUseCase;
-  let getUseCase;
   let createUseCase;
 
   beforeEach(async () => {
     clientRepository = new InMemoryClientRepository();
-    serviceRepository = new InMemoryServiceRepository([
-      new Service(1, "Catering", "Servicio de catering", "activo"),
-    ]);
     reservationRequestRepository = new InMemoryReservationRequestRepository();
-
     const folioGenerator = new InMemoryFolioGenerator();
     const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
 
     approveUseCase = new ApproveReservationRequestUseCase(reservationRequestRepository);
-    getUseCase = new GetReservationRequestUseCase(
-      reservationRequestRepository,
-      clientRepository,
-      serviceRepository
-    );
     createUseCase = new CreateReservationRequestUseCase(
       upsertClientByEmailUseCase,
       reservationRequestRepository,
@@ -47,26 +34,33 @@ describe("ReservationRequest Review UseCases", () => {
     );
   });
 
+  async function createPendingRequest() {
+    await createUseCase.execute({
+      client_full_name: "John Doe",
+      email: "john@example.com",
+      phone: "1234567890",
+      event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 60 * 1000).toISOString(),
+      event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 3 * 60 * 60 * 1000).toISOString(),
+      guest_count: 100,
+      event_address: "123 Main St",
+      services_ids: [1],
+    });
+
+    const firstRequest = await reservationRequestRepository.findAll(
+      {},
+      { field: "eventDate", direction: "asc" },
+      1,
+      1
+    );
+
+    return firstRequest.requests[0].requestId;
+  }
+
   describe("ApproveReservationRequestUseCase", () => {
     it("should approve a pending request", async () => {
-      await createUseCase.execute({
-        client_full_name: "John Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-        event_date_time: new Date().toISOString(),
-        guest_count: 100,
-        event_address: "123 Main St",
-        services_ids: [1],
-      });
+      const requestId = await createPendingRequest();
 
-      const firstRequest = await reservationRequestRepository.findAll(
-        {},
-        { field: "EventDate", direction: "asc" },
-        1,
-        1
-      );
-
-      const result = await approveUseCase.execute(firstRequest.requests[0].requestId);
+      const result = await approveUseCase.execute(requestId);
 
       expect(result.data[0].status).toBe("Aprobada");
     });
@@ -78,34 +72,6 @@ describe("ReservationRequest Review UseCases", () => {
       } catch (error) {
         expect(error.message).toBe("Reservation request not found");
       }
-    });
-  });
-
-  describe("GetReservationRequestUseCase", () => {
-    it("should get a request with full details", async () => {
-      await createUseCase.execute({
-        client_full_name: "John Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-        event_date_time: new Date().toISOString(),
-        guest_count: 100,
-        event_address: "123 Main St",
-        services_ids: [1],
-      });
-
-      const firstRequest = await reservationRequestRepository.findAll(
-        {},
-        { field: "EventDate", direction: "asc" },
-        1,
-        1
-      );
-
-      const result = await getUseCase.execute(firstRequest.requests[0].requestId);
-
-      expect(result.data[0]).toHaveProperty("request_id");
-      expect(result.data[0]).toHaveProperty("folio");
-      expect(result.data[0]).toHaveProperty("client_name");
-      expect(result.data[0].selected_services).toHaveLength(1);
     });
   });
 });

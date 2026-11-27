@@ -1,8 +1,13 @@
+/* eslint-disable max-lines-per-function, max-len */
 require("dotenv").config();
 
 const { createApp } = require("../presentation/app");
 const { createPostgresPool } = require("../infrastructure/database/postgres-pool");
-
+const { ServicesService } = require("../application/services/service/services-service");
+const {
+  PostgresPromotionRepository,
+} = require("../infrastructure/repositories/promotion/postgres-promotion-repository");
+const { PromotionsService } = require("../application/services/promotion/promotions-service");
 const {
   PostgresClientRepository,
 } = require("../infrastructure/repositories/client/postgres-client-repository");
@@ -13,6 +18,37 @@ const {
   PostgresReservationRequestRepository,
 } = require("../infrastructure/repositories/reservation-request/postgres-reservation-request-repository");
 const PostgresFolioGenerator = require("../infrastructure/services/reservation-request/postgres-folio-generator");
+const {
+  PostgresResourceRepository,
+} = require("../infrastructure/repositories/resource/postgres-resource-repository");
+const {
+  PostgresOperativeRoleRepository,
+} = require("../infrastructure/repositories/operative-role/postgres-operative-role-repository");
+const {
+  PostgresResourceAssignmentRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-assignment-repository");
+const {
+  PostgresResourceConfirmationRepository,
+} = require("../infrastructure/repositories/resource-assignment/postgres-resource-confirmation-repository");
+const {
+  PostgresTransactionManager,
+} = require("../infrastructure/services/transaction/postgres-transaction-manager");
+const {
+  ConfirmedResourceAdapter,
+} = require("../infrastructure/repositories/proposal/confirmed-resource-adapter");
+const {
+  PostgresDerivedInformationRepository,
+} = require("../infrastructure/repositories/proposal/postgres-derived-information-repository");
+const {
+  PostgresProposalRepository,
+} = require("../infrastructure/repositories/proposal/postgres-proposal-repository");
+const {
+  PostgresAuditLogRepository,
+} = require("../infrastructure/repositories/proposal/postgres-audit-log-repository");
+const { PdfkitPdfGenerator } = require("../infrastructure/services/proposal/pdfkit-pdf-generator");
+const {
+  PostgresEventClosureRepository,
+} = require("../infrastructure/repositories/event-closure/postgres-event-closure-repository");
 
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
@@ -81,6 +117,9 @@ function loadConfig() {
       resetPasswordUrl: process.env.RESET_PASSWORD_URL,
     },
     authCookie: { secure: process.env.NODE_ENV === "production" },
+    proposalStorage: {
+      storageDir: process.env.PROPOSAL_STORAGE_DIR || "storage/proposals",
+    },
   };
 }
 
@@ -93,6 +132,7 @@ const JwtTokenService = require("../infrastructure/security/jwt-token-service");
 const NodemailerEmailService = require("../infrastructure/email/nodemailer-email-service");
 
 // Authentication use cases
+const createUserManagementUseCases = require("./create-user-management-use-cases");
 const AuthenticateUser = require("../application/use-cases/auth/authenticate-user");
 const BlockService = require("../application/use-cases/auth/block-service");
 const ChangePassword = require("../application/use-cases/auth/change-password");
@@ -113,10 +153,132 @@ const {
 const {
   GetReservationRequestsUseCase,
 } = require("../application/use-cases/reservation-request/get-reservation-requests-use-case");
+const {
+  AssignReservationRequestUseCase,
+} = require("../application/use-cases/reservation-request/assign-reservation-request-use-case");
+const {
+  GetAvailableLogisticsUsersUseCase,
+} = require("../application/use-cases/reservation-request/get-available-logistics-users-use-case");
+
+// Calendar Use Cases (Función 3.3)
+const {
+  ScheduleEventUseCase,
+} = require("../application/use-cases/calendar/schedule-event-use-case");
+const { EditEventUseCase } = require("../application/use-cases/calendar/edit-event-use-case");
+const { CancelEventUseCase } = require("../application/use-cases/calendar/cancel-event-use-case");
+const {
+  ListCalendarEventsUseCase,
+} = require("../application/use-cases/calendar/list-calendar-events-use-case");
+const {
+  PostgresCalendarEventRepository,
+} = require("../infrastructure/repositories/calendar/postgres-calendar-event-repository");
+// Resources use cases (Funciones 2.8 a 2.10)
+const {
+  createResourceUseCases,
+} = require("../application/use-cases/resource/create-resource-use-cases");
+const {
+  createResourceAssignmentUseCases,
+} = require("../application/use-cases/resource-assignment/create-resource-assignment-use-cases");
+
+// Proposal use cases (Función 3.4)
+const {
+  GetRequestAgreementsUseCase,
+} = require("../application/use-cases/proposal/get-request-agreements-use-case");
+const {
+  SaveAgreementsUseCase,
+} = require("../application/use-cases/proposal/save-agreements-use-case");
+const {
+  GenerateProposalUseCase,
+} = require("../application/use-cases/proposal/generate-proposal-use-case");
+const { GetProposalUseCase } = require("../application/use-cases/proposal/get-proposal-use-case");
+const {
+  DownloadProposalUseCase,
+} = require("../application/use-cases/proposal/download-proposal-use-case");
+const { SendProposalUseCase } = require("../application/use-cases/proposal/send-proposal-use-case");
+
+// Funciones 2.4, 2.5 y 2.11: consultas de GET /api/admin/requests (DAD v3.0)
+const {
+  PostgresAdminRequestQueryRepository,
+} = require("../infrastructure/repositories/reservation-request/postgres-admin-request-query-repository");
+// Incremento 3 - Funciones 4.4 y 4.5: casos de uso de cliente y adaptadores.
+const {
+  GetClientRequestTrackingUseCase,
+} = require("../application/use-cases/client-proposal/get-client-request-tracking-use-case");
+const {
+  GetClientProposalDetailUseCase,
+} = require("../application/use-cases/client-proposal/get-client-proposal-detail-use-case");
+const {
+  AcceptProposalUseCase,
+} = require("../application/use-cases/client-proposal/accept-proposal-use-case");
+const {
+  RequestProposalAdjustmentsUseCase,
+} = require("../application/use-cases/client-proposal/request-proposal-adjustments-use-case");
+const {
+  RejectProposalUseCase,
+} = require("../application/use-cases/client-proposal/reject-proposal-use-case");
+const {
+  GetClientProposalPdfUseCase,
+} = require("../application/use-cases/client-proposal/get-client-proposal-pdf-use-case");
+const {
+  PostgresProposalAdjustmentRepository,
+} = require("../infrastructure/repositories/client-proposal/postgres-proposal-adjustment-repository");
+const {
+  PostgresProposalAcceptanceScheduler,
+} = require("../infrastructure/services/proposal/postgres-proposal-acceptance-scheduler");
+
+// Event closure use case (Función 3.6)
+const {
+  FinalizeEventUseCase,
+} = require("../application/use-cases/event-closure/finalize-event-use-case");
+
+// Incremento 4 - Funciones 2.15 y 4.1: reportes y contenido público.
+const {
+  PostgresReportRepository,
+} = require("../infrastructure/repositories/report/postgres-report-repository");
+const {
+  PostgresClientDirectoryRepository,
+} = require("../infrastructure/repositories/client/postgres-client-directory-repository");
+const {
+  PostgresGalleryRepository,
+} = require("../infrastructure/repositories/content/postgres-gallery-repository");
+const {
+  PostgresSocialLinkRepository,
+} = require("../infrastructure/repositories/content/postgres-social-link-repository");
+const { writeReportWorkbook } = require("../infrastructure/services/excel/excel-report-writer");
+const GenerateReportUseCase = require("../application/use-cases/reports/generate-report-use-case");
+const ExportReportUseCase = require("../application/use-cases/reports/export-report-use-case");
+const ListReportClientsUseCase = require("../application/use-cases/reports/list-report-clients-use-case");
 
 // Controllers
 const AuthController = require("../presentation/controller/auth/auth-controller");
 const PasswordResetController = require("../presentation/controller/password-reset/password-reset-controller");
+
+// Funciones 2.8 a 2.10 (recursos) y 3.2 (confirmación de recursos). Los datos de asignación y
+// confirmación se persisten en PostgreSQL con la migración assigned-resources.sql.
+function createResourceDependencies(pool, reservationRequestRepository, userRepository) {
+  const resourceRepository = new PostgresResourceRepository(pool);
+  const operativeRoleRepository = new PostgresOperativeRoleRepository(pool);
+  const assignmentRepository = new PostgresResourceAssignmentRepository(pool);
+  const resourceConfirmationRepository = new PostgresResourceConfirmationRepository(pool);
+
+  return {
+    resourceConfirmationRepository,
+    assignedResourceRepository: new ConfirmedResourceAdapter(
+      assignmentRepository,
+      resourceRepository
+    ),
+    ...createResourceUseCases(resourceRepository, operativeRoleRepository),
+    ...createResourceAssignmentUseCases(
+      resourceRepository,
+      reservationRequestRepository,
+      assignmentRepository,
+      resourceConfirmationRepository,
+      operativeRoleRepository,
+      userRepository,
+      new PostgresTransactionManager(pool)
+    ),
+  };
+}
 
 async function main() {
   const config = loadConfig();
@@ -166,7 +328,13 @@ async function main() {
 
   const clientRepository = new PostgresClientRepository(pool);
   const serviceRepository = new PostgresServiceRepository(pool);
+  // Función 2.6: gestión de servicios.
+  const servicesService = new ServicesService(serviceRepository);
+  // Función 2.7 (gestión) y 4.1 (catálogo público) comparten la misma instancia (AD-06).
+  const promotionRepository = new PostgresPromotionRepository(pool);
+  const promotionsService = new PromotionsService(promotionRepository);
   const reservationRequestRepository = new PostgresReservationRequestRepository(pool);
+  const adminRequestQueryRepository = new PostgresAdminRequestQueryRepository(pool);
   const folioGenerator = new PostgresFolioGenerator(pool);
   const upsertClientByEmailUseCase = new UpsertClientByEmailUseCase(clientRepository);
   const createReservationRequestUseCase = new CreateReservationRequestUseCase(
@@ -178,15 +346,144 @@ async function main() {
     reservationRequestRepository
   );
   const getReservationRequestUseCase = new GetReservationRequestUseCase(
-    reservationRequestRepository,
-    clientRepository,
-    serviceRepository
+    adminRequestQueryRepository
   );
   const getReservationRequestsUseCase = new GetReservationRequestsUseCase(
+    adminRequestQueryRepository
+  );
+  const assignReservationRequestUseCase = new AssignReservationRequestUseCase(
+    reservationRequestRepository,
+    userRepository
+  );
+
+  // Función 3.4 - Contacto con el cliente.
+  const resourceDependencies = createResourceDependencies(
+    pool,
+    reservationRequestRepository,
+    userRepository
+  );
+  const { assignedResourceRepository, resourceConfirmationRepository } = resourceDependencies;
+  const derivedInformationRepository = new PostgresDerivedInformationRepository(pool);
+  const proposalRepository = new PostgresProposalRepository(pool);
+  const auditLogRepository = new PostgresAuditLogRepository(pool);
+  const pdfGenerator = new PdfkitPdfGenerator(config.proposalStorage);
+
+  const getRequestAgreementsUseCase = new GetRequestAgreementsUseCase(
     reservationRequestRepository,
     clientRepository,
-    serviceRepository
+    assignedResourceRepository,
+    derivedInformationRepository,
+    resourceConfirmationRepository,
+    new PostgresTransactionManager(pool)
   );
+  const saveAgreementsUseCase = new SaveAgreementsUseCase(
+    reservationRequestRepository,
+    assignedResourceRepository,
+    derivedInformationRepository,
+    new PostgresTransactionManager(pool)
+  );
+  const generateProposalUseCase = new GenerateProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    assignedResourceRepository,
+    pdfGenerator,
+    new PostgresTransactionManager(pool),
+    promotionRepository
+  );
+  const getProposalUseCase = new GetProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository
+  );
+  const downloadProposalUseCase = new DownloadProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    pdfGenerator
+  );
+  const sendProposalUseCase = new SendProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    proposalRepository,
+    pdfGenerator,
+    emailService,
+    auditLogRepository
+  );
+
+  // Calendar (necesario para la aceptación de la propuesta, Función 4.4).
+  const calendarEventRepository = new PostgresCalendarEventRepository(pool);
+  const acceptanceScheduler = new PostgresProposalAcceptanceScheduler(calendarEventRepository);
+
+  // Incremento 3 - Funciones 4.4 y 4.5: seguimiento por folio y confirmación de evento.
+  const proposalAdjustmentRepository = new PostgresProposalAdjustmentRepository(pool);
+  const clientTransactionManager = new PostgresTransactionManager(pool);
+  const getClientRequestTrackingUseCase = new GetClientRequestTrackingUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository
+  );
+  const getClientProposalDetailUseCase = new GetClientProposalDetailUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    clientTransactionManager
+  );
+  const acceptProposalUseCase = new AcceptProposalUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    derivedInformationRepository,
+    proposalRepository,
+    pdfGenerator,
+    acceptanceScheduler,
+    clientTransactionManager
+  );
+  const requestProposalAdjustmentsUseCase = new RequestProposalAdjustmentsUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    proposalAdjustmentRepository,
+    clientTransactionManager
+  );
+  const rejectProposalUseCase = new RejectProposalUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    assignedResourceRepository,
+    clientTransactionManager
+  );
+  const getClientProposalPdfUseCase = new GetClientProposalPdfUseCase(
+    reservationRequestRepository,
+    proposalRepository,
+    pdfGenerator
+  );
+
+  const scheduleEventUseCase = new ScheduleEventUseCase(
+    reservationRequestRepository,
+    clientRepository,
+    calendarEventRepository
+  );
+  const editEventUseCase = new EditEventUseCase(calendarEventRepository);
+  const cancelEventUseCase = new CancelEventUseCase(calendarEventRepository);
+  const listCalendarEventsUseCase = new ListCalendarEventsUseCase(calendarEventRepository);
+
+  // Función 3.6 - Seguimiento y cierre del evento.
+  const finalizeEventUseCase = new FinalizeEventUseCase(
+    new PostgresEventClosureRepository(),
+    new PostgresTransactionManager(pool)
+  );
+
+  // Incremento 4 - Función 2.15 (reportes) y Función 4.1 (contenido público).
+  const reportRepository = new PostgresReportRepository(pool);
+  const generateReportUseCase = new GenerateReportUseCase(reportRepository);
+  const exportReportUseCase = new ExportReportUseCase(generateReportUseCase, reportRepository, {
+    write: writeReportWorkbook,
+  });
+  const listReportClientsUseCase = new ListReportClientsUseCase(
+    new PostgresClientDirectoryRepository(pool)
+  );
+  // promotionRepository y promotionsService ya se construyeron arriba (Función 2.7);
+  // ClientContentController (contratos 11 y 12) comparte esa misma instancia (AD-06).
+  const galleryRepository = new PostgresGalleryRepository(pool);
+  const socialLinkRepository = new PostgresSocialLinkRepository(pool);
 
   const app = createApp({
     // Authentication
@@ -195,6 +492,9 @@ async function main() {
     tokenService,
     clientRepository,
     serviceRepository,
+    servicesService,
+    promotionRepository,
+    promotionsService,
     reservationRequestRepository,
     folioGenerator,
     upsertClientByEmailUseCase,
@@ -202,6 +502,42 @@ async function main() {
     approveReservationRequestUseCase,
     getReservationRequestUseCase,
     getReservationRequestsUseCase,
+    assignReservationRequestUseCase,
+    getAvailableLogisticsUsersUseCase: new GetAvailableLogisticsUsersUseCase(userRepository),
+    // Calendar
+    scheduleEventUseCase,
+    editEventUseCase,
+    cancelEventUseCase,
+    listCalendarEventsUseCase,
+    // User management (Función 2.12)
+    ...createUserManagementUseCases({ pool, emailService }),
+    // Resources
+    ...resourceDependencies,
+    // Proposals (Función 3.4)
+    getRequestAgreementsUseCase,
+    saveAgreementsUseCase,
+    generateProposalUseCase,
+    getProposalUseCase,
+    downloadProposalUseCase,
+    sendProposalUseCase,
+    // Incremento 3 - Funciones 4.4 y 4.5
+    proposalRepository,
+    proposalAdjustmentRepository,
+    getClientRequestTrackingUseCase,
+    getClientProposalDetailUseCase,
+    acceptProposalUseCase,
+    requestProposalAdjustmentsUseCase,
+    rejectProposalUseCase,
+    getClientProposalPdfUseCase,
+    // Event closure (Función 3.6)
+    finalizeEventUseCase,
+    // Incremento 4 - Funciones 2.15 y 4.1
+    reportRepository,
+    generateReportUseCase,
+    exportReportUseCase,
+    listReportClientsUseCase,
+    galleryRepository,
+    socialLinkRepository,
   });
 
   app.listen(config.port, () => {

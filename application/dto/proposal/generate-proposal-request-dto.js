@@ -1,0 +1,68 @@
+const {
+  ProposalMessages,
+  ProposalFieldNames,
+  requiredFieldMessage,
+} = require("../../../domain/constants/proposal-messages");
+
+// Body de POST /api/logistics/requests/:id/proposals (contrato DAD).
+class GenerateProposalRequestDto {
+  constructor(data = {}) {
+    this.derivedInformationId = data.derived_information_id;
+    this.clientObservations = data.client_observations;
+    // Incremento 3 (RF-3.4.4.3): descuento opcional, por defecto 0.
+    this.discountAmount = data.discount_amount;
+    // Promoción vigente elegida: el descuento lo calcula el servidor, nunca el navegador.
+    this.promotionId = data.promotion_id;
+  }
+
+  validate() {
+    return Object.fromEntries(
+      Object.entries(this.fieldValidations()).filter(([, message]) => message !== undefined)
+    );
+  }
+
+  fieldValidations() {
+    return {
+      derived_information_id: this.validateDerivedInformationId(),
+      client_observations: this.validateClientObservations(),
+      promotion_id: this.validatePromotionId(),
+    };
+  }
+
+  validateDerivedInformationId() {
+    const id = Number(this.derivedInformationId);
+
+    if (
+      this.derivedInformationId === undefined ||
+      this.derivedInformationId === null ||
+      !Number.isInteger(id) ||
+      id < 1
+    ) {
+      return requiredFieldMessage(ProposalFieldNames.DERIVED_INFORMATION_ID);
+    }
+
+    return undefined;
+  }
+
+  validatePromotionId() {
+    if (this.promotionId === undefined || this.promotionId === null) return undefined;
+
+    return Number.isInteger(this.promotionId) && this.promotionId >= 1
+      ? undefined
+      : "La promoción seleccionada no es válida.";
+  }
+
+  validateClientObservations() {
+    if (
+      this.clientObservations !== undefined &&
+      this.clientObservations !== null &&
+      typeof this.clientObservations !== "string"
+    ) {
+      return ProposalMessages.CLIENT_OBSERVATIONS_INVALID;
+    }
+
+    return undefined;
+  }
+}
+
+module.exports = { GenerateProposalRequestDto };

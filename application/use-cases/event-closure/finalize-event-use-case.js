@@ -1,0 +1,141 @@
+const {
+  ReservationRequestStatus,
+} = require("../../../domain/enums/reservation-request/request-status");
+const {
+  EventClosureMessages,
+  EVENT_OBSERVATION_MAX_LENGTH,
+} = require("../../../domain/constants/event-closure-messages");
+const EventClosureValidationException = require("../../../domain/exceptions/event-closure/event-closure-validation-exception");
+const EventClosureConflictException = require("../../../domain/exceptions/event-closure/event-closure-conflict-exception");
+const EventClosureStateException = require("../../../domain/exceptions/event-closure/event-closure-state-exception");
+const EventClosureNotFoundException = require("../../../domain/exceptions/event-closure/event-closure-not-found-exception");
+const EventClosureAccessDeniedException = require("../../../domain/exceptions/event-closure/event-closure-access-denied-exception");
+const {
+  parseMeridaDateTime,
+  formatMeridaDate,
+} = require("../../services/event-closure/merida-time");
+const { isWithinClosureDay } = require("../../services/event-closure/closure-window");
+const {
+  FinalizeEventResponseDto,
+  FINALIZED_API_STATUS,
+} = require("../../dto/event-closure/finalize-event-response-dto");
+
+function isMissing(value) {
+  return value === undefined || value === null || value === "";
+}
+
+// Función 3.6 - Seguimiento y cierre del evento (RF-2.3.6.1 a RF-2.3.6.5): registra las horas
+// reales y las observaciones del evento y lo cierra ("Finalizado") en una sola operación.
+class FinalizeEventUseCase {
+  constructor(eventClosureRepository, transactionManager, clock = () => new Date()) {
+    this.eventClosureRepository = eventClosureRepository;
+    this.transactionManager = transactionManager;
+    this.clock = clock;
+  }
+
+  // dto: FinalizeEventRequestDto. userId: responsable de logística autenticado.
+  async execute(requestId, userId, dto) {
+    return this.transactionManager.run(async (transaction) => {
+      const now = this.clock();
+
+      // El bloqueo de la solicitud serializa dos finalizaciones simultáneas: la segunda ve
+      // el estado "Finalizado" y recibe 409 (RF-2.3.6.5).
+      const event = await this.eventClosureRepository.findForUpdate(requestId, transaction, now);
+
+      if (!event) {
+        throw new EventClosureNotFoundException(EventClosureMessages.REQUEST_NOT_FOUND);
+      }
+
+      // RF-2.3.6.1: solo el Personal de Logística asignado.
+      if (Number(event.logisticUserId) !== Number(userId)) {
+        throw new EventClosureAccessDeniedException(EventClosureMessages.FORBIDDEN);
+      }
+
+      const input = this.validateInput(dto, now);
+
+      this.validateState(event, now);
+
+      // El día real de inicio no puede ser anterior al programado; la hora sí (casos particulares).
+      if (formatMeridaDate(input.actualStartAt) < formatMeridaDate(event.scheduledStartAt)) {
+        throw new EventClosureValidationException(
+          EventClosureMessages.ACTUAL_START_BEFORE_SCHEDULED_DAY
+        );
+      }
+
+      const closure = {
+        requestId: event.requestId,
+        previousStatus: event.status,
+        newStatus: ReservationRequestStatus.FINALIZED,
+        actualStartAt: input.actualStartAt,
+        actualEndAt: input.actualEndAt,
+        eventObservation: input.eventObservation,
+        changedByUserId: userId,
+      };
+      const { statusChangedAt } = await this.eventClosureRepository.finalize(closure, transaction);
+
+      return new FinalizeEventResponseDto({ ...closure, statusChangedAt });
+    });
+  }
+
+  // Validaciones del cuerpo en el orden de los errores del contrato (DAD, Función 3.6).
+  validateInput(dto, now) {
+    if (isMissing(dto.actualStartAt) || isMissing(dto.actualEndAt)) {
+      throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIMES_REQUIRED);
+    }
+
+    const actualStartAt = parseMeridaDateTime(dto.actualStartAt);
+    const actualEndAt = parseMeridaDateTime(dto.actualEndAt);
+
+    if (!actualStartAt || !actualEndAt) {
+      throw new EventClosureValidationException(EventClosureMessages.INVALID_DATE_TIME_FORMAT);
+    }
+
+    // RF-2.3.6.3: la finalización es estrictamente posterior al inicio.
+    if (actualEndAt.getTime() <= actualStartAt.getTime()) {
+      throw new EventClosureValidationException(EventClosureMessages.END_BEFORE_START);
+    }
+
+    if (actualStartAt.getTime() > now.getTime() || actualEndAt.getTime() > now.getTime()) {
+      throw new EventClosureValidationException(EventClosureMessages.ACTUAL_TIME_IN_FUTURE);
+    }
+
+    const eventObservation = this.normalizeObservation(dto.eventObservation);
+
+    // RF-2.3.6.3: "Finalizar" es la única transición que admite este endpoint.
+    if (dto.status !== FINALIZED_API_STATUS) {
+      throw new EventClosureValidationException(EventClosureMessages.INVALID_STATUS);
+    }
+
+    return { actualStartAt, actualEndAt, eventObservation };
+  }
+
+  // RF-2.3.6.2: opcional, hasta 1000 caracteres; null o cadena vacía se guardan como null.
+  normalizeObservation(value) {
+    if (value === undefined || value === null) return null;
+
+    if (typeof value !== "string" || Array.from(value).length > EVENT_OBSERVATION_MAX_LENGTH) {
+      throw new EventClosureValidationException(EventClosureMessages.OBSERVATION_TOO_LONG);
+    }
+
+    return value.trim() === "" ? null : value;
+  }
+
+  validateState(event, now) {
+    // RF-2.3.6.5: un evento finalizado (manual o automáticamente) ya no se modifica.
+    if (event.status === ReservationRequestStatus.FINALIZED) {
+      throw new EventClosureStateException(EventClosureMessages.ALREADY_FINALIZED);
+    }
+
+    // RF-2.3.6.1 / Defecto 5: solo desde «Confirmado».
+    if (event.status !== ReservationRequestStatus.CONFIRMED) {
+      throw new EventClosureStateException(EventClosureMessages.NOT_CONFIRMED);
+    }
+
+    // RF-2.3.6.1: solo el día programado vigente, en hora de Mérida.
+    if (!isWithinClosureDay(event.scheduledStartAt, event.scheduledEndAt, now)) {
+      throw new EventClosureConflictException(EventClosureMessages.OUTSIDE_SCHEDULED_DAY);
+    }
+  }
+}
+
+module.exports = { FinalizeEventUseCase };

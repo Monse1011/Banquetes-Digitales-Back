@@ -5,6 +5,7 @@ const AccountBlockedException = require("../../../domain/exceptions/auth/account
 const InvalidPasswordException = require("../../../domain/exceptions/password-reset/invalid-password-exception");
 const { SecurityConstants, getAuthCookieOptions } = require("../../../domain/constants/security");
 const ErrorMessages = require("../../constants/error-messages");
+const UserStatus = require("../../../domain/enums/auth/user-status");
 
 class AuthController {
   constructor(authenticateUser, changePassword, userRepository = null, authCookieOptions = {}) {
@@ -52,6 +53,40 @@ class AuthController {
       console.error("Error al consultar primer acceso:", error);
       return res.status(500).json({ message: ErrorMessages.FIRST_ACCESS_CHECK_FAILED });
     }
+  };
+
+  session = async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      const user = await this.userRepository.findById(req.user.id_user);
+      if (!user || user.status !== UserStatus.ACTIVE || user.role !== req.user.role) {
+        return res
+          .status(401)
+          .json({ message: "La sesión ya no es válida. Inicia sesión nuevamente." });
+      }
+      return res.status(200).json({
+        user: {
+          id_user: user.id,
+          id_employee: user.employeeId,
+          full_name: user.fullName,
+          email: user.email,
+          role: user.role,
+        },
+        firstAccess: user.isFirstAccess(),
+      });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ message: "No fue posible comprobar la sesión. Intenta nuevamente." });
+    }
+  };
+
+  logout = (req, res) => {
+    res.clearCookie(
+      SecurityConstants.AUTH_COOKIE_NAME,
+      getAuthCookieOptions(this.authCookieOptions)
+    );
+    return res.status(204).end();
   };
 
   changePassword = async (req, res) => {

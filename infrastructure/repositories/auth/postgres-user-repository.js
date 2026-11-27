@@ -40,6 +40,35 @@ class PostgresUserRepository {
     return result.rows[0] ? this.toEntity(result.rows[0]) : null;
   }
 
+  // RF-1.2.4.10: población elegible para asignación (usuarios Activos por rol).
+  async findActiveByRole(role) {
+    const result = await this.pool.query(
+      `
+            SELECT id_user, id_employee, full_name, email, password_hash,
+                    role, status, creation_date, last_access
+            FROM users
+            WHERE role = $1 AND status = $2
+            ORDER BY full_name`,
+      [role, UserStatus.ACTIVE.toUpperCase()]
+    );
+    return result.rows.map((row) => this.toEntity(row));
+  }
+
+  async findByIds(ids) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const result = await this.pool.query(
+      `
+            SELECT id_user, id_employee, full_name, email, password_hash,
+                    role, status, creation_date, last_access
+            FROM users WHERE id_user = ANY($1::bigint[])`,
+      [ids]
+    );
+    return result.rows.map((row) => this.toEntity(row));
+  }
+
   async updateLastAccess(idUser) {
     await this.pool.query("UPDATE users SET last_access = NOW() WHERE id_user = $1", [idUser]);
   }
@@ -57,11 +86,10 @@ class PostgresUserRepository {
     const rawStatus = row.status ? String(row.status).toLowerCase() : "";
     const status = rawStatus === UserStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE;
 
-    const rawRole = row.role ? String(row.role).toLowerCase() : "";
-    const role = rawRole === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICA;
+    const role = row.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.LOGISTICS;
 
     return new User(
-      row.id_user,
+      Number(row.id_user),
       row.id_employee,
       row.full_name,
       row.email,

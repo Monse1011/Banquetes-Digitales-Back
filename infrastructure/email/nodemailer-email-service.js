@@ -1,5 +1,12 @@
 const nodemailer = require("nodemailer");
 
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 class NodemailerEmailService {
   constructor({ host, port, user, password, resetPasswordUrl } = {}) {
     this.user = user;
@@ -29,6 +36,46 @@ class NodemailerEmailService {
                 <p><a href="${resetUrl}">Restablecer contraseña</a></p>
                 <p>Este enlace tiene una vigencia de <strong>15 minutos</strong> y solo puede utilizarse una vez.</p>
                 <p>Si no solicitaste este cambio, puedes ignorar este correo.</p>
+                <p>Saludos,<br>Banquetes Elegancia</p>
+            `,
+    });
+  }
+
+  // RF-2.3.4.6: la propuesta se remite como adjunto al correo del cliente.
+  async sendProposalEmail(email, clientName, proposalCode, fileName, pdfBuffer) {
+    await this.transporter.sendMail({
+      from: `"Banquetes Elegancia" <${this.user}>`,
+      to: email,
+      subject: `Propuesta de evento ${proposalCode} - Banquetes Elegancia`,
+      html: `
+                <h2>Propuesta de evento</h2>
+                <p>Hola ${clientName},</p>
+                <p>Adjuntamos la propuesta <strong>${proposalCode}</strong> para tu evento.</p>
+                <p>Quedamos atentos a tu confirmación.</p>
+                <p>Saludos,<br>Banquetes Elegancia</p>
+            `,
+      attachments: [
+        {
+          filename: fileName,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  }
+
+  // RF-1.2.12.3: envía la contraseña temporal al correo del usuario recién registrado.
+  async sendCredentials({ to, fullName, tempPassword }) {
+    await this.transporter.sendMail({
+      from: `"Banquetes Elegancia" <${this.user}>`,
+      to,
+      subject: "Credenciales de acceso - Banquetes Elegancia",
+      html: `
+                <h2>Credenciales de acceso</h2>
+                <p>Hola ${escapeHtml(fullName)},</p>
+                <p>Se creó tu cuenta en Banquetes Digitales.</p>
+                <p>Tu contraseña temporal es: <strong>${escapeHtml(tempPassword)}</strong></p>
+                <p>Deberás cambiarla en tu primer inicio de sesión.</p>
                 <p>Saludos,<br>Banquetes Elegancia</p>
             `,
     });

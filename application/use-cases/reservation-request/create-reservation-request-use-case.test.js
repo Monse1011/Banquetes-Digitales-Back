@@ -11,6 +11,9 @@ const {
 } = require("../../../infrastructure/services/reservation-request/in-memory-folio-generator");
 const ReservationRequestValidationException = require("../../../domain/exceptions/reservation-request/reservation-request-validation-exception");
 
+// Más de 3 meses: cumple cualquier plazo de anticipación por temporada.
+const FAR_FUTURE_MS = 400 * 24 * 60 * 60 * 1000;
+
 describe("CreateReservationRequestUseCase", () => {
   let useCase;
 
@@ -32,7 +35,8 @@ describe("CreateReservationRequestUseCase", () => {
       client_full_name: "John Doe",
       email: "john@example.com",
       phone: "1234567890",
-      event_date_time: new Date().toISOString(),
+      event_date_time: new Date(Date.now() + FAR_FUTURE_MS + 60 * 60 * 1000).toISOString(),
+      event_end_time: new Date(Date.now() + FAR_FUTURE_MS + 3 * 60 * 60 * 1000).toISOString(),
       guest_count: 100,
       event_address: "123 Main St",
       services_ids: [1, 2],
@@ -49,6 +53,7 @@ describe("CreateReservationRequestUseCase", () => {
         email: "not-an-email",
         phone: "123",
         event_date_time: "2000-01-01T10:00:00.000Z",
+        event_end_time: "2000-01-01T12:00:00.000Z",
         guest_count: 0,
         event_address: "",
         services_ids: [],
@@ -74,6 +79,7 @@ describe("CreateReservationRequestUseCase", () => {
         email: "",
         phone: "",
         event_date_time: "",
+        event_end_time: "",
         guest_count: 0,
         event_address: "",
         services_ids: [],

@@ -40,13 +40,34 @@ PGPASSWORD=password
 PGDATABASE=banquetes_db
 JWT_SECRET=your-secret-key
 DATABASE_URL=postgresql://user:password@localhost:5432/banquetes_db
+PROPOSAL_STORAGE_DIR=storage/proposals
 ```
 
-4. Crear y ejecutar migraciones de base de datos:
+`PROPOSAL_STORAGE_DIR` es opcional e indica el directorio donde se guardan los PDF
+de las propuestas (Función 3.4); si no se define, se usa `storage/proposals`.
+
+4. Crear la base de datos con el esquema único `database/schema.sql` (no hay migraciones;
+   el script es idempotente y va envuelto en una transacción):
 
 ```bash
-psql -U postgres -d banquetes_db -f database.sql
+createdb -U postgres banquetes_db
+psql -U postgres -d banquetes_db -v ON_ERROR_STOP=1 -f database/schema.sql
 ```
+
+El esquema no trae datos. El catálogo `services` no tiene endpoint de alta: cárgalo aparte
+antes de recibir solicitudes.
+
+5. Pruebas de integración: usan un PostgreSQL desechable que carga `schema.sql` al crearse.
+   Agrega a `.env` `TEST_PGHOST=127.0.0.1`, `TEST_PGPORT=55432`, `TEST_PGUSER`,
+   `TEST_PGPASSWORD` y `TEST_PGDATABASE`, y luego:
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+npx vitest run
+```
+
+Sin `TEST_PGHOST` (por ejemplo en CI) las pruebas de base de datos se omiten. Para recrear
+la BD desde cero: `docker compose -f docker-compose.test.yml down -v`.
 
 ## Desarrollo
 
@@ -84,12 +105,12 @@ npm start
 
 ```
 ├── domain/                 # Entidades y lógica de dominio, sin dependencias de otras capas
-│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/
+│   ├── entities/          # auth/, client/, service/, reservation-request/, password-reset/, resource/, operative-role/
 │   ├── enums/             # Constantes y enumeradores del negocio, por feature
 │   ├── exceptions/        # Errores de dominio, por feature
 │   └── value-objects/     # Email, Password (validación de conceptos sin entidad propia)
 ├── application/           # Casos de uso que orquestan la lógica de dominio
-│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/
+│   ├── use-cases/        # auth/, password-reset/, client/, reservation-request/, resource/
 │   ├── dto/               # Entrada/salida de los casos de uso, por feature
 │   ├── ports/              # Contratos con el mundo exterior que no son repositorios (email, tokens)
 │   ├── repositories/       # Contratos de los repositorios, por feature
@@ -130,6 +151,47 @@ npm start
 - **GET** `/api/admin/requests` - Listar solicitudes
 - **GET** `/api/admin/requests/:id` - Consultar una solicitud
 - **PATCH** `/api/admin/requests/:id` - Aprobar una solicitud
+
+### Recursos (Administrador)
+
+- **GET** `/api/admin/resources` - Ver recursos de todos los tipos (`type`, `name`, `status`, `page`, `per_page`)
+
+Para cada tipo `human` (2.8), `material` (2.9) y `logistic` (2.10):
+
+- **GET** `/api/admin/resources/<tipo>` - Listar (`status`, `name`, `order`, `page`, `per_page`; en `human` también `operative_role_id`)
+- **POST** `/api/admin/resources/<tipo>` - Registrar (en `human`, `confirm_duplicate: true` confirma un posible duplicado)
+- **GET** `/api/admin/resources/<tipo>/:id` - Consultar el detalle
+- **PATCH** `/api/admin/resources/<tipo>/:id` - Editar
+- **PUT** `/api/admin/resources/<tipo>/:id` - Desactivar (baja lógica) o reactivar
+- **DELETE** `/api/admin/resources/logistic/:id` - Borrado suave (solo recursos logísticos)
+
+### Roles operativos (Administrador)
+
+- **GET** `/api/admin/resources/operative-roles` - Listar roles activos
+- **POST** `/api/admin/resources/operative-roles` - Crear rol (`data.name`; máximo 100 caracteres)
+- **GET** `/api/admin/resources/operative-roles/:id` - Consultar un rol
+- **PATCH** `/api/admin/resources/operative-roles/:id` - Editar el nombre
+- **DELETE** `/api/admin/resources/operative-roles/:id` - Desactivar (baja lógica; conserva asociaciones con recursos)
+
+### Logística
+
+El Personal de Logística responsable de la solicitud y el Administrador General (RF-2.3.2.21).
+
+- **GET** `/api/logistics/resources/<tipo>` - Listar recursos activos de cada tipo; con `request_id` agrega la cantidad disponible para el periodo del evento y lo registrado para la solicitud
+- **POST** `/api/logistics/requests/:id/resources` - Registrar recursos solicitados; los suficientes quedan asignados como provisionales (3.2)
+- **DELETE** `/api/logistics/requests/:id/resources/:resourceId` - Quitar un recurso registrado: libera su asignación provisional sin descartar los demás (3.2)
+- **POST** `/api/logistics/requests/:id/resources/confirm` - Finalizar confirmación (3.2)
+- **POST** `/api/logistics/requests/:id/resources/cancel` - Descartar las asignaciones provisionales (3.2)
+
+Las asignaciones, confirmaciones y observaciones pendientes de recursos (Función 3.2) se guardan en PostgreSQL mediante `PostgresResourceAssignmentRepository` y `PostgresResourceConfirmationRepository`. Las tablas (`assigned_resources`, `resource_confirmations` y `resource_confirmation_pending_observations`) están en `database/schema.sql`. La información persiste entre reinicios del servidor. Confirmar recursos guarda las asignaciones, el registro de confirmación, las observaciones pendientes y el estado de la solicitud en una sola transacción.
+
+## Fechas y horas
+
+Las fechas y horas que recibe la API deben llegar **con offset o `Z`** (por ejemplo
+`2030-05-01T18:00:00-06:00`). Si llegan sin zona, el servidor las interpreta con su zona local;
+esa interpretación no se modifica. Las reglas de horario (inicio posterior a "ahora", fin al día
+siguiente solo si `horaFin <= horaInicio`, máximo un día) se evalúan en hora de Mérida
+(`America/Merida`) en `application/services/calendar/event-window.js`.
 
 ## Documentación API
 

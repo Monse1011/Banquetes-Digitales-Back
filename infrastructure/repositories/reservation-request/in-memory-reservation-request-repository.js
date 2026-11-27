@@ -2,8 +2,61 @@ const {
   ReservationRequest,
 } = require("../../../domain/entities/reservation-request/reservation-request");
 const {
+  ReservationRequestStatus,
+  ActiveReservationRequestStatuses,
+  ReassignableReservationRequestStatuses,
+} = require("../../../domain/enums/reservation-request/request-status");
+const {
   ReservationRequestSortField,
 } = require("../../../domain/enums/reservation-request/reservation-request-sort-field");
+
+function matchesStatus(request, filters) {
+  if (filters.status) {
+    if (Array.isArray(filters.status)) {
+      return filters.status.some(
+        (candidate) => candidate.toUpperCase() === (request.status || "").toUpperCase()
+      );
+    }
+    return request.status?.toUpperCase() === filters.status.toUpperCase();
+  }
+  if (filters.statuses && Array.isArray(filters.statuses)) {
+    return filters.statuses.some(
+      (candidate) => candidate.toUpperCase() === (request.status || "").toUpperCase()
+    );
+  }
+  return true;
+}
+
+function matchesLogisticUser(request, filters) {
+  const logisticUserId = filters.logisticUserId ?? filters.logistic_user_id;
+  if (logisticUserId !== undefined && logisticUserId !== null) {
+    const requestLogisticId = request.logisticUserId ?? request.logistic_user_id;
+    return Number(requestLogisticId) === Number(logisticUserId);
+  }
+  return true;
+}
+
+function matchesEventDate(request, filters) {
+  if (filters.eventDate) {
+    return (
+      request.eventDateTime.toISOString().slice(0, 10) ===
+      filters.eventDate.toISOString().slice(0, 10)
+    );
+  }
+  return true;
+}
+
+function matchesClientName(request, filters) {
+  if (filters.clientName) {
+    const name = request.clientName || request.client_name || "";
+    return name.toLowerCase().includes(filters.clientName.toLowerCase());
+  }
+  return true;
+}
+
+function getClientField(request, key, alias) {
+  return request[key] || request[alias] || null;
+}
 
 class InMemoryReservationRequestRepository {
   constructor() {
@@ -12,18 +65,33 @@ class InMemoryReservationRequestRepository {
   }
 
   async create(request) {
+    const id = request.requestId || request.id || this.nextId++;
+    const clientName = getClientField(request, "clientName", "client_name");
+    const clientEmail = getClientField(request, "clientEmail", "client_email");
+    const clientPhone = getClientField(request, "clientPhone", "client_phone");
+
     const createdRequest = new ReservationRequest(
-      this.nextId++,
+      id,
       request.folio,
       request.clientId,
       request.userId,
       request.eventDateTime,
+      request.eventEndTime,
       request.guestCount,
       request.eventAddress,
       request.status,
       request.requestDate,
-      request.servicesIds
+      request.servicesIds,
+      request.logisticUserId,
+      request.assignedByUserId,
+      request.assignedAt,
+      clientName,
+      clientEmail,
+      clientPhone
     );
+
+    createdRequest.services = request.services || [];
+    createdRequest.selected_services = request.selected_services || [];
 
     this.requests.push(createdRequest);
     return createdRequest;
@@ -31,6 +99,54 @@ class InMemoryReservationRequestRepository {
 
   async findById(id) {
     return this.requests.find((request) => request.requestId === id) ?? null;
+  }
+
+  // Función 4.5: consulta por folio (único medio de acceso del cliente).
+  async findByFolio(folio) {
+    return this.requests.find((request) => request.folio === folio) ?? null;
+  }
+
+  // Incremento 3 (RF-3.4.4.x): cambio de estado atómico con historial y status_changed_at.
+  // Devuelve null si el estado actual ya no coincide con el esperado (concurrencia).
+  async changeStatusAtomic(
+    requestId,
+    { fromStatus, toStatus, changedByUserId = null, changedAt = new Date(), transaction = null }
+  ) {
+    const request = this.requests.find((candidate) => candidate.requestId === requestId);
+
+    if (!request || request.status !== fromStatus) {
+      return null;
+    }
+
+    const previousStatus = request.status;
+    const previousChangedAt = request.statusChangedAt;
+
+    request.status = toStatus;
+    request.statusChangedAt = changedAt;
+    request.status_changed_at = changedAt;
+    this.history = this.history || [];
+    const historyEntry = {
+      requestId,
+      previousStatus: fromStatus,
+      newStatus: toStatus,
+      changedByUserId,
+      changedAt,
+    };
+    this.history.push(historyEntry);
+
+    transaction?.afterRollback(() => {
+      request.status = previousStatus;
+      request.statusChangedAt = previousChangedAt;
+      request.status_changed_at = previousChangedAt;
+      const index = this.history.indexOf(historyEntry);
+      if (index !== -1) this.history.splice(index, 1);
+    });
+
+    return request;
+  }
+
+  async findHistoryByRequestId(requestId) {
+    return (this.history || []).filter((entry) => entry.requestId === requestId);
   }
 
   async update(request) {
@@ -46,29 +162,96 @@ class InMemoryReservationRequestRepository {
     return request;
   }
 
-  async findAll(filters, sort, page, perPage) {
-    const filteredRequests = this.requests.filter((request) => {
-      if (filters.status && request.status !== filters.status) {
-        return false;
+  // RF-1.2.4.3 / RF-1.2.4.4 / RF-1.2.4.7: valida estado, responsable actual esperado
+  // y traslape, y registra la (re)asignación en una sola operación atómica
+  // (ejecución single-thread).
+  async assign(requestId, logisticUserId, assignedByUserId, currentLogisticUserId = null) {
+    const request = await this.findById(requestId);
+
+    if (!request) {
+      return { status: "not_found" };
+    }
+
+    if (!ReassignableReservationRequestStatuses.includes(request.status)) {
+      return { status: "not_reassignable" };
+    }
+
+    if (currentLogisticUserId !== null && request.logisticUserId !== currentLogisticUserId) {
+      return { status: "assignment_conflict" };
+    }
+
+    const overlapping = this.requests.filter(
+      (existingRequest) =>
+        existingRequest.requestId !== requestId &&
+        existingRequest.logisticUserId === logisticUserId &&
+        ActiveReservationRequestStatuses.includes(existingRequest.status) &&
+        existingRequest.eventDateTime < request.eventEndTime &&
+        existingRequest.eventEndTime > request.eventDateTime
+    );
+
+    if (overlapping.length > 0) {
+      return {
+        status: "overlap",
+        conflicts: overlapping.map((conflict) => ({
+          folio: conflict.folio,
+          startDateTime: conflict.eventDateTime,
+          endDateTime: conflict.eventEndTime,
+        })),
+      };
+    }
+
+    request.status = ReservationRequestStatus.ASSIGNED;
+    request.logisticUserId = logisticUserId;
+    request.assignedByUserId = assignedByUserId;
+    request.assignedAt = new Date();
+
+    return { status: "assigned", request };
+  }
+
+  // Función 3.4 (RF-2.3.4.10): traslapes de agenda del responsable al cambiar el
+  // horario confirmado de una solicitud.
+  async findOverlappingByLogisticUser(logisticUserId, excludeRequestId, start, end) {
+    return this.requests
+      .filter(
+        (request) =>
+          request.requestId !== excludeRequestId &&
+          request.logisticUserId === logisticUserId &&
+          ActiveReservationRequestStatuses.includes(request.status) &&
+          request.eventDateTime < end &&
+          request.eventEndTime > start
+      )
+      .map((request) => ({
+        folio: request.folio,
+        startDateTime: request.eventDateTime,
+        endDateTime: request.eventEndTime,
+      }));
+  }
+
+  async findAll(filters = {}, sort = null, page = 1, perPage = 10) {
+    const filteredRequests = this.requests.filter(
+      (request) =>
+        matchesStatus(request, filters) &&
+        matchesLogisticUser(request, filters) &&
+        matchesEventDate(request, filters) &&
+        matchesClientName(request, filters)
+    );
+
+    const sortField = sort?.field ?? ReservationRequestSortField.EVENT_DATE;
+    const sortDirection = sort?.direction ?? "asc";
+
+    const sortedRequests = [...filteredRequests].sort((requestA, requestB) => {
+      const valueA = this.getSortValue(requestA, sortField);
+      const valueB = this.getSortValue(requestB, sortField);
+      let comparison = 0;
+      if (valueA < valueB) comparison = -1;
+      else if (valueA > valueB) comparison = 1;
+      else {
+        const folioA = requestA.folio || "";
+        const folioB = requestB.folio || "";
+        comparison = folioA.localeCompare(folioB);
       }
 
-      if (
-        filters.eventDate &&
-        request.eventDateTime.toISOString().slice(0, 10) !==
-          filters.eventDate.toISOString().slice(0, 10)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const sortedRequests = [...filteredRequests].sort((left, right) => {
-      const leftValue = this.getSortValue(left, sort.field);
-      const rightValue = this.getSortValue(right, sort.field);
-      const comparison = leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
-
-      return sort.direction === "asc" ? comparison : -comparison;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
     const start = (page - 1) * perPage;
@@ -80,14 +263,15 @@ class InMemoryReservationRequestRepository {
   }
 
   getSortValue(request, field) {
-    switch (field) {
-      case ReservationRequestSortField.EVENT_DATE:
-        return request.eventDateTime.getTime();
-      case ReservationRequestSortField.STATUS:
-        return request.status;
-      case ReservationRequestSortField.CLIENT_NAME:
-        return request.clientId;
+    if (field === ReservationRequestSortField.STATUS) {
+      return request.status || "";
     }
+    if (field === ReservationRequestSortField.CLIENT_NAME) {
+      return request.clientName || request.client_name || request.clientId || "";
+    }
+    return request.eventDateTime instanceof Date
+      ? request.eventDateTime.getTime()
+      : new Date(request.eventDateTime || 0).getTime();
   }
 }
 
